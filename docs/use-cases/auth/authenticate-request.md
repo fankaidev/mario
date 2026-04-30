@@ -18,12 +18,12 @@
 
 | ID | Priority | Status | Scenario | Rules |
 |----|----------|--------|----------|-------|
-| UC-AUTH-002-S01 | P0 | ❌ | Given request has valid `CF-Access-Authenticated-User-Email: user@example.com` header, When calling any authenticated endpoint, Then request succeeds with user@example.com as current user | R1 |
-| UC-AUTH-002-S02 | P0 | ❌ | Given request has valid `Authorization: Bearer <token>`, When calling any authenticated endpoint, Then request succeeds with token owner as current user | R2 |
-| UC-AUTH-002-S03 | P0 | ❌ | Given request has both CF header and Bearer token (different users), When calling any authenticated endpoint, Then use CF header user | R3 |
-| UC-AUTH-002-S04 | P0 | ❌ | Given request has neither CF header nor Bearer token, When calling any authenticated endpoint, Then return 401 unauthorized |
-| UC-AUTH-002-S05 | P0 | ❌ | Given request has invalid Bearer token, When calling any authenticated endpoint, Then return 401 unauthorized |
-| UC-AUTH-002-S06 | P1 | ❌ | Given new user@example.com authenticates for first time, When request completes, Then user record created in users table | R4 |
+| UC-AUTH-002-S01 | P0 | ✅ | Given request has valid `CF-Access-Authenticated-User-Email: user@example.com` header, When calling any authenticated endpoint, Then request succeeds with user@example.com as current user | R1 |
+| UC-AUTH-002-S02 | P0 | ✅ | Given request has valid `Authorization: Bearer <token>`, When calling any authenticated endpoint, Then request succeeds with token owner as current user | R2 |
+| UC-AUTH-002-S03 | P0 | ✅ | Given request has both CF header and Bearer token (different users), When calling any authenticated endpoint, Then use CF header user | R3 |
+| UC-AUTH-002-S04 | P0 | ✅ | Given request has neither CF header nor Bearer token, When calling any authenticated endpoint, Then return 401 unauthorized |
+| UC-AUTH-002-S05 | P0 | ✅ | Given request has invalid Bearer token, When calling any authenticated endpoint, Then return 401 unauthorized |
+| UC-AUTH-002-S06 | P1 | ✅ | Given new user@example.com authenticates for first time, When request completes, Then user record created in users table | R4 |
 
 ### ai-e2e
 (none)
