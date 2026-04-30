@@ -21,10 +21,10 @@
 
 | ID | Priority | Status | Scenario | Rules |
 |----|----------|--------|----------|-------|
-| UC-PORTFOLIO-003-S01 | P0 | ❌ | Given portfolio "US Stocks" has AAPL (lot1: remaining 20 @ 150, lot2: remaining 50 @ 160), and prices table shows AAPL latest price 180, When viewing holdings, Then return AAPL holding quantity 70, cost 11000 USD, market value 12600 USD, unrealized P&L 1600 USD, P&L rate 14.55% | R1, R2, R3, R4, R5, R6 |
-| UC-PORTFOLIO-003-S02 | P0 | ❌ | Given all lots in portfolio are closed, When viewing holdings, Then return empty holdings list |
-| UC-PORTFOLIO-003-S03 | P1 | ❌ | Given portfolio has holdings but prices table has no latest price for that stock, When viewing holdings, Then that stock's market value and P&L show as null |
-| UC-PORTFOLIO-003-S04 | P1 | ❌ | Given holdings list contains AAPL (P&L rate +14%), TSLA (P&L rate -5%), NVDA (P&L rate +8%), When viewing by unrealizedPnlRate descending, Then order is AAPL, NVDA, TSLA | R8 |
+| UC-PORTFOLIO-003-S01 | P0 | ✅ | Given portfolio "US Stocks" has AAPL (lot1: remaining 20 @ 150, lot2: remaining 50 @ 160), and prices table shows AAPL latest price 180, When viewing holdings, Then return AAPL holding quantity 70, cost 11000 USD, market value 12600 USD, unrealized P&L 1600 USD, P&L rate 14.55% | R1, R2, R3, R4, R5, R6 |
+| UC-PORTFOLIO-003-S02 | P0 | ✅ | Given all lots in portfolio are closed, When viewing holdings, Then return empty holdings list |
+| UC-PORTFOLIO-003-S03 | P1 | ✅ | Given portfolio has holdings but prices table has no latest price for that stock, When viewing holdings, Then that stock's market value and P&L show as null |
+| UC-PORTFOLIO-003-S04 | P1 | ✅ | Given holdings list contains AAPL (P&L rate +14%), TSLA (P&L rate -5%), NVDA (P&L rate +8%), When viewing by unrealizedPnlRate descending, Then order is AAPL, NVDA, TSLA | R8 |
 | UC-PORTFOLIO-003-S05 | P1 | ❌ | Given holdings list contains multiple stocks, When viewing by symbol ascending, Then arranged alphabetically A-Z | R7 |
 | UC-PORTFOLIO-003-S06 | P1 | ❌ | Given holdings list contains multiple stocks, When viewing by marketValue descending, Then arranged by market value high to low | R7 |
 | UC-PORTFOLIO-003-S07 | P1 | ❌ | Given user is not logged in, When viewing holdings, Then return 401 unauthorized |
