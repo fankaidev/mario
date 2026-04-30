@@ -16,7 +16,7 @@ export interface CreatePortfolioRequest {
   currency: "USD" | "HKD" | "CNY";
 }
 
-export type TransactionType = "buy" | "sell" | "dividend";
+export type TransactionType = "buy" | "sell" | "dividend" | "initial";
 
 export interface Transaction {
   id: number;

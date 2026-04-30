@@ -160,7 +160,7 @@ portfolios.get("/:id/summary", async (c) => {
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
 
   const buyRow = await c.env.DB.prepare(
-    "SELECT SUM(quantity * price + fee) AS total FROM transactions WHERE portfolio_id = ? AND type = 'buy'",
+    "SELECT SUM(quantity * price + fee) AS total FROM transactions WHERE portfolio_id = ? AND type IN ('buy', 'initial')",
   )
     .bind(portfolioId)
     .first<{ total: number | null }>();
@@ -196,7 +196,7 @@ portfolios.get("/:id/summary", async (c) => {
     .first<{ total: number | null }>();
 
   const feeRow = await c.env.DB.prepare(
-    "SELECT SUM(CASE WHEN type = 'buy' THEN fee ELSE 0 END) AS buy_fees, SUM(CASE WHEN type = 'sell' THEN fee ELSE 0 END) AS sell_fees, SUM(CASE WHEN type = 'dividend' THEN fee ELSE 0 END) AS withholding_tax FROM transactions WHERE portfolio_id = ?",
+    "SELECT SUM(CASE WHEN type IN ('buy', 'initial') THEN fee ELSE 0 END) AS buy_fees, SUM(CASE WHEN type = 'sell' THEN fee ELSE 0 END) AS sell_fees, SUM(CASE WHEN type = 'dividend' THEN fee ELSE 0 END) AS withholding_tax FROM transactions WHERE portfolio_id = ?",
   )
     .bind(portfolioId)
     .first<{ buy_fees: number | null; sell_fees: number | null; withholding_tax: number | null }>();

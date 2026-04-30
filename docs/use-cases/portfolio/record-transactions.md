@@ -12,7 +12,8 @@
 | R4 | Dividend transaction does not consume lots, only records as cash income |
 | R5 | Multiple buys of the same stock within a portfolio maintain independent lots |
 | R6 | Transaction date cannot be later than current date |
-| R7 | `fee` field meaning varies by transaction type: buy=commission, sell=commission, dividend=withholding tax |
+| R7 | `fee` field meaning varies by transaction type: buy=commission, sell=commission, dividend=withholding tax, initial=commission |
+| R8 | Initial transaction creates a lot just like buy, recording quantity and cost basis for pre-existing holdings |
 
 ## Scenarios
 
@@ -28,6 +29,7 @@
 | UC-PORTFOLIO-002-S06 | P0 | ✅ | Given portfolio exists, When recording AAPL dividend 100 USD (withholding tax 30), Then create dividend transaction (fee=30), lots unaffected, net dividend income 70 USD | R4, R7 |
 | UC-PORTFOLIO-002-S07 | P1 | ❌ | Given user is not logged in, When recording transaction, Then return 401 unauthorized |
 | UC-PORTFOLIO-002-S08 | P1 | ❌ | Given portfolio belongs to another user, When attempting to record transaction in that portfolio, Then return 403 forbidden |
+| UC-PORTFOLIO-002-S09 | P0 | ✅ | Given portfolio exists with no holdings, When recording initial holding of 800 shares 1810.HK @ 40 HKD, Then create 1 transaction and 1 lot (remaining quantity 800, cost basis 32000 + fee), holdings show 800 shares | R8 |
 
 ### ai-e2e
 (none)

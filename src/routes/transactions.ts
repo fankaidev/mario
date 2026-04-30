@@ -23,7 +23,7 @@ function parseBody(body: unknown): CreateTransactionRequest {
     throw { status: 400, message: "Symbol is required" };
   }
 
-  if (type !== "buy" && type !== "sell" && type !== "dividend") {
+  if (type !== "buy" && type !== "sell" && type !== "dividend" && type !== "initial") {
     throw { status: 400, message: "Invalid transaction type" };
   }
 
@@ -94,7 +94,7 @@ transactions.post("/", async (c) => {
     return c.json({ error: err.message }, err.status as 400);
   }
 
-  if (body.type === "buy") {
+  if (body.type === "buy" || body.type === "initial") {
     return handleBuy(c, portfolioId, body);
   }
   if (body.type === "sell") {
@@ -161,7 +161,7 @@ transactions.delete("/:txId", async (c) => {
     return c.json({ error: "Transaction not found" }, 404);
   }
 
-  if (tx.type === "buy") {
+  if (tx.type === "buy" || tx.type === "initial") {
     await c.env.DB.batch([
       c.env.DB.prepare("DELETE FROM lots WHERE transaction_id = ?").bind(txId),
       c.env.DB.prepare("DELETE FROM transactions WHERE id = ?").bind(txId),
