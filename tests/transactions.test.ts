@@ -237,3 +237,29 @@ describe("Sell Transaction", () => {
     expect(pnl.results[0].pnl).toBe(400);
   });
 });
+
+describe("Dividend Transaction", () => {
+  function divPayload(symbol: string, amount: number, withholdingTax: number, date: string) {
+    return { symbol, type: "dividend", quantity: 0, price: amount, fee: withholdingTax, date };
+  }
+
+  it("[UC-PORTFOLIO-002-S06] creates dividend transaction without affecting lots", async () => {
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(divPayload("AAPL", 100, 30, "2024-04-01")),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      data: { symbol: string; type: string; price: number; fee: number; quantity: number };
+    };
+    expect(body.data.symbol).toBe("AAPL");
+    expect(body.data.type).toBe("dividend");
+    expect(body.data.price).toBe(100);
+    expect(body.data.fee).toBe(30);
+    expect(body.data.quantity).toBe(0);
+
+    const lots = await db.prepare("SELECT id FROM lots").all();
+    expect(lots.results).toHaveLength(0);
+  });
+});

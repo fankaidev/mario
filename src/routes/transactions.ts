@@ -26,16 +26,8 @@ function parseBody(body: unknown): CreateTransactionRequest {
     throw { status: 400, message: "Symbol is required" };
   }
 
-  if (type !== "buy" && type !== "sell") {
+  if (type !== "buy" && type !== "sell" && type !== "dividend") {
     throw { status: 400, message: "Invalid transaction type" };
-  }
-
-  if (typeof quantity !== "number" || quantity <= 0) {
-    throw { status: 400, message: "Quantity must be greater than 0" };
-  }
-
-  if (typeof price !== "number" || price < 0) {
-    throw { status: 400, message: "Price must be 0 or greater" };
   }
 
   const parsedFee = ((): number => {
@@ -53,6 +45,21 @@ function parseBody(body: unknown): CreateTransactionRequest {
   }
   if (new Date(date) > new Date()) {
     throw { status: 400, message: "Date cannot be in the future" };
+  }
+
+  if (type === "dividend") {
+    if (typeof price !== "number" || price < 0) {
+      throw { status: 400, message: "Price must be 0 or greater" };
+    }
+    return { symbol: symbol.trim(), type, quantity: 0, price, fee: parsedFee, date };
+  }
+
+  if (typeof quantity !== "number" || quantity <= 0) {
+    throw { status: 400, message: "Quantity must be greater than 0" };
+  }
+
+  if (typeof price !== "number" || price < 0) {
+    throw { status: 400, message: "Price must be 0 or greater" };
   }
 
   return { symbol: symbol.trim(), type, quantity, price, fee: parsedFee, date };
@@ -93,7 +100,10 @@ transactions.post("/", async (c) => {
   if (body.type === "buy") {
     return handleBuy(c, portfolioId, body);
   }
-  return handleSell(c, portfolioId, body);
+  if (body.type === "sell") {
+    return handleSell(c, portfolioId, body);
+  }
+  return handleDividend(c, portfolioId, body);
 });
 
 async function handleBuy(
@@ -182,6 +192,26 @@ async function handleSell(
     "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE id = ?",
   )
     .bind(txId)
+    .first<Transaction>();
+
+  return c.json({ data: transaction }, 201);
+}
+
+async function handleDividend(
+  c: { env: { DB: D1Database }; json: (obj: unknown, status: number) => Response },
+  portfolioId: number,
+  body: CreateTransactionRequest,
+) {
+  const txResult = await c.env.DB.prepare(
+    "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  )
+    .bind(portfolioId, body.symbol, body.type, body.quantity, body.price, body.fee, body.date)
+    .run();
+
+  const transaction = await c.env.DB.prepare(
+    "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE id = ?",
+  )
+    .bind(txResult.meta.last_row_id)
     .first<Transaction>();
 
   return c.json({ data: transaction }, 201);
