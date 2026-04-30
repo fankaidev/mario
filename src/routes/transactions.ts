@@ -117,10 +117,21 @@ transactions.get("/", async (c) => {
     return c.json({ error: "Portfolio not found" }, 404);
   }
 
-  const rows = await c.env.DB.prepare(
-    "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ? ORDER BY date DESC, created_at DESC",
-  )
-    .bind(portfolioId)
+  const symbol = c.req.query("symbol")?.trim().toUpperCase();
+
+  let query =
+    "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ?";
+  const params: (number | string)[] = [portfolioId];
+
+  if (symbol) {
+    query += " AND symbol = ?";
+    params.push(symbol);
+  }
+
+  query += " ORDER BY date DESC, created_at DESC";
+
+  const rows = await c.env.DB.prepare(query)
+    .bind(...params)
     .all<Transaction>();
 
   return c.json({ data: rows.results });

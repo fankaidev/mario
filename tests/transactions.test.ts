@@ -373,4 +373,42 @@ describe("Transaction History", () => {
     const body = await getTransactions();
     expect(body.data).toHaveLength(0);
   });
+
+  it("[UC-PORTFOLIO-004-S07] filters transactions by symbol query parameter", async () => {
+    await makeBuy("AAPL", 100, 150, "2024-01-15");
+    await makeBuy("TSLA", 50, 200, "2024-02-01");
+
+    const sellRes = await worker.fetch(
+      `http://localhost/api/portfolios/${portfolioId}/transactions`,
+      {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(sellPayload("AAPL", 30, 170, "2024-03-01")),
+      },
+    );
+    expect(sellRes.status).toBe(201);
+
+    const res = await worker.fetch(
+      `http://localhost/api/portfolios/${portfolioId}/transactions?symbol=AAPL`,
+      { headers: authHeaders() },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: Array<{ symbol: string; date: string }> };
+    expect(body.data).toHaveLength(2);
+    expect(body.data.every((tx) => tx.symbol === "AAPL")).toBe(true);
+    expect(body.data[0].date).toBe("2024-03-01");
+    expect(body.data[1].date).toBe("2024-01-15");
+  });
+
+  it("returns empty array when symbol filter matches nothing", async () => {
+    await makeBuy("AAPL", 100, 150, "2024-01-15");
+
+    const res = await worker.fetch(
+      `http://localhost/api/portfolios/${portfolioId}/transactions?symbol=UNKNOWN`,
+      { headers: authHeaders() },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: unknown[] };
+    expect(body.data).toHaveLength(0);
+  });
 });

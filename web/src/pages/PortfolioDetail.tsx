@@ -40,6 +40,7 @@ interface Summary {
 export function PortfolioDetail() {
   const { id } = useParams<{ id: string }>();
   const [tab, setTab] = useState<"holdings" | "transactions" | "summary">("holdings");
+  const [symbolFilter, setSymbolFilter] = useState("");
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -60,14 +61,34 @@ export function PortfolioDetail() {
         ))}
       </div>
 
-      {tab === "holdings" && <HoldingsTab id={id!} />}
-      {tab === "transactions" && <TransactionsTab id={id!} />}
+      {tab === "holdings" && (
+        <HoldingsTab
+          id={id!}
+          onSelectSymbol={(s) => {
+            setSymbolFilter(s);
+            setTab("transactions");
+          }}
+        />
+      )}
+      {tab === "transactions" && (
+        <TransactionsTab
+          id={id!}
+          symbolFilter={symbolFilter}
+          onSymbolFilterChange={setSymbolFilter}
+        />
+      )}
       {tab === "summary" && <SummaryTab id={id!} />}
     </div>
   );
 }
 
-function HoldingsTab({ id }: { id: string }) {
+function HoldingsTab({
+  id,
+  onSelectSymbol,
+}: {
+  id: string;
+  onSelectSymbol: (symbol: string) => void;
+}) {
   const [sort, setSort] = useState("unrealizedPnlRate");
 
   const { data, isLoading } = useQuery({
@@ -94,7 +115,14 @@ function HoldingsTab({ id }: { id: string }) {
           <tbody>
             {data?.data.map((h) => (
               <tr key={h.symbol} className="border-b">
-                <td className="py-2 font-medium">{h.symbol}</td>
+                <td className="py-2">
+                  <button
+                    className="font-medium text-blue-600 hover:underline cursor-pointer"
+                    onClick={() => onSelectSymbol(h.symbol)}
+                  >
+                    {h.symbol}
+                  </button>
+                </td>
                 <td className="py-2">{h.quantity}</td>
                 <td className="py-2">{h.cost.toLocaleString()}</td>
                 <td className="py-2">{h.market_value?.toLocaleString() ?? "-"}</td>
@@ -142,14 +170,24 @@ function Th({
   );
 }
 
-function TransactionsTab({ id }: { id: string }) {
+function TransactionsTab({
+  id,
+  symbolFilter,
+  onSymbolFilterChange,
+}: {
+  id: string;
+  symbolFilter: string;
+  onSymbolFilterChange: (filter: string) => void;
+}) {
   const queryClient = useQueryClient();
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [showAdd, setShowAdd] = useState(false);
 
+  const queryString = symbolFilter ? `?symbol=${encodeURIComponent(symbolFilter)}` : "";
+
   const { data, isLoading } = useQuery({
-    queryKey: ["transactions", id],
-    queryFn: () => get<{ data: Transaction[] }>(`/portfolios/${id}/transactions`),
+    queryKey: ["transactions", id, symbolFilter],
+    queryFn: () => get<{ data: Transaction[] }>(`/portfolios/${id}/transactions${queryString}`),
   });
 
   const deleteMutation = useMutation({
@@ -172,6 +210,16 @@ function TransactionsTab({ id }: { id: string }) {
         >
           Add Transaction
         </button>
+      </div>
+
+      <div className="mb-4">
+        <input
+          type="text"
+          value={symbolFilter}
+          onChange={(e) => onSymbolFilterChange(e.target.value.toUpperCase())}
+          placeholder="Filter by symbol"
+          className="w-full max-w-xs border rounded px-3 py-2 text-sm"
+        />
       </div>
 
       <div className="space-y-1">
