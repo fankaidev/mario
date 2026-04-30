@@ -48,7 +48,7 @@ async function seedBuy(symbol: string, quantity: number, price: number, fee: num
     .prepare(
       "INSERT INTO lots (transaction_id, portfolio_id, symbol, quantity, remaining_quantity, cost_basis) VALUES (?, ?, ?, ?, ?, ?)",
     )
-    .bind(txRes.meta.last_row_id, portfolioId, symbol, quantity, quantity, quantity * price)
+    .bind(txRes.meta.last_row_id, portfolioId, symbol, quantity, quantity, quantity * price + fee)
     .run();
 }
 
@@ -71,7 +71,8 @@ async function seedSell(
     .bind(lotId)
     .first<{ quantity: number; cost_basis: number }>();
   const cost = (lot!.cost_basis / lot!.quantity) * consumed;
-  const pnl = price * consumed - cost;
+  const proceeds = price * consumed - fee * (consumed / quantity);
+  const pnl = proceeds - cost;
   await db
     .prepare(
       "INSERT INTO realized_pnl (sell_transaction_id, lot_id, quantity, proceeds, cost, pnl) VALUES (?, ?, ?, ?, ?, ?)",
@@ -118,9 +119,9 @@ describe("Portfolio Summary", () => {
     const { data } = await getSummary();
     expect(data.total_investment).toBe(15005 + 5003);
     expect(data.total_market_value).toBe(18000 + 4500);
-    expect(data.unrealized_pnl).toBeCloseTo(2500, 0);
+    expect(data.unrealized_pnl).toBeCloseTo(2492, 0);
     expect(data.realized_pnl).toBe(0);
-    expect(data.total_pnl).toBeCloseTo(2500, 0);
+    expect(data.total_pnl).toBeCloseTo(2492, 0);
   });
 
   it("[UC-PORTFOLIO-006-S02] includes realized P&L from sells", async () => {

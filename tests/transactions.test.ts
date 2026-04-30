@@ -73,7 +73,7 @@ describe("Buy Transaction", () => {
       .first<{ remaining_quantity: number; cost_basis: number }>();
     expect(lot).not.toBeNull();
     expect(lot!.remaining_quantity).toBe(100);
-    expect(lot!.cost_basis).toBe(100 * 150);
+    expect(lot!.cost_basis).toBe(100 * 150 + 5);
   });
 
   it("[UC-PORTFOLIO-002-S02] multiple buys create independent lots", async () => {
@@ -97,9 +97,9 @@ describe("Buy Transaction", () => {
       .all<{ remaining_quantity: number; cost_basis: number }>();
     expect(lots.results).toHaveLength(2);
     expect(lots.results[0].remaining_quantity).toBe(100);
-    expect(lots.results[0].cost_basis).toBe(100 * 150);
+    expect(lots.results[0].cost_basis).toBe(100 * 150 + 5);
     expect(lots.results[1].remaining_quantity).toBe(50);
-    expect(lots.results[1].cost_basis).toBe(50 * 160);
+    expect(lots.results[1].cost_basis).toBe(50 * 160 + 3);
 
     expect(body2.data.id).toBeGreaterThan(0);
   });
@@ -241,9 +241,9 @@ describe("Sell Transaction", () => {
       .all<{ quantity: number; proceeds: number; cost: number; pnl: number }>();
     expect(pnl.results).toHaveLength(1);
     expect(pnl.results[0].quantity).toBe(20);
-    expect(pnl.results[0].proceeds).toBe(170 * 20);
-    expect(pnl.results[0].cost).toBe(150 * 20);
-    expect(pnl.results[0].pnl).toBe(400);
+    expect(pnl.results[0].proceeds).toBeCloseTo(3395, 0);
+    expect(pnl.results[0].cost).toBeCloseTo(3001, 0);
+    expect(pnl.results[0].pnl).toBeCloseTo(394, 0);
   });
 });
 
