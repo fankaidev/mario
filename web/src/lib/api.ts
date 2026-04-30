@@ -19,3 +19,7 @@ export function get<T>(url: string) {
 export function post<T>(url: string, body: unknown) {
   return request<T>(url, { method: "POST", body: JSON.stringify(body) });
 }
+
+export function del<T>(url: string) {
+  return request<T>(url, { method: "DELETE" });
+}
