@@ -1,10 +1,7 @@
 import { Hono } from "hono";
 import type { AuthVariables } from "../middleware/auth";
+import type { Bindings } from "../types";
 import type { PriceFetcher } from "../clients/price-fetcher";
-
-type Bindings = {
-  DB: D1Database;
-};
 
 export async function updatePrices(db: D1Database, fetcher: PriceFetcher): Promise<number> {
   const symbols = await db

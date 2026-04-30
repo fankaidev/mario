@@ -1,8 +1,5 @@
 import { createMiddleware } from "hono/factory";
-
-type Bindings = {
-  DB: D1Database;
-};
+import type { Bindings } from "../types";
 
 export type AuthUser = {
   id: number;

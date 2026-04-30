@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import type { AuthVariables } from "../middleware/auth";
-
-type Bindings = { DB: D1Database };
+import type { Bindings } from "../types";
 
 const tags = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 

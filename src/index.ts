@@ -1,15 +1,12 @@
 import { Hono } from "hono";
 import { auth, type AuthVariables } from "./middleware/auth";
+import type { Bindings } from "./types";
 import portfolios from "./routes/portfolios";
 import transactions from "./routes/transactions";
 import prices, { updatePrices } from "./routes/prices";
 import tokens from "./routes/tokens";
 import tags from "./routes/tags";
 import type { PriceFetcher } from "./clients/price-fetcher";
-
-type Bindings = {
-  DB: D1Database;
-};
 
 const app = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 

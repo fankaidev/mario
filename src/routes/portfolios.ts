@@ -1,10 +1,7 @@
 import { Hono } from "hono";
 import type { AuthVariables } from "../middleware/auth";
+import type { Bindings } from "../types";
 import type { Portfolio } from "../../shared/types/api";
-
-type Bindings = {
-  DB: D1Database;
-};
 
 type Holding = {
   symbol: string;
