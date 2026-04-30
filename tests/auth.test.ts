@@ -67,7 +67,7 @@ describe("Auth Middleware", () => {
     expect(tokenRow!.last_used_at).not.toBeNull();
   });
 
-  it("[UC-AUTH-002-S03] CF header takes priority over Bearer token", async () => {
+  it("[UC-AUTH-002-S03] Bearer token takes priority over CF header", async () => {
     const userResult = await db
       .prepare("INSERT INTO users (email) VALUES (?) RETURNING id")
       .bind("token-user@example.com")
@@ -94,7 +94,7 @@ describe("Auth Middleware", () => {
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: { id: number; email: string } };
-    expect(body.data.email).toBe("cf-user@example.com");
+    expect(body.data.email).toBe("token-user@example.com");
   });
 
   it("[UC-AUTH-002-S04] returns 401 when no auth header present", async () => {
