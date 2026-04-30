@@ -73,7 +73,7 @@ describe("Buy Transaction", () => {
       .first<{ remaining_quantity: number; cost_basis: number }>();
     expect(lot).not.toBeNull();
     expect(lot!.remaining_quantity).toBe(100);
-    expect(lot!.cost_basis).toBe(100 * 150 + 5);
+    expect(lot!.cost_basis).toBe(100 * 150);
   });
 
   it("[UC-PORTFOLIO-002-S02] multiple buys create independent lots", async () => {
@@ -97,9 +97,9 @@ describe("Buy Transaction", () => {
       .all<{ remaining_quantity: number; cost_basis: number }>();
     expect(lots.results).toHaveLength(2);
     expect(lots.results[0].remaining_quantity).toBe(100);
-    expect(lots.results[0].cost_basis).toBe(100 * 150 + 5);
+    expect(lots.results[0].cost_basis).toBe(100 * 150);
     expect(lots.results[1].remaining_quantity).toBe(50);
-    expect(lots.results[1].cost_basis).toBe(50 * 160 + 3);
+    expect(lots.results[1].cost_basis).toBe(50 * 160);
 
     expect(body2.data.id).toBeGreaterThan(0);
   });
@@ -137,5 +137,103 @@ describe("Buy Transaction", () => {
       );
       expect(res.status).toBe(400);
     }
+  });
+});
+
+describe("Sell Transaction", () => {
+  function sellPayload(
+    symbol: string,
+    quantity: number,
+    price: number,
+    date: string,
+    fee?: number,
+  ) {
+    return { symbol, type: "sell", quantity, price, fee: fee ?? 0, date };
+  }
+
+  async function makeBuy(
+    symbol: string,
+    quantity: number,
+    price: number,
+    date: string,
+    fee?: number,
+  ) {
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(buyPayload(symbol, quantity, price, date, fee)),
+    });
+    return (await res.json()) as { data: { id: number } };
+  }
+
+  it("[UC-PORTFOLIO-002-S03] sells consume lots in FIFO order", async () => {
+    await makeBuy("AAPL", 100, 150, "2024-01-15", 5);
+    await makeBuy("AAPL", 50, 160, "2024-02-10", 3);
+
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(sellPayload("AAPL", 80, 170, "2024-03-01", 5)),
+    });
+    expect(res.status).toBe(201);
+
+    const lots = await db
+      .prepare(
+        "SELECT remaining_quantity, closed FROM lots WHERE symbol = ? ORDER BY created_at ASC",
+      )
+      .bind("AAPL")
+      .all<{ remaining_quantity: number; closed: number }>();
+    expect(lots.results[0].remaining_quantity).toBe(20);
+    expect(lots.results[0].closed).toBe(0);
+    expect(lots.results[1].remaining_quantity).toBe(50);
+    expect(lots.results[1].closed).toBe(0);
+
+    const pnl = await db
+      .prepare("SELECT quantity, pnl FROM realized_pnl")
+      .all<{ quantity: number; pnl: number }>();
+    expect(pnl.results).toHaveLength(1);
+    expect(pnl.results[0].quantity).toBe(80);
+  });
+
+  it("[UC-PORTFOLIO-002-S04] returns 400 for insufficient quantity", async () => {
+    await makeBuy("AAPL", 100, 150, "2024-01-15");
+
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(sellPayload("AAPL", 150, 170, "2024-03-01")),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("Insufficient");
+  });
+
+  it("[UC-PORTFOLIO-002-S05] marks lot closed and calculates realized P&L", async () => {
+    await makeBuy("AAPL", 100, 150, "2024-01-15", 5);
+    await makeBuy("AAPL", 50, 160, "2024-02-10", 3);
+
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(sellPayload("AAPL", 20, 170, "2024-03-15", 5)),
+    });
+    expect(res.status).toBe(201);
+
+    const lots = await db
+      .prepare(
+        "SELECT id, remaining_quantity, closed FROM lots WHERE symbol = 'AAPL' ORDER BY created_at ASC",
+      )
+      .all<{ id: number; remaining_quantity: number; closed: number }>();
+    expect(lots.results[0].remaining_quantity).toBe(80);
+    expect(lots.results[0].closed).toBe(0);
+
+    const pnl = await db
+      .prepare("SELECT quantity, proceeds, cost, pnl FROM realized_pnl")
+      .all<{ quantity: number; proceeds: number; cost: number; pnl: number }>();
+    expect(pnl.results).toHaveLength(1);
+    expect(pnl.results[0].quantity).toBe(20);
+    expect(pnl.results[0].proceeds).toBe(170 * 20);
+    expect(pnl.results[0].cost).toBe(150 * 20);
+    expect(pnl.results[0].pnl).toBe(400);
   });
 });

@@ -86,7 +86,7 @@ Example: `feat: add FIFO lot tracking for sell transactions`
 - P&L is calculated only within the portfolio's own currency.
 
 ### FIFO Lot Tracking
-- Every buy creates a `lot` with remaining quantity and cost basis (including fee).
+- Every buy creates a `lot` with remaining quantity and cost basis (quantity * price, fee tracked on transaction).
 - Every sell consumes lots in FIFO order, creating `realized_pnl` records.
 - Lots are immutable; sells update `remaining_quantity` and set `closed=1` when exhausted.
 
