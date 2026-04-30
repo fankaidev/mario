@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getPlatformProxy, unstable_dev } from "wrangler";
 import type { UnstableDevWorker } from "wrangler";
+import { cleanDatabase } from "./helpers";
 
 let worker: UnstableDevWorker;
 let db: D1Database;
@@ -19,8 +20,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  await db.exec("DELETE FROM api_tokens");
-  await db.exec("DELETE FROM users");
+  await cleanDatabase(db);
 });
 
 describe("Auth Middleware", () => {

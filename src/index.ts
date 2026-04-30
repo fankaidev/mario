@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { auth, type AuthVariables } from "./middleware/auth";
 import portfolios from "./routes/portfolios";
+import transactions from "./routes/transactions";
 
 type Bindings = {
   DB: D1Database;
@@ -18,5 +19,6 @@ app.get("/api/me", (c) => {
 });
 
 app.route("/api/portfolios", portfolios);
+app.route("/api/portfolios/:portfolioId/transactions", transactions);
 
 export default app;

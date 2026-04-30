@@ -1,0 +1,141 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { getPlatformProxy, unstable_dev } from "wrangler";
+import type { UnstableDevWorker } from "wrangler";
+import { cleanDatabase } from "./helpers";
+
+let worker: UnstableDevWorker;
+let db: D1Database;
+let portfolioId: number;
+
+beforeAll(async () => {
+  const { env } = await getPlatformProxy<{ DB: D1Database }>();
+  db = env.DB;
+  worker = await unstable_dev("src/index.ts", {
+    config: "wrangler.toml",
+    local: true,
+  });
+});
+
+afterAll(async () => {
+  await worker.stop();
+});
+
+beforeEach(async () => {
+  await cleanDatabase(db);
+
+  const userResult = await db
+    .prepare("INSERT INTO users (email) VALUES (?) RETURNING id")
+    .bind("test@example.com")
+    .first<{ id: number }>();
+  const userId = userResult!.id;
+
+  const portfolioResult = await db
+    .prepare("INSERT INTO portfolios (user_id, name, currency) VALUES (?, ?, ?) RETURNING id")
+    .bind(userId, "US Stocks", "USD")
+    .first<{ id: number }>();
+  portfolioId = portfolioResult!.id;
+});
+
+function authHeaders(email = "test@example.com"): Record<string, string> {
+  return { "CF-Access-Authenticated-User-Email": email };
+}
+
+function buyPayload(symbol: string, quantity: number, price: number, date: string, fee?: number) {
+  return { symbol, type: "buy", quantity, price, fee: fee ?? 0, date };
+}
+
+describe("Buy Transaction", () => {
+  it("[UC-PORTFOLIO-002-S01] creates transaction and lot for buy", async () => {
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(buyPayload("AAPL", 100, 150, "2024-01-15", 5)),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      data: {
+        id: number;
+        symbol: string;
+        type: string;
+        quantity: number;
+        price: number;
+        fee: number;
+      };
+    };
+    expect(body.data.symbol).toBe("AAPL");
+    expect(body.data.type).toBe("buy");
+    expect(body.data.quantity).toBe(100);
+    expect(body.data.fee).toBe(5);
+
+    const lot = await db
+      .prepare("SELECT remaining_quantity, cost_basis FROM lots WHERE transaction_id = ?")
+      .bind(body.data.id)
+      .first<{ remaining_quantity: number; cost_basis: number }>();
+    expect(lot).not.toBeNull();
+    expect(lot!.remaining_quantity).toBe(100);
+    expect(lot!.cost_basis).toBe(100 * 150 + 5);
+  });
+
+  it("[UC-PORTFOLIO-002-S02] multiple buys create independent lots", async () => {
+    await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(buyPayload("AAPL", 100, 150, "2024-01-15", 5)),
+    });
+
+    const res2 = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(buyPayload("AAPL", 50, 160, "2024-02-10", 3)),
+    });
+    expect(res2.status).toBe(201);
+    const body2 = (await res2.json()) as { data: { id: number } };
+
+    const lots = await db
+      .prepare("SELECT remaining_quantity, cost_basis FROM lots WHERE symbol = ? ORDER BY id")
+      .bind("AAPL")
+      .all<{ remaining_quantity: number; cost_basis: number }>();
+    expect(lots.results).toHaveLength(2);
+    expect(lots.results[0].remaining_quantity).toBe(100);
+    expect(lots.results[0].cost_basis).toBe(100 * 150 + 5);
+    expect(lots.results[1].remaining_quantity).toBe(50);
+    expect(lots.results[1].cost_basis).toBe(50 * 160 + 3);
+
+    expect(body2.data.id).toBeGreaterThan(0);
+  });
+
+  it("returns 404 for non-existent portfolio", async () => {
+    const res = await worker.fetch("http://localhost/api/portfolios/99999/transactions", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(buyPayload("AAPL", 100, 150, "2024-01-15")),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 400 for invalid input", async () => {
+    const cases: Array<[string, unknown]> = [
+      ["missing symbol", { type: "buy", quantity: 100, price: 150, date: "2024-01-15" }],
+      [
+        "quantity <= 0",
+        { symbol: "AAPL", type: "buy", quantity: 0, price: 150, date: "2024-01-15" },
+      ],
+      [
+        "future date",
+        { symbol: "AAPL", type: "buy", quantity: 100, price: 150, date: "2099-01-01" },
+      ],
+    ];
+
+    for (const [_desc, body] of cases) {
+      const res = await worker.fetch(
+        `http://localhost/api/portfolios/${portfolioId}/transactions`,
+        {
+          method: "POST",
+          headers: { ...authHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      expect(res.status).toBe(400);
+    }
+  });
+});
