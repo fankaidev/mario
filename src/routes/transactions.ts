@@ -106,6 +106,80 @@ transactions.post("/", async (c) => {
   return handleDividend(c, portfolioId, body);
 });
 
+transactions.get("/", async (c) => {
+  const user = c.get("user");
+  const portfolioId = parseInt(c.req.param("portfolioId") ?? "", 10);
+  if (isNaN(portfolioId)) {
+    return c.json({ error: "Invalid portfolio ID" }, 400);
+  }
+
+  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+    .bind(portfolioId, user.id)
+    .first();
+  if (!portfolio) {
+    return c.json({ error: "Portfolio not found" }, 404);
+  }
+
+  const rows = await c.env.DB.prepare(
+    "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ? ORDER BY date DESC, created_at DESC",
+  )
+    .bind(portfolioId)
+    .all<Transaction>();
+
+  return c.json({ data: rows.results });
+});
+
+transactions.delete("/:txId", async (c) => {
+  const user = c.get("user");
+  const portfolioId = parseInt(c.req.param("portfolioId") ?? "", 10);
+  const txId = parseInt(c.req.param("txId") ?? "", 10);
+  if (isNaN(portfolioId) || isNaN(txId)) {
+    return c.json({ error: "Invalid ID" }, 400);
+  }
+
+  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+    .bind(portfolioId, user.id)
+    .first();
+  if (!portfolio) {
+    return c.json({ error: "Portfolio not found" }, 404);
+  }
+
+  const tx = await c.env.DB.prepare(
+    "SELECT id, type FROM transactions WHERE id = ? AND portfolio_id = ?",
+  )
+    .bind(txId, portfolioId)
+    .first<{ id: number; type: string }>();
+  if (!tx) {
+    return c.json({ error: "Transaction not found" }, 404);
+  }
+
+  if (tx.type === "buy") {
+    await c.env.DB.prepare("DELETE FROM lots WHERE transaction_id = ?").bind(txId).run();
+  } else if (tx.type === "sell") {
+    const pnlRows = await c.env.DB.prepare(
+      "SELECT lot_id, quantity FROM realized_pnl WHERE sell_transaction_id = ?",
+    )
+      .bind(txId)
+      .all<{ lot_id: number; quantity: number }>();
+
+    for (const row of pnlRows.results) {
+      await c.env.DB.prepare(
+        "UPDATE lots SET remaining_quantity = remaining_quantity + ?, closed = 0 WHERE id = ?",
+      )
+        .bind(row.quantity, row.lot_id)
+        .run();
+    }
+
+    await c.env.DB.prepare("DELETE FROM realized_pnl WHERE sell_transaction_id = ?")
+      .bind(txId)
+      .run();
+  }
+
+  await c.env.DB.prepare("DELETE FROM transactions WHERE id = ?").bind(txId).run();
+
+  return c.json({ data: null });
+});
+
 async function handleBuy(
   c: { env: { DB: D1Database } },
   portfolioId: number,
