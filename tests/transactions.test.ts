@@ -140,17 +140,26 @@ describe("Buy Transaction", () => {
   });
 });
 
-describe("Sell Transaction", () => {
-  function sellPayload(
-    symbol: string,
-    quantity: number,
-    price: number,
-    date: string,
-    fee?: number,
-  ) {
-    return { symbol, type: "sell", quantity, price, fee: fee ?? 0, date };
-  }
+function sellPayload(symbol: string, quantity: number, price: number, date: string, fee?: number) {
+  return { symbol, type: "sell", quantity, price, fee: fee ?? 0, date };
+}
 
+async function makeBuy(
+  symbol: string,
+  quantity: number,
+  price: number,
+  date: string,
+  fee?: number,
+) {
+  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(buyPayload(symbol, quantity, price, date, fee)),
+  });
+  return (await res.json()) as { data: { id: number } };
+}
+
+describe("Sell Transaction", () => {
   async function makeBuy(
     symbol: string,
     quantity: number,
@@ -261,5 +270,107 @@ describe("Dividend Transaction", () => {
 
     const lots = await db.prepare("SELECT id FROM lots").all();
     expect(lots.results).toHaveLength(0);
+  });
+});
+
+describe("Transaction History", () => {
+  async function getTransactions() {
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      headers: authHeaders(),
+    });
+    return (await res.json()) as { data: Array<{ id: number; type: string; date: string }> };
+  }
+
+  async function deleteTransaction(txId: number) {
+    return worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions/${txId}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+  }
+
+  it("[UC-PORTFOLIO-004-S01] lists transactions sorted by date DESC", async () => {
+    const dates = ["2024-01-15", "2024-02-20", "2024-03-10"];
+    for (const date of dates) {
+      await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(buyPayload("AAPL", 10, 150, date)),
+      });
+    }
+
+    const body = await getTransactions();
+    expect(body.data).toHaveLength(3);
+    expect(body.data[0].date).toBe("2024-03-10");
+    expect(body.data[1].date).toBe("2024-02-20");
+    expect(body.data[2].date).toBe("2024-01-15");
+  });
+
+  it("[UC-PORTFOLIO-004-S02] deleting a buy removes the lot", async () => {
+    const { data: tx } = await makeBuy("AAPL", 100, 150, "2024-01-15", 5);
+
+    const lotBefore = await db
+      .prepare("SELECT id FROM lots WHERE transaction_id = ?")
+      .bind(tx.id)
+      .first();
+    expect(lotBefore).not.toBeNull();
+
+    const res = await deleteTransaction(tx.id);
+    expect(res.status).toBe(200);
+
+    const lotAfter = await db
+      .prepare("SELECT id FROM lots WHERE transaction_id = ?")
+      .bind(tx.id)
+      .first();
+    expect(lotAfter).toBeNull();
+    const txAfter = await db
+      .prepare("SELECT id FROM transactions WHERE id = ?")
+      .bind(tx.id)
+      .first();
+    expect(txAfter).toBeNull();
+  });
+
+  it("[UC-PORTFOLIO-004-S03] deleting a sell restores lot quantities", async () => {
+    await makeBuy("AAPL", 100, 150, "2024-01-15", 5);
+
+    const sellRes = await worker.fetch(
+      `http://localhost/api/portfolios/${portfolioId}/transactions`,
+      {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: "AAPL",
+          type: "sell",
+          quantity: 50,
+          price: 170,
+          fee: 5,
+          date: "2024-02-01",
+        }),
+      },
+    );
+    const { data: sellTx } = (await sellRes.json()) as { data: { id: number } };
+
+    const lotBefore = await db
+      .prepare("SELECT remaining_quantity FROM lots WHERE symbol = 'AAPL'")
+      .first<{ remaining_quantity: number }>();
+    expect(lotBefore!.remaining_quantity).toBe(50);
+
+    const res = await deleteTransaction(sellTx.id);
+    expect(res.status).toBe(200);
+
+    const lotAfter = await db
+      .prepare("SELECT remaining_quantity FROM lots WHERE symbol = 'AAPL'")
+      .first<{ remaining_quantity: number }>();
+    expect(lotAfter!.remaining_quantity).toBe(100);
+
+    const pnlRecords = await db
+      .prepare("SELECT id FROM realized_pnl WHERE sell_transaction_id = ?")
+      .bind(sellTx.id)
+      .all();
+    expect(pnlRecords.results).toHaveLength(0);
+  });
+
+  it("[UC-PORTFOLIO-004-S04] returns empty array when no transactions", async () => {
+    const body = await getTransactions();
+    expect(body.data).toHaveLength(0);
   });
 });
