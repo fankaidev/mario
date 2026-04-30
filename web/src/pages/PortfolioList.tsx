@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { get, post } from "../lib/api";
 import type { Portfolio } from "../../../shared/types/api";
 
@@ -42,13 +43,17 @@ export function PortfolioList() {
 
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         {data?.data.map((p) => (
-          <div key={p.id} className="p-4 border rounded shadow-sm hover:shadow-md transition">
+          <Link
+            key={p.id}
+            to={`/portfolios/${p.id}`}
+            className="p-4 border rounded shadow-sm hover:shadow-md transition block"
+          >
             <h2 className="text-lg font-semibold">{p.name}</h2>
             <p className="text-sm text-gray-500">{p.currency}</p>
             <p className="text-xs text-gray-400 mt-2">
               Created {new Date(p.created_at).toLocaleDateString()}
             </p>
-          </div>
+          </Link>
         ))}
       </div>
 
