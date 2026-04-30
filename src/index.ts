@@ -6,6 +6,7 @@ import transactions from "./routes/transactions";
 import prices, { updatePrices } from "./routes/prices";
 import tokens from "./routes/tokens";
 import tags from "./routes/tags";
+import corporateActions from "./routes/corporate-actions";
 import type { PriceFetcher } from "./clients/price-fetcher";
 
 const app = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
@@ -24,6 +25,7 @@ app.route("/api/portfolios/:portfolioId/transactions", transactions);
 app.route("/api/prices", prices);
 app.route("/api/tokens", tokens);
 app.route("/api/portfolios/:portfolioId/tags", tags);
+app.route("/api/portfolios/:portfolioId/corporate-actions", corporateActions);
 
 export default {
   fetch: app.fetch,

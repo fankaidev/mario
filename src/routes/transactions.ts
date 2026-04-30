@@ -189,7 +189,7 @@ async function handleBuy(
   portfolioId: number,
   body: CreateTransactionRequest,
 ) {
-  const costBasis = body.quantity * body.price;
+  const costBasis = body.quantity * body.price + body.fee;
 
   const txResult = await c.env.DB.prepare(
     "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -258,14 +258,15 @@ async function handleSell(
       ),
     );
 
-    const proceeds = body.price * consumed;
+    const proceeds = body.price * consumed - body.fee * (consumed / body.quantity);
     const cost = (lot.cost_basis / lot.quantity) * consumed;
     const pnl = proceeds - cost;
+    const costPerShare = lot.cost_basis / lot.quantity;
 
     statements.push(
       c.env.DB.prepare(
-        "INSERT INTO realized_pnl (sell_transaction_id, lot_id, quantity, proceeds, cost, pnl) VALUES (?, ?, ?, ?, ?, ?)",
-      ).bind(txId, lot.id, consumed, proceeds, cost, pnl),
+        "INSERT INTO realized_pnl (sell_transaction_id, lot_id, quantity, proceeds, cost, pnl, sell_price, cost_per_share) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      ).bind(txId, lot.id, consumed, proceeds, cost, pnl, body.price, costPerShare),
     );
 
     remainingToSell -= consumed;
