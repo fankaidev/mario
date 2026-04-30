@@ -23,11 +23,10 @@
 
 | ID | Priority | Status | Scenario | Rules |
 |----|----------|--------|----------|-------|
-| UC-PORTFOLIO-006-S01 | P0 | ❌ | Given portfolio "US Stocks" holds AAPL (cost 11000, market value 12600) and TSLA (cost 5000, market value 4500), no historical sells, When viewing portfolio summary, Then return total investment 16000, total market value 17100, unrealized P&L 1100, cumulative realized P&L 0, total P&L 1100, return rate 6.88% | R1, R2, R4, R5 |
-| UC-PORTFOLIO-006-S02 | P0 | ❌ | Given portfolio holds AAPL (unrealized P&L 1600), and previously sold MSFT with realized P&L 800, When viewing portfolio summary, Then total P&L = 2400 | R4 |
-| UC-PORTFOLIO-006-S03 | P0 | ❌ | Given portfolio has AAPL dividend 100 (withholding tax 30) and TSLA dividend 50 (withholding tax 10), When viewing portfolio summary, Then cumulative withholding tax 40, net dividend income 110, total P&L includes net dividend income | R4, R9 |
-| UC-PORTFOLIO-006-S04 | P1 | ❌ | Given portfolio has buy transaction (fee 8) and sell transaction (fee 5), When viewing portfolio summary, Then cumulative buy fee 8, cumulative sell fee 5, total cumulative fees 13 | R7, R8, R10 |
-| UC-PORTFOLIO-006-S05 | P1 | ❌ | Given portfolio has no transaction records, When viewing portfolio summary, Then all metrics return 0 | R6 |
+| UC-PORTFOLIO-006-S01 | P0 | ✅ | Given portfolio "US Stocks" holds AAPL (cost 11000, market value 12600) and TSLA (cost 5000, market value 4500), no historical sells, When viewing portfolio summary, Then return total investment 16000, total market value 17100, unrealized P&L 1100, cumulative realized P&L 0, total P&L 1100, return rate 6.88% | R1, R2, R4, R5 |
+| UC-PORTFOLIO-006-S02 | P0 | ✅ | Given portfolio holds AAPL (unrealized P&L 1600), and previously sold MSFT with realized P&L 800, When viewing portfolio summary, Then total P&L = 2400 | R4 |
+| UC-PORTFOLIO-006-S03 | P0 | ✅ | Given portfolio has AAPL dividend 100 (withholding tax 30) and TSLA dividend 50 (withholding tax 10), When viewing portfolio summary, Then cumulative withholding tax 40, net dividend income 110, total P&L includes net dividend income | R4, R9 |
+| UC-PORTFOLIO-006-S05 | P1 | ✅ | Given portfolio has no transaction records, When viewing portfolio summary, Then all metrics return 0 | R6 |
 | UC-PORTFOLIO-006-S06 | P1 | ❌ | Given portfolio has holdings but some stocks have no latest price, When viewing portfolio summary, Then total market value and P&L calculated based on stocks with prices, stocks missing prices excluded from calculation and flagged |
 | UC-PORTFOLIO-006-S07 | P1 | ❌ | Given user is not logged in, When viewing portfolio summary, Then return 401 unauthorized |
 
