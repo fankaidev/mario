@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "no-explicit-any": "error",
+    "no-non-null-assertion": "error",
+    "prefer-nullish-coalescing": "warn",
+    "rules-of-hooks": "error",
+    "exhaustive-deps": "error",
+    "no-cycle": "error",
+    "no-self-import": "error",
+    "no-eval": "error"
+  },
+  "ignorePatterns": ["node_modules", "dist", "build", ".next", "coverage"]
+}
