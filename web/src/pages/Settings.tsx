@@ -71,8 +71,7 @@ export function Settings() {
 
       {showCreate && (
         <CreateTokenModal
-          onClose={() => setShowCreate(false)}
-          onCreated={() => {
+          onClose={() => {
             queryClient.invalidateQueries({ queryKey: ["tokens"] });
             setShowCreate(false);
           }}
@@ -90,7 +89,7 @@ export function Settings() {
   );
 }
 
-function CreateTokenModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function CreateTokenModal({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState("");
   const [token, setToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -99,7 +98,6 @@ function CreateTokenModal({ onClose, onCreated }: { onClose: () => void; onCreat
     mutationFn: (body: { name: string }) => post<{ data: { token: string } }>("/tokens", body),
     onSuccess: (data) => {
       setToken(data.data.token);
-      onCreated();
     },
   });
 
