@@ -4,6 +4,8 @@ A personal portfolio tracker for US, HK, and China A-share markets. Deployed on 
 
 ## Development Workflow
 
+**Always use `pnpm` instead of `npm` for dependency management and script execution.**
+
 **All changes must be issue-driven and follow the BDD workflow (see `docs/bdd.md`):**
 
 1. **Create Issue first** — Before making any changes, create a GitHub Issue describing:
@@ -28,9 +30,13 @@ A personal portfolio tracker for US, HK, and China A-share markets. Deployed on 
      it('[UC-PORTFOLIO-001-S01] user creates portfolio and sees it in list', async () => {
      ```
 
-4. **Create PR for the Issue** — Branch off main, implement the changes, and open a PR linked to the Issue
+4. **Create PR for the Issue** — After implementation is complete, commit the changes, push the branch, and open a PR linked to the Issue
 
-5. **Pass checks, then merge** — PR must pass all CI checks (lint, format, tests) before merging to main
+5. **Wait for PR checks** — Wait for all PR checks to finish. If any check fails, investigate, fix the issue, push the fix, and wait for checks again until they pass
+
+6. **Review the PR** — Review the PR once checks pass. Start a subagent to perform an independent PR review so the review is less biased by the implementation context. The review must verify the diff matches the Issue and BDD scenarios, confirm no unrelated changes were introduced, and leave a PR comment summarizing the review result
+
+7. **Pass checks, then merge** — PR must pass all CI checks (lint, format, tests) before merging to main
 
 This ensures all work is traceable, specified, tested, and documented.
 
