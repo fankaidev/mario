@@ -10,6 +10,7 @@
 | R2 | When deleting a transaction, synchronously rollback lot changes caused by that transaction (buy deletion removes corresponding lot; sell deletion restores consumed lot remaining quantities) |
 | R3 | Transaction records cannot be edited, only deleted and re-entered |
 | R4 | Export API returns complete transaction list in JSON format, including all fields |
+| R5 | Transaction history can be filtered by symbol to show only transactions for a specific stock |
 
 ## Scenarios
 
@@ -23,6 +24,7 @@
 | UC-PORTFOLIO-004-S04 | P1 | ✅ | Given portfolio has no transaction records, When viewing transaction history, Then return empty array |
 | UC-PORTFOLIO-004-S05 | P1 | ❌ | Given portfolio has multiple transaction records, When calling export API, Then return JSON array containing all transaction fields | R4 |
 | UC-PORTFOLIO-004-S06 | P1 | ❌ | Given user is not logged in, When viewing transaction history, Then return 401 unauthorized |
+| UC-PORTFOLIO-004-S07 | P1 | ❌ | Given portfolio has AAPL (buy, sell, dividend) and TSLA (buy) transactions, When viewing transactions filtered by symbol=AAPL, Then return only AAPL transactions in date descending order | R5 |
 
 ### ai-e2e
 (none)
