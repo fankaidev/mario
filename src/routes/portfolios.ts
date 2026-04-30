@@ -152,4 +152,84 @@ portfolios.get("/:id/holdings", async (c) => {
   return c.json({ data: holdings });
 });
 
+portfolios.get("/:id/summary", async (c) => {
+  const user = c.get("user");
+  const portfolioId = parseInt(c.req.param("id") ?? "", 10);
+  if (isNaN(portfolioId)) return c.json({ error: "Invalid portfolio ID" }, 400);
+
+  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+    .bind(portfolioId, user.id)
+    .first();
+  if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
+
+  const buyRow = await c.env.DB.prepare(
+    "SELECT SUM(quantity * price + fee) AS total FROM transactions WHERE portfolio_id = ? AND type = 'buy'",
+  )
+    .bind(portfolioId)
+    .first<{ total: number | null }>();
+
+  const lots = await c.env.DB.prepare(
+    "SELECT symbol, SUM(remaining_quantity) AS qty, SUM(remaining_quantity * cost_basis / quantity) AS cost FROM lots WHERE portfolio_id = ? AND closed = 0 GROUP BY symbol",
+  )
+    .bind(portfolioId)
+    .all<{ symbol: string; qty: number; cost: number }>();
+
+  let totalMarketValue = 0;
+  let totalCost = 0;
+  for (const row of lots.results) {
+    const priceRow = await c.env.DB.prepare("SELECT price FROM prices WHERE symbol = ?")
+      .bind(row.symbol)
+      .first<{ price: number | null }>();
+    if (priceRow?.price != null) {
+      totalMarketValue += row.qty * priceRow.price;
+    }
+    totalCost += row.cost;
+  }
+
+  const realizedPnlRow = await c.env.DB.prepare(
+    "SELECT SUM(rp.pnl) AS total FROM realized_pnl rp JOIN transactions t ON rp.sell_transaction_id = t.id WHERE t.portfolio_id = ?",
+  )
+    .bind(portfolioId)
+    .first<{ total: number | null }>();
+
+  const dividendRow = await c.env.DB.prepare(
+    "SELECT SUM(price - fee) AS total FROM transactions WHERE portfolio_id = ? AND type = 'dividend'",
+  )
+    .bind(portfolioId)
+    .first<{ total: number | null }>();
+
+  const feeRow = await c.env.DB.prepare(
+    "SELECT SUM(CASE WHEN type = 'buy' THEN fee ELSE 0 END) AS buy_fees, SUM(CASE WHEN type = 'sell' THEN fee ELSE 0 END) AS sell_fees, SUM(CASE WHEN type = 'dividend' THEN fee ELSE 0 END) AS withholding_tax FROM transactions WHERE portfolio_id = ?",
+  )
+    .bind(portfolioId)
+    .first<{ buy_fees: number | null; sell_fees: number | null; withholding_tax: number | null }>();
+
+  const totalInvestment = buyRow?.total ?? 0;
+  const unrealizedPnl = totalMarketValue - totalCost;
+  const realizedPnl = realizedPnlRow?.total ?? 0;
+  const realizedWithFee = realizedPnl - (feeRow?.sell_fees ?? 0);
+  const dividendIncome = dividendRow?.total ?? 0;
+  const totalPnl = unrealizedPnl + realizedWithFee + dividendIncome;
+  const returnRate = totalInvestment > 0 ? (totalPnl / totalInvestment) * 100 : 0;
+  const buyFees = feeRow?.buy_fees ?? 0;
+  const sellFees = feeRow?.sell_fees ?? 0;
+  const withholdingTax = feeRow?.withholding_tax ?? 0;
+
+  return c.json({
+    data: {
+      total_investment: Math.round(totalInvestment * 100) / 100,
+      total_market_value: Math.round(totalMarketValue * 100) / 100,
+      unrealized_pnl: Math.round(unrealizedPnl * 100) / 100,
+      realized_pnl: Math.round(realizedWithFee * 100) / 100,
+      dividend_income: Math.round(dividendIncome * 100) / 100,
+      total_pnl: Math.round(totalPnl * 100) / 100,
+      return_rate: Math.round(returnRate * 100) / 100,
+      cumulative_buy_fees: Math.round(buyFees * 100) / 100,
+      cumulative_sell_fees: Math.round(sellFees * 100) / 100,
+      cumulative_withholding_tax: Math.round(withholdingTax * 100) / 100,
+      cumulative_total_fees: Math.round((buyFees + sellFees + withholdingTax) * 100) / 100,
+    },
+  });
+});
+
 export default portfolios;
