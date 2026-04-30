@@ -6,6 +6,8 @@ A personal portfolio tracker for US, HK, and China A-share markets. Deployed on 
 
 **Always use `pnpm` instead of `npm` for dependency management and script execution.**
 
+**Always use the `gh` CLI for GitHub operations, including issues, labels, pull requests, checks, comments, and reviews.**
+
 **All changes must be issue-driven and follow the BDD workflow (see `docs/bdd.md`):**
 
 1. **Create Issue first** — Before making any changes, create a GitHub Issue describing:

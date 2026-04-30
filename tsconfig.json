@@ -10,8 +10,13 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
+    "exactOptionalPropertyTypes": true,
     "noImplicitAny": true,
+    "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   }
 }
