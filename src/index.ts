@@ -4,6 +4,7 @@ import portfolios from "./routes/portfolios";
 import transactions from "./routes/transactions";
 import prices from "./routes/prices";
 import tokens from "./routes/tokens";
+import tags from "./routes/tags";
 
 type Bindings = {
   DB: D1Database;
@@ -24,5 +25,6 @@ app.route("/api/portfolios", portfolios);
 app.route("/api/portfolios/:portfolioId/transactions", transactions);
 app.route("/api/prices", prices);
 app.route("/api/tokens", tokens);
+app.route("/api/portfolios/:portfolioId/tags", tags);
 
 export default app;
