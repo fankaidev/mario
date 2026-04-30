@@ -2,9 +2,10 @@ import { Hono } from "hono";
 import { auth, type AuthVariables } from "./middleware/auth";
 import portfolios from "./routes/portfolios";
 import transactions from "./routes/transactions";
-import prices from "./routes/prices";
+import prices, { updatePrices } from "./routes/prices";
 import tokens from "./routes/tokens";
 import tags from "./routes/tags";
+import type { PriceFetcher } from "./clients/price-fetcher";
 
 type Bindings = {
   DB: D1Database;
@@ -27,4 +28,23 @@ app.route("/api/prices", prices);
 app.route("/api/tokens", tokens);
 app.route("/api/portfolios/:portfolioId/tags", tags);
 
-export default app;
+export default {
+  fetch: app.fetch,
+  async scheduled(_event: ScheduledEvent, env: Bindings) {
+    const fetcher: PriceFetcher = {
+      async fetchPrice(symbol: string) {
+        const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}`, {
+          headers: { "X-Finnhub-Token": "sandbox" },
+        });
+        if (res.ok) {
+          const body = (await res.json()) as { c: number };
+          if (typeof body.c === "number" && body.c > 0) return body.c;
+        }
+        return null;
+      },
+    };
+
+    const updated = await updatePrices(env.DB, fetcher);
+    console.log(`Scheduled price update: ${updated} stocks updated`);
+  },
+};
