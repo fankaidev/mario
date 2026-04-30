@@ -50,3 +50,20 @@ export interface Lot {
   closed: number;
   created_at: string;
 }
+
+export interface PortfolioSnapshot {
+  id: number;
+  portfolio_id: number;
+  date: string;
+  total_investment: number;
+  market_value: number;
+  note: string | null;
+  created_at: string;
+}
+
+export interface CreatePortfolioSnapshotRequest {
+  date: string;
+  total_investment: number;
+  market_value: number;
+  note?: string;
+}
