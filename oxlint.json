@@ -7,7 +7,12 @@
     "exhaustive-deps": "error",
     "no-cycle": "error",
     "no-self-import": "error",
-    "no-eval": "error"
+    "no-eval": "error",
+    "no-console": "warn",
+    "eqeqeq": "error",
+    "no-var": "error",
+    "prefer-const": "error",
+    "no-unused-vars": "error"
   },
   "ignorePatterns": ["node_modules", "dist", "build", ".next", "coverage"]
 }

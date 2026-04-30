@@ -4,6 +4,10 @@ A personal portfolio tracker for US, HK, and China A-share markets. Deployed on 
 
 ## Development Workflow
 
+**Always use `pnpm` instead of `npm` for dependency management and script execution.**
+
+**Always use the `gh` CLI for GitHub operations, including issues, labels, pull requests, checks, comments, and reviews.**
+
 **All changes must be issue-driven and follow the BDD workflow (see `docs/bdd.md`):**
 
 1. **Create Issue first** — Before making any changes, create a GitHub Issue describing:
@@ -28,9 +32,17 @@ A personal portfolio tracker for US, HK, and China A-share markets. Deployed on 
      it('[UC-PORTFOLIO-001-S01] user creates portfolio and sees it in list', async () => {
      ```
 
-4. **Create PR for the Issue** — Branch off main, implement the changes, and open a PR linked to the Issue
+4. **Run pre-PR checks** — Before creating a PR, run `pnpm check`, inspect `git diff --stat origin/main...`, and inspect `git diff origin/main... -- docs/use-cases` when use cases may be affected. Confirm the diff scope matches the Issue and no required BDD updates are missing
 
-5. **Pass checks, then merge** — PR must pass all CI checks (lint, format, tests) before merging to main
+5. **Create PR for the Issue** — After implementation is complete, commit the changes, push the branch, and open a PR linked to the Issue
+
+6. **Wait for PR checks** — Wait for all PR checks to finish. If any check fails, investigate, fix the issue, commit and push the fix to the same PR branch, and wait for checks again until they pass
+
+7. **Review the PR** — Review the PR once checks pass. Start a subagent to perform an independent PR review so the review is less biased by the implementation context. The review must verify the diff matches the Issue and BDD scenarios, confirm no unrelated changes were introduced, and leave a PR comment summarizing the review result. If the subagent finds a blocking issue, fix it, commit and push the fix to the same PR branch, wait for checks again, and re-verify the specific risk before marking the review complete
+
+8. **Handle PR comments** — Inspect all PR comments and reviews. Blocking comments must be fixed or answered with a clear reason why no code change is needed. Non-blocking suggestions may be addressed immediately or converted into a follow-up Issue. After any PR follow-up fix, commit and push the fix to the same PR branch. After handling a comment, reply to the original comment with the fix commit, verification result, or follow-up Issue
+
+9. **Merge after approval** — After CI passes, independent review is complete, and all blocking comments are handled, merge the PR with `gh pr merge --squash` unless the user asks to leave it open
 
 This ensures all work is traceable, specified, tested, and documented.
 

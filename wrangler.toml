@@ -1,0 +1,13 @@
+name = "mario"
+main = "src/index.ts"
+compatibility_date = "2026-04-30"
+
+[assets]
+directory = "web/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mario"
+database_id = "6acd872c-2230-477b-82f3-f3471451084f"

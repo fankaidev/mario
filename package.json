@@ -1,0 +1,40 @@
+{
+  "name": "mario",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm build:web && wrangler dev",
+    "typecheck": "tsc --noEmit -p tsconfig.worker.json && tsc --noEmit -p web/tsconfig.json",
+    "build:web": "vite build --config web/vite.config.ts",
+    "build": "pnpm typecheck && pnpm build:web",
+    "check": "pnpm lint && pnpm format:check && pnpm build",
+    "deploy": "pnpm build && wrangler deploy",
+    "prepare": "lefthook install",
+    "lint": "oxlint .",
+    "format": "oxfmt --write '**/*.{ts,tsx,json,sql}'",
+    "format:check": "oxfmt --check '**/*.{ts,tsx,json,sql}'"
+  },
+  "dependencies": {
+    "@cloudflare/vite-plugin": "^1.7.5",
+    "@tailwindcss/vite": "^4.1.18",
+    "@vitejs/plugin-react": "^5.1.1",
+    "hono": "^4.10.7",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "tailwindcss": "^4.1.18",
+    "vite": "^7.2.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260425.0",
+    "@types/node": "^24.10.3",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "lefthook": "^1.13.6",
+    "oxfmt": "^0.47.0",
+    "oxlint": "^1.29.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.54.0"
+  },
+  "packageManager": "pnpm@10.26.1"
+}
