@@ -1,5 +1,6 @@
 import { Routes, Route, Link } from "react-router-dom";
 import { PortfolioList } from "./pages/PortfolioList";
+import { PortfolioDetail } from "./pages/PortfolioDetail";
 import { Settings } from "./pages/Settings";
 
 export function App() {
@@ -15,6 +16,7 @@ export function App() {
       </nav>
       <Routes>
         <Route path="/" element={<PortfolioList />} />
+        <Route path="/portfolios/:id" element={<PortfolioDetail />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
     </main>
