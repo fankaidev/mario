@@ -1,10 +1,7 @@
 import { Hono } from "hono";
 import type { AuthVariables } from "../middleware/auth";
+import type { Bindings } from "../types";
 import type { CreateTransactionRequest, Transaction } from "../../shared/types/api";
-
-type Bindings = {
-  DB: D1Database;
-};
 
 const transactions = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
