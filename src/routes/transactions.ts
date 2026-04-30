@@ -154,7 +154,10 @@ transactions.delete("/:txId", async (c) => {
   }
 
   if (tx.type === "buy") {
-    await c.env.DB.prepare("DELETE FROM lots WHERE transaction_id = ?").bind(txId).run();
+    await c.env.DB.batch([
+      c.env.DB.prepare("DELETE FROM lots WHERE transaction_id = ?").bind(txId),
+      c.env.DB.prepare("DELETE FROM transactions WHERE id = ?").bind(txId),
+    ]);
   } else if (tx.type === "sell") {
     const pnlRows = await c.env.DB.prepare(
       "SELECT lot_id, quantity FROM realized_pnl WHERE sell_transaction_id = ?",
@@ -162,17 +165,21 @@ transactions.delete("/:txId", async (c) => {
       .bind(txId)
       .all<{ lot_id: number; quantity: number }>();
 
+    const statements: D1PreparedStatement[] = [];
     for (const row of pnlRows.results) {
-      await c.env.DB.prepare(
-        "UPDATE lots SET remaining_quantity = remaining_quantity + ?, closed = 0 WHERE id = ?",
-      )
-        .bind(row.quantity, row.lot_id)
-        .run();
+      statements.push(
+        c.env.DB.prepare(
+          "UPDATE lots SET remaining_quantity = remaining_quantity + ?, closed = 0 WHERE id = ?",
+        ).bind(row.quantity, row.lot_id),
+      );
     }
+    statements.push(
+      c.env.DB.prepare("DELETE FROM realized_pnl WHERE sell_transaction_id = ?").bind(txId),
+      c.env.DB.prepare("DELETE FROM transactions WHERE id = ?").bind(txId),
+    );
 
-    await c.env.DB.prepare("DELETE FROM realized_pnl WHERE sell_transaction_id = ?")
-      .bind(txId)
-      .run();
+    await c.env.DB.batch(statements);
+    return c.json({ data: null });
   }
 
   await c.env.DB.prepare("DELETE FROM transactions WHERE id = ?").bind(txId).run();
@@ -195,11 +202,11 @@ async function handleBuy(
 
   const txId = txResult.meta.last_row_id;
 
-  await c.env.DB.prepare(
-    "INSERT INTO lots (transaction_id, portfolio_id, symbol, quantity, remaining_quantity, cost_basis) VALUES (?, ?, ?, ?, ?, ?)",
-  )
-    .bind(txId, portfolioId, body.symbol, body.quantity, body.quantity, costBasis)
-    .run();
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      "INSERT INTO lots (transaction_id, portfolio_id, symbol, quantity, remaining_quantity, cost_basis) VALUES (?, ?, ?, ?, ?, ?)",
+    ).bind(txId, portfolioId, body.symbol, body.quantity, body.quantity, costBasis),
+  ]);
 
   const transaction = await c.env.DB.prepare(
     "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE id = ?",
@@ -237,6 +244,7 @@ async function handleSell(
 
   const txId = txResult.meta.last_row_id;
 
+  const statements: D1PreparedStatement[] = [];
   let remainingToSell = body.quantity;
   for (const lot of lots.results) {
     if (remainingToSell <= 0) break;
@@ -245,22 +253,28 @@ async function handleSell(
     const newRemaining = lot.remaining_quantity - consumed;
     const closed = newRemaining === 0 ? 1 : 0;
 
-    await c.env.DB.prepare("UPDATE lots SET remaining_quantity = ?, closed = ? WHERE id = ?")
-      .bind(newRemaining, closed, lot.id)
-      .run();
+    statements.push(
+      c.env.DB.prepare("UPDATE lots SET remaining_quantity = ?, closed = ? WHERE id = ?").bind(
+        newRemaining,
+        closed,
+        lot.id,
+      ),
+    );
 
     const proceeds = body.price * consumed;
     const cost = (lot.cost_basis / lot.quantity) * consumed;
     const pnl = proceeds - cost;
 
-    await c.env.DB.prepare(
-      "INSERT INTO realized_pnl (sell_transaction_id, lot_id, quantity, proceeds, cost, pnl) VALUES (?, ?, ?, ?, ?, ?)",
-    )
-      .bind(txId, lot.id, consumed, proceeds, cost, pnl)
-      .run();
+    statements.push(
+      c.env.DB.prepare(
+        "INSERT INTO realized_pnl (sell_transaction_id, lot_id, quantity, proceeds, cost, pnl) VALUES (?, ?, ?, ?, ?, ?)",
+      ).bind(txId, lot.id, consumed, proceeds, cost, pnl),
+    );
 
     remainingToSell -= consumed;
   }
+
+  await c.env.DB.batch(statements);
 
   const transaction = await c.env.DB.prepare(
     "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE id = ?",
