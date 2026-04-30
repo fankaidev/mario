@@ -273,6 +273,85 @@ describe("Dividend Transaction", () => {
   });
 });
 
+describe("Initial Transaction", () => {
+  function initialPayload(
+    symbol: string,
+    quantity: number,
+    price: number,
+    date: string,
+    fee?: number,
+  ) {
+    return { symbol, type: "initial", quantity, price, fee: fee ?? 0, date };
+  }
+
+  it("[UC-PORTFOLIO-002-S09] creates transaction and lot for initial holding", async () => {
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(initialPayload("1810.HK", 800, 40, "2026-01-01", 0)),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      data: {
+        id: number;
+        symbol: string;
+        type: string;
+        quantity: number;
+        price: number;
+        fee: number;
+      };
+    };
+    expect(body.data.symbol).toBe("1810.HK");
+    expect(body.data.type).toBe("initial");
+    expect(body.data.quantity).toBe(800);
+    expect(body.data.price).toBe(40);
+    expect(body.data.fee).toBe(0);
+
+    const lot = await db
+      .prepare("SELECT remaining_quantity, cost_basis FROM lots WHERE transaction_id = ?")
+      .bind(body.data.id)
+      .first<{ remaining_quantity: number; cost_basis: number }>();
+    expect(lot).not.toBeNull();
+    expect(lot!.remaining_quantity).toBe(800);
+    expect(lot!.cost_basis).toBe(800 * 40 + 0);
+  });
+
+  it("deleting an initial transaction removes the lot", async () => {
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(initialPayload("1810.HK", 800, 40, "2026-01-01")),
+    });
+    const { data: tx } = (await res.json()) as { data: { id: number } };
+
+    const lotBefore = await db
+      .prepare("SELECT id FROM lots WHERE transaction_id = ?")
+      .bind(tx.id)
+      .first();
+    expect(lotBefore).not.toBeNull();
+
+    const delRes = await worker.fetch(
+      `http://localhost/api/portfolios/${portfolioId}/transactions/${tx.id}`,
+      {
+        method: "DELETE",
+        headers: authHeaders(),
+      },
+    );
+    expect(delRes.status).toBe(200);
+
+    const lotAfter = await db
+      .prepare("SELECT id FROM lots WHERE transaction_id = ?")
+      .bind(tx.id)
+      .first();
+    expect(lotAfter).toBeNull();
+    const txAfter = await db
+      .prepare("SELECT id FROM transactions WHERE id = ?")
+      .bind(tx.id)
+      .first();
+    expect(txAfter).toBeNull();
+  });
+});
+
 describe("Transaction History", () => {
   async function getTransactions() {
     const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {

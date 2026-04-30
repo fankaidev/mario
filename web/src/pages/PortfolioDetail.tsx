@@ -228,7 +228,7 @@ function TransactionsTab({
             <div>
               <span className="font-medium">{tx.symbol}</span>
               <span
-                className={`ml-2 px-1.5 py-0.5 rounded text-xs ${tx.type === "buy" ? "bg-green-100 text-green-700" : tx.type === "sell" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}
+                className={`ml-2 px-1.5 py-0.5 rounded text-xs ${tx.type === "buy" ? "bg-green-100 text-green-700" : tx.type === "sell" ? "bg-red-100 text-red-700" : tx.type === "initial" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}
               >
                 {tx.type}
               </span>
@@ -283,7 +283,7 @@ function AddTransactionModal({
   onCreated: () => void;
 }) {
   const [symbol, setSymbol] = useState("");
-  const [type, setType] = useState<"buy" | "sell" | "dividend">("buy");
+  const [type, setType] = useState<"buy" | "sell" | "dividend" | "initial">("buy");
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
   const [fee, setFee] = useState("0");
@@ -325,11 +325,12 @@ function AddTransactionModal({
             <select
               className="w-full border rounded px-3 py-2"
               value={type}
-              onChange={(e) => setType(e.target.value as "buy" | "sell" | "dividend")}
+              onChange={(e) => setType(e.target.value as "buy" | "sell" | "dividend" | "initial")}
             >
               <option value="buy">Buy</option>
               <option value="sell">Sell</option>
               <option value="dividend">Dividend</option>
+              <option value="initial">Initial</option>
             </select>
           </div>
           {type !== "dividend" && (
