@@ -41,10 +41,14 @@ async function createApiToken(email: string): Promise<string> {
 }
 
 async function createAccessJwt(email: string): Promise<string> {
+  return createAccessJwtWithAudience(email, TEST_ACCESS_AUD);
+}
+
+async function createAccessJwtWithAudience(email: string, audience: string): Promise<string> {
   return new SignJWT({ email })
     .setProtectedHeader({ alg: "RS256", kid: ACCESS_KEY_ID })
     .setIssuer(TEST_ACCESS_ISSUER)
-    .setAudience(TEST_ACCESS_AUD)
+    .setAudience(audience)
     .setIssuedAt()
     .setExpirationTime("5m")
     .sign(accessPrivateKey);
@@ -185,5 +189,19 @@ describe("Auth Middleware", () => {
       .first<{ id: number; email: string }>();
     expect(userAfter).not.toBeNull();
     expect(userAfter!.email).toBe(email);
+  });
+
+  it("[UC-AUTH-002-S10] rejects Access JWT with wrong audience", async () => {
+    const accessJwt = await createAccessJwtWithAudience(
+      "access-user@example.com",
+      "wrong-audience",
+    );
+
+    const res = await worker.fetch("http://localhost/api/me", {
+      headers: { "Cf-Access-Jwt-Assertion": accessJwt },
+    });
+    expect(res.status).toBe(401);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Unauthorized");
   });
 });

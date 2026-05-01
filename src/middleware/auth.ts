@@ -44,10 +44,12 @@ function getJwks(jwksUrl: string): ReturnType<typeof createRemoteJWKSet> {
 }
 
 function getAccessConfig(env: Bindings): {
-  audience: string | undefined;
+  audience: string;
   issuer: string;
   jwksUrl: string;
-} {
+} | null {
+  if (!env.ACCESS_AUD) return null;
+
   const issuer = env.ACCESS_ISSUER ?? DEFAULT_ACCESS_ISSUER;
   return {
     audience: env.ACCESS_AUD,
@@ -87,12 +89,13 @@ async function authenticateAccessJwt(
   accessJwt: string,
 ): Promise<AuthUser | null> {
   try {
-    const { audience, issuer, jwksUrl } = getAccessConfig(env);
-    const { payload } = await jwtVerify(
-      accessJwt,
-      getJwks(jwksUrl),
-      audience ? { issuer, audience } : { issuer },
-    );
+    const config = getAccessConfig(env);
+    if (!config) return null;
+
+    const { payload } = await jwtVerify(accessJwt, getJwks(config.jwksUrl), {
+      audience: config.audience,
+      issuer: config.issuer,
+    });
     const rawEmail = payload["email"];
     const email = typeof rawEmail === "string" ? rawEmail : null;
     if (!email) return null;

@@ -8,7 +8,7 @@
 |----|------|
 | R1 | `Authorization: Bearer <token>` validates against stored SHA-256 token hashes and loads the token owner from `users` |
 | R2 | Bearer token authentication takes priority over Cloudflare Access JWT authentication if both are present |
-| R3 | Web authentication requires a verified Cloudflare Access JWT from `CF_Authorization` cookie or `Cf-Access-Jwt-Assertion` header |
+| R3 | Web authentication requires a Cloudflare Access JWT from `CF_Authorization` cookie or `Cf-Access-Jwt-Assertion` header with verified signature, issuer, and configured audience |
 | R4 | `CF-Access-Authenticated-User-Email` alone is never sufficient to authenticate a request |
 | R5 | On first successful verified Cloudflare Access JWT auth for a new email, auto-create user record in users table |
 
@@ -25,6 +25,7 @@
 | UC-AUTH-002-S07 | P0 | ✅ | Given request has a valid Cloudflare Access JWT for user@example.com, When calling any authenticated endpoint, Then request succeeds with user@example.com as current user | R3 |
 | UC-AUTH-002-S08 | P0 | ✅ | Given request only has spoofed `CF-Access-Authenticated-User-Email: user@example.com` header, When calling any authenticated endpoint, Then return 401 unauthorized | R4 |
 | UC-AUTH-002-S09 | P1 | ✅ | Given a new email authenticates with a valid Cloudflare Access JWT for the first time, When request completes, Then user record created in users table | R5 |
+| UC-AUTH-002-S10 | P0 | ✅ | Given request has a Cloudflare Access JWT signed by a trusted key but for the wrong audience, When calling any authenticated endpoint, Then return 401 unauthorized | R3 |
 
 ### ai-e2e
 (none)
