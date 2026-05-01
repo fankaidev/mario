@@ -29,10 +29,10 @@ Format serves clarity — natural language that clearly explains doesn't need to
 
 | Strategy | Use Case | Execution Method |
 |----------|----------|------------------|
-| `api-test` | Pure backend logic, permissions, state changes | Standard automated tests |
-| `e2e-test` | Real UI, Agent, third-party integrations | E2E tests |
+| `api-test` | Pure backend logic, permissions, state changes | vitest integration tests |
+| `ai-e2e` | Real UI, Agent, third-party integrations | AI-driven browser tests |
 
-Priority order: api-test > e2e-test
+Priority order: api-test > ai-e2e
 
 ## Priority
 
@@ -75,7 +75,10 @@ Scenario table format:
 - Rules column only contains related Rule IDs, leave blank if none
 - Empty strategy groups show `(none)`, don't delete the section
 - Scenario ID is globally unique across the project
-- **When modifying scenarios**: Prefer assigning a new ID to avoid drift between specs and tests. If reusing the same ID, you must update the corresponding test implementation to match.
+- **ID reuse rules**:
+  - Use Case ID: only reuse if the core intent is unchanged; delete obsolete UCs, create new ones, or merge/split as needed
+  - Scenario ID: only reuse for wording-only changes; if the scenario logic changes, assign a new ID
+  - Keep tests in sync: delete tests for removed scenarios, add tests for new scenarios, update test names and content when scenario IDs or logic change
 
 ## Non-Goals
 
