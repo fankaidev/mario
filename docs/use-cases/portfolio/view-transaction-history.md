@@ -11,6 +11,7 @@
 | R3 | Transaction records cannot be edited, only deleted and re-entered |
 | R4 | Export API returns complete transaction list in JSON format, including all fields |
 | R5 | Transaction history can be filtered by symbol to show only transactions for a specific stock |
+| R6 | Each transaction includes stock name from stocks table, fallback to symbol if not yet populated |
 
 ## Scenarios
 
@@ -25,6 +26,8 @@
 | UC-PORTFOLIO-004-S05 | P1 | ❌ | Given portfolio has multiple transaction records, When calling export API, Then return JSON array containing all transaction fields | R4 |
 | UC-PORTFOLIO-004-S06 | P1 | ❌ | Given user is not logged in, When viewing transaction history, Then return 401 unauthorized |
 | UC-PORTFOLIO-004-S07 | P1 | ✅ | Given portfolio has AAPL (buy, sell, dividend) and TSLA (buy) transactions, When viewing transactions filtered by symbol=AAPL, Then return only AAPL transactions in date descending order | R5 |
+| UC-PORTFOLIO-004-S08 | P0 | ✅ | Given portfolio has AAPL buy transaction and stocks table has AAPL name "Apple Inc", When viewing transactions, Then AAPL transaction returns name "Apple Inc" | R6 |
+| UC-PORTFOLIO-004-S09 | P1 | ✅ | Given portfolio has AAPL transaction but stocks table has no entry, When viewing transactions, Then AAPL transaction returns name "AAPL" (symbol fallback) | R6 |
 
 ### ai-e2e
 (none)
