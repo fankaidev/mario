@@ -13,36 +13,60 @@ A personal portfolio tracker for US, HK, and China A-share markets. Deployed on 
 1. **Create Issue first** — Before making any changes, create a GitHub Issue describing:
    - Goal: What problem are we solving or what feature are we adding
    - Approach: How we plan to implement it
+   - **Checklist** (must complete before merge):
+     ```markdown
+     ## Checklist
+     - [ ] Use cases and tests updated
+     - [ ] CI passes
+     - [ ] Sub-agent review submitted on PR
+     - [ ] All PR comments resolved
+     ```
 
 2. **Audit & Update Use Cases** — Before writing code:
-   - Audit existing use cases for accuracy against current behavior
-   - Find or create the relevant use case in `docs/use-cases/`
-   - Define Rules (business invariants)
-   - Define Scenarios (Given/When/Then) with priorities (P0/P1/P2)
-   - Mark execution strategy: `api-test` or `e2e-test`
+   - Find relevant use cases in `docs/use-cases/{domain}/`
+   - **Use Case level**: Delete obsolete use cases, create new ones, or merge/split as needed. Only reuse UC ID if core intent unchanged
+   - **Rules**: Add/remove/modify business invariants
+   - **Scenarios**:
+     - Delete scenarios no longer valid
+     - Add new scenarios for new behavior
+     - Only reuse scenario ID for wording-only changes; new logic = new ID
+     - Mark priority: P0 (must test) / P1 (should test) / P2 (can defer)
+     - Mark strategy: `api-test` or `ai-e2e`
+     - Mark status: ❌ (not implemented) → ✅ (implemented and tested)
 
-3. **Implement with Tests** — For each scenario:
-   - P0 scenarios: must have automated tests before PR merge
-   - P1 scenarios: should be automated, can follow shortly after
-   - P2 scenarios: can defer automation
+3. **Implement with Tests** — Keep tests in sync with use cases:
+   - Delete tests for removed scenarios
+   - Add tests for new scenarios
+   - Update test names when scenario IDs change
+   - Test coverage requirements: P0 (must before merge) / P1 (should) / P2 (can defer)
    - `api-test` → vitest integration tests
-   - `e2e-test` → AI-driven browser tests
-   - **Test names must include UC scenario ID**, e.g.:
+   - `ai-e2e` → AI-driven browser tests
+   - **Test names must include scenario ID**, e.g.:
      ```typescript
      it('[UC-PORTFOLIO-001-S01] user creates portfolio and sees it in list', async () => {
      ```
 
 4. **Run pre-PR checks** — Before creating a PR, run `pnpm check`, inspect `git diff --stat origin/main...`, and inspect `git diff origin/main... -- docs/use-cases` when use cases may be affected. Confirm the diff scope matches the Issue and no required BDD updates are missing
 
-5. **Create PR for the Issue** — After implementation is complete, commit the changes, push the branch, and open a PR linked to the Issue
+5. **Create PR for the Issue** — After implementation is complete:
+   - Create branch `issue-{ID}` from `origin/main` (or use `/next-issue` skill which does this automatically)
+   - Commit changes, push branch, and open a PR
+   - Include `Closes #{issue_number}` in PR body to auto-close issue on merge
 
 6. **Wait for PR checks** — Wait for all PR checks to finish. If any check fails, investigate, fix the issue, commit and push the fix to the same PR branch, and wait for checks again until they pass
 
-7. **Review the PR** — Review the PR once checks pass. Start a subagent to perform an independent PR review so the review is less biased by the implementation context. The review must verify the diff matches the Issue and BDD scenarios, confirm no unrelated changes were introduced, and leave a PR comment summarizing the review result. If the subagent finds a blocking issue, fix it, commit and push the fix to the same PR branch, wait for checks again, and re-verify the specific risk before marking the review complete
+7. **Review the PR** — Once CI passes, **always spawn a sub-agent** for independent review (avoid bias from implementation context). Sub-agent must:
+   - Read Issue description and PR description carefully
+   - Verify all requirements in Issue are fully implemented
+   - Verify diff matches BDD scenarios
+   - Verify all `api-test` scenarios have test coverage (ai-e2e scenarios excluded)
+   - Confirm no unrelated changes
+   - Evaluate implementation approach for correctness and reasonableness
+   - **Submit review via `gh pr review`** (not just a comment)
 
 8. **Handle PR comments** — Inspect all PR comments and reviews. Blocking comments must be fixed or answered with a clear reason why no code change is needed. Non-blocking suggestions may be addressed immediately or converted into a follow-up Issue. After any PR follow-up fix, commit and push the fix to the same PR branch. After handling a comment, reply to the original comment with the fix commit, verification result, or follow-up Issue
 
-9. **Merge after approval** — After CI passes, independent review is complete, and all blocking comments are handled, merge the PR with `gh pr merge --squash` unless the user asks to leave it open
+9. **Merge** — Before merging, verify all Issue checklist items are checked. Then merge with `gh pr merge --squash --delete-branch`. The linked issue will auto-close via `Closes #XX` keyword
 
 This ensures all work is traceable, specified, tested, and documented.
 
