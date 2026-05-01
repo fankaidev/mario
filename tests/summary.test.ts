@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getPlatformProxy, unstable_dev } from "wrangler";
 import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase } from "./helpers";
+import { cleanDatabase, createApiTokenForUser } from "./helpers";
 
 let worker: UnstableDevWorker;
 let db: D1Database;
 let portfolioId: number;
+let authToken: string;
 
 beforeAll(async () => {
   const { env } = await getPlatformProxy<{ DB: D1Database }>();
@@ -26,6 +27,7 @@ beforeEach(async () => {
     .prepare("INSERT INTO users (email) VALUES (?) RETURNING id")
     .bind("test@example.com")
     .first<{ id: number }>();
+  authToken = await createApiTokenForUser(db, userResult!.id);
   const portfolioResult = await db
     .prepare("INSERT INTO portfolios (user_id, name, currency) VALUES (?, ?, ?) RETURNING id")
     .bind(userResult!.id, "US Stocks", "USD")
@@ -34,7 +36,7 @@ beforeEach(async () => {
 });
 
 function authHeaders(): Record<string, string> {
-  return { "CF-Access-Authenticated-User-Email": "test@example.com" };
+  return { Authorization: `Bearer ${authToken}` };
 }
 
 async function seedBuy(symbol: string, quantity: number, price: number, fee: number) {

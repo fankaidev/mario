@@ -12,8 +12,8 @@ export type AuthVariables = {
   user: AuthUser;
 };
 
-const ACCESS_URL = "https://fklj.cloudflareaccess.com";
-const JWKS = createRemoteJWKSet(new URL(`${ACCESS_URL}/cdn-cgi/access/certs`));
+const DEFAULT_ACCESS_ISSUER = "https://fklj.cloudflareaccess.com";
+const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 
 async function sha256(input: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -34,7 +34,32 @@ async function getOrCreateUser(db: D1Database, email: string): Promise<AuthUser>
   return { id: result.meta.last_row_id!, email };
 }
 
-async function authenticateBearer(db: D1Database, authHeader: string): Promise<AuthUser | null> {
+function getJwks(jwksUrl: string): ReturnType<typeof createRemoteJWKSet> {
+  const cached = jwksCache.get(jwksUrl);
+  if (cached) return cached;
+
+  const jwks = createRemoteJWKSet(new URL(jwksUrl));
+  jwksCache.set(jwksUrl, jwks);
+  return jwks;
+}
+
+function getAccessConfig(env: Bindings): {
+  audience: string | undefined;
+  issuer: string;
+  jwksUrl: string;
+} {
+  const issuer = env.ACCESS_ISSUER ?? DEFAULT_ACCESS_ISSUER;
+  return {
+    audience: env.ACCESS_AUD,
+    issuer,
+    jwksUrl: env.ACCESS_JWKS_URL ?? `${issuer}/cdn-cgi/access/certs`,
+  };
+}
+
+async function authenticateBearer(
+  db: D1Database,
+  authHeader: string | undefined,
+): Promise<AuthUser | null> {
   if (!authHeader?.startsWith("Bearer ")) return null;
   const token = authHeader.slice(7);
   const tokenHash = await sha256(token);
@@ -56,11 +81,18 @@ async function authenticateBearer(db: D1Database, authHeader: string): Promise<A
     .first<AuthUser>();
 }
 
-async function authenticateCookie(db: D1Database, cookie: string): Promise<AuthUser | null> {
+async function authenticateAccessJwt(
+  db: D1Database,
+  env: Bindings,
+  accessJwt: string,
+): Promise<AuthUser | null> {
   try {
-    const { payload } = await jwtVerify(cookie, JWKS, {
-      issuer: ACCESS_URL,
-    });
+    const { audience, issuer, jwksUrl } = getAccessConfig(env);
+    const { payload } = await jwtVerify(
+      accessJwt,
+      getJwks(jwksUrl),
+      audience ? { issuer, audience } : { issuer },
+    );
     const rawEmail = payload["email"];
     const email = typeof rawEmail === "string" ? rawEmail : null;
     if (!email) return null;
@@ -73,26 +105,19 @@ async function authenticateCookie(db: D1Database, cookie: string): Promise<AuthU
 export const auth = createMiddleware<{ Bindings: Bindings; Variables: AuthVariables }>(
   async (c, next) => {
     const authHeader = c.req.header("Authorization");
-    const bearerUser = authHeader ? await authenticateBearer(c.env.DB, authHeader) : null;
+    const bearerUser = await authenticateBearer(c.env.DB, authHeader);
     if (bearerUser) {
       c.set("user", bearerUser);
       return next();
     }
 
-    const cfAuthCookie = getCookie(c, "CF_Authorization");
-    if (cfAuthCookie) {
-      const cookieUser = await authenticateCookie(c.env.DB, cfAuthCookie);
-      if (cookieUser) {
-        c.set("user", cookieUser);
+    const accessJwt = c.req.header("Cf-Access-Jwt-Assertion") ?? getCookie(c, "CF_Authorization");
+    if (accessJwt) {
+      const accessUser = await authenticateAccessJwt(c.env.DB, c.env, accessJwt);
+      if (accessUser) {
+        c.set("user", accessUser);
         return next();
       }
-    }
-
-    const cfEmail = c.req.header("CF-Access-Authenticated-User-Email");
-    if (cfEmail) {
-      const user = await getOrCreateUser(c.env.DB, cfEmail);
-      c.set("user", user);
-      return next();
     }
 
     return c.json({ error: "Unauthorized" }, 401);
