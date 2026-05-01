@@ -5,8 +5,6 @@ import { LineChart } from "../components/LineChart";
 import { get, post, del } from "../lib/api";
 import type { HoldingLots } from "../../../shared/types/api";
 
-import type { HoldingLots } from "../../../shared/types/api";
-
 interface Tag {
   id: number;
   name: string;
