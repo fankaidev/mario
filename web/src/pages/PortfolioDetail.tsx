@@ -280,6 +280,8 @@ function HoldingsTab({
 
   if (isLoading) return <p className="text-sm text-gray-500">Loading...</p>;
 
+  const totalMarketValue = sortedHoldings.reduce((sum, h) => sum + (h.market_value ?? 0), 0);
+
   return (
     <div>
       {tags.length > 0 && (
@@ -307,10 +309,12 @@ function HoldingsTab({
             <tr className="border-b text-left">
               <Th label="Symbol" field="symbol" sort={sort} onSort={setSort} />
               <Th label="Qty" field="quantity" sort={sort} onSort={setSort} />
-              <Th label="Cost" field="cost" sort={sort} onSort={setSort} />
+              <Th label="Avg Cost" field="cost" sort={sort} onSort={setSort} />
               <Th label="Price" field="marketValue" sort={sort} onSort={setSort} />
+              <Th label="Mkt Value" field="marketValue" sort={sort} onSort={setSort} />
               <Th label="P&L" field="unrealizedPnl" sort={sort} onSort={setSort} />
               <Th label="P&L%" field="unrealizedPnlRate" sort={sort} onSort={setSort} />
+              <Th label="Weight%" field="marketValue" sort={sort} onSort={setSort} />
             </tr>
           </thead>
           <tbody>
@@ -338,7 +342,8 @@ function HoldingsTab({
                   )}
                 </td>
                 <td className="py-2">{h.quantity}</td>
-                <td className="py-2">{h.cost.toLocaleString()}</td>
+                <td className="py-2">{(h.cost / h.quantity).toFixed(2)}</td>
+                <td className="py-2">{h.price?.toLocaleString() ?? "-"}</td>
                 <td className="py-2">{h.market_value?.toLocaleString() ?? "-"}</td>
                 <td
                   className={`py-2 ${(h.unrealized_pnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}
@@ -349,6 +354,11 @@ function HoldingsTab({
                   className={`py-2 ${(h.unrealized_pnl_rate ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}
                 >
                   {h.unrealized_pnl_rate != null ? `${h.unrealized_pnl_rate}%` : "-"}
+                </td>
+                <td className="py-2 text-gray-500">
+                  {totalMarketValue > 0
+                    ? `${(((h.market_value ?? 0) / totalMarketValue) * 100).toFixed(1)}%`
+                    : "-"}
                 </td>
               </tr>
             ))}
@@ -384,7 +394,17 @@ function HoldingsTab({
               <span className="text-sm text-gray-500">{h.quantity} shares</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Cost: {h.cost.toLocaleString()}</span>
+              <span className="text-gray-500">Avg Cost: {(h.cost / h.quantity).toFixed(2)}</span>
+              <span className="text-gray-500">
+                {totalMarketValue > 0
+                  ? `${(((h.market_value ?? 0) / totalMarketValue) * 100).toFixed(1)}%`
+                  : "-"}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">
+                Mkt Value: {h.market_value?.toLocaleString() ?? "-"}
+              </span>
               <span
                 className={
                   h.unrealized_pnl != null && h.unrealized_pnl >= 0
