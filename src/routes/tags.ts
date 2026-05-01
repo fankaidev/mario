@@ -45,11 +45,28 @@ tags.get("/", async (c) => {
     .first();
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
 
+  const includeStocks = c.req.query("include_stocks") === "true";
+
   const rows = await c.env.DB.prepare("SELECT id, name FROM tags WHERE portfolio_id = ?")
     .bind(portfolioId)
-    .all();
+    .all<{ id: number; name: string }>();
 
-  return c.json({ data: rows.results });
+  if (!includeStocks) {
+    return c.json({ data: rows.results });
+  }
+
+  const tagsWithStocks = [];
+  for (const tag of rows.results) {
+    const stocks = await c.env.DB.prepare("SELECT symbol FROM stock_tags WHERE tag_id = ?")
+      .bind(tag.id)
+      .all<{ symbol: string }>();
+    tagsWithStocks.push({
+      ...tag,
+      symbols: stocks.results.map((s) => s.symbol),
+    });
+  }
+
+  return c.json({ data: tagsWithStocks });
 });
 
 tags.delete("/:tagId", async (c) => {

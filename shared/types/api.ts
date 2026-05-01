@@ -79,3 +79,17 @@ export interface CreatePortfolioSnapshotRequest {
   market_value: number;
   note?: string;
 }
+
+export interface Tag {
+  id: number;
+  portfolio_id: number;
+  name: string;
+}
+
+export interface TagWithStocks extends Tag {
+  symbols: string[];
+}
+
+export interface CreateTagRequest {
+  name: string;
+}
