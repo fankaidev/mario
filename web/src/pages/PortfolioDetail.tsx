@@ -371,11 +371,53 @@ function TransactionsTab({
   const queryClient = useQueryClient();
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [datePreset, setDatePreset] = useState("ALL");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
 
-  const queryString = symbolFilter ? `?symbol=${encodeURIComponent(symbolFilter)}` : "";
+  const presets: Record<string, string> = {
+    "1M": "Past Month",
+    "3M": "Past 3M",
+    "1Y": "Past Year",
+    YTD: "This Year",
+    ALL: "All Time",
+  };
+
+  const today = new Date().toISOString().split("T")[0]!;
+  let startDate: string | undefined;
+  let endDate: string | undefined;
+
+  if (datePreset === "1M") {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    startDate = d.toISOString().split("T")[0]!;
+    endDate = today;
+  } else if (datePreset === "3M") {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 3);
+    startDate = d.toISOString().split("T")[0]!;
+    endDate = today;
+  } else if (datePreset === "1Y") {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 1);
+    startDate = d.toISOString().split("T")[0]!;
+    endDate = today;
+  } else if (datePreset === "YTD") {
+    startDate = `${today.slice(0, 4)}-01-01`;
+    endDate = today;
+  } else if (datePreset === "CUSTOM") {
+    startDate = customStart || undefined;
+    endDate = customEnd || undefined;
+  }
+
+  const params = new URLSearchParams();
+  if (symbolFilter) params.set("symbol", symbolFilter);
+  if (startDate) params.set("startDate", startDate);
+  if (endDate) params.set("endDate", endDate);
+  const queryString = params.toString() ? `?${params.toString()}` : "";
 
   const { data, isLoading } = useQuery({
-    queryKey: ["transactions", id, symbolFilter],
+    queryKey: ["transactions", id, symbolFilter, startDate, endDate],
     queryFn: () => get<{ data: Transaction[] }>(`/portfolios/${id}/transactions${queryString}`),
   });
 
@@ -401,7 +443,7 @@ function TransactionsTab({
         </button>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap gap-2 items-center">
         <input
           type="text"
           value={symbolFilter}
@@ -409,6 +451,40 @@ function TransactionsTab({
           placeholder="Filter by symbol"
           className="w-full max-w-xs border rounded px-3 py-2 text-sm"
         />
+        <div className="flex gap-1 flex-wrap">
+          {Object.entries(presets).map(([key, label]) => (
+            <button
+              key={key}
+              className={`px-2 py-1 text-xs rounded cursor-pointer ${datePreset === key ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+              onClick={() => setDatePreset(key)}
+            >
+              {label}
+            </button>
+          ))}
+          <button
+            className={`px-2 py-1 text-xs rounded cursor-pointer ${datePreset === "CUSTOM" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+            onClick={() => setDatePreset("CUSTOM")}
+          >
+            Custom
+          </button>
+        </div>
+        {datePreset === "CUSTOM" && (
+          <div className="flex gap-2 items-center">
+            <input
+              type="date"
+              value={customStart}
+              onChange={(e) => setCustomStart(e.target.value)}
+              className="border rounded px-2 py-1 text-xs"
+            />
+            <span className="text-xs text-gray-500">to</span>
+            <input
+              type="date"
+              value={customEnd}
+              onChange={(e) => setCustomEnd(e.target.value)}
+              className="border rounded px-2 py-1 text-xs"
+            />
+          </div>
+        )}
       </div>
 
       <div className="space-y-1">

@@ -118,6 +118,8 @@ transactions.get("/", async (c) => {
   }
 
   const symbol = c.req.query("symbol")?.trim().toUpperCase();
+  const startDate = c.req.query("startDate")?.trim();
+  const endDate = c.req.query("endDate")?.trim();
 
   let query =
     "SELECT t.id, t.portfolio_id, t.symbol, t.type, t.quantity, t.price, t.fee, t.date, t.created_at, COALESCE(s.name, t.symbol) AS name FROM transactions t LEFT JOIN stocks s ON t.symbol = s.symbol WHERE t.portfolio_id = ?";
@@ -126,6 +128,16 @@ transactions.get("/", async (c) => {
   if (symbol) {
     query += " AND t.symbol = ?";
     params.push(symbol);
+  }
+
+  if (startDate) {
+    query += " AND t.date >= ?";
+    params.push(startDate);
+  }
+
+  if (endDate) {
+    query += " AND t.date <= ?";
+    params.push(endDate);
   }
 
   query += " ORDER BY date DESC, created_at DESC";
