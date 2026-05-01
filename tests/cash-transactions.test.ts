@@ -46,24 +46,41 @@ async function getCashBalance(): Promise<number> {
   return portfolio!.cash_balance;
 }
 
+async function createTransfer(
+  type: string,
+  amount: number,
+  fee: number,
+): Promise<{ status: number; data?: { id: number } }> {
+  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transfers`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ type, amount, fee, date: "2024-01-15" }),
+  });
+  const json = (await res.json()) as { data?: { id: number } };
+  return { status: res.status, data: json.data };
+}
+
 async function createTransaction(
   type: string,
   price: number,
   fee: number,
-  symbol?: string,
-  quantity?: number,
+  symbol: string,
+  quantity: number,
 ): Promise<{ status: number; data?: { id: number } }> {
-  const body: Record<string, unknown> = { type, price, fee, date: "2024-01-15" };
-  if (symbol) body.symbol = symbol;
-  if (quantity !== undefined) body.quantity = quantity;
-
   const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ type, price, fee, date: "2024-01-15", symbol, quantity }),
   });
   const json = (await res.json()) as { data?: { id: number } };
   return { status: res.status, data: json.data };
+}
+
+async function deleteTransfer(transferId: number): Promise<Response> {
+  return worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transfers/${transferId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
 }
 
 async function deleteTransaction(txId: number): Promise<Response> {
@@ -77,7 +94,7 @@ describe("Cash Transactions", () => {
   it("[UC-PORTFOLIO-006-S01] deposit increases cash_balance", async () => {
     expect(await getCashBalance()).toBe(0);
 
-    const result = await createTransaction("deposit", 10000, 0);
+    const result = await createTransfer("deposit", 10000, 0);
     expect(result.status).toBe(201);
 
     expect(await getCashBalance()).toBe(10000);
@@ -89,7 +106,7 @@ describe("Cash Transactions", () => {
       .bind(portfolioId)
       .run();
 
-    const result = await createTransaction("withdrawal", 3000, 0);
+    const result = await createTransfer("withdrawal", 3000, 0);
     expect(result.status).toBe(201);
 
     expect(await getCashBalance()).toBe(7000);
@@ -101,7 +118,7 @@ describe("Cash Transactions", () => {
       .bind(portfolioId)
       .run();
 
-    const result = await createTransaction("withdrawal", 2000, 0);
+    const result = await createTransfer("withdrawal", 2000, 0);
     expect(result.status).toBe(400);
 
     expect(await getCashBalance()).toBe(1000);
@@ -151,11 +168,11 @@ describe("Cash Transactions", () => {
   });
 
   it("[UC-PORTFOLIO-006-S07] deleting deposit reverses cash_balance", async () => {
-    const result = await createTransaction("deposit", 5000, 0);
+    const result = await createTransfer("deposit", 5000, 0);
     expect(result.status).toBe(201);
     expect(await getCashBalance()).toBe(5000);
 
-    const res = await deleteTransaction(result.data!.id);
+    const res = await deleteTransfer(result.data!.id);
     expect(res.status).toBe(200);
 
     expect(await getCashBalance()).toBe(0);
@@ -178,14 +195,14 @@ describe("Cash Transactions", () => {
   });
 
   it("[UC-PORTFOLIO-006-S09] deleting deposit fails if would cause negative balance from withdrawals", async () => {
-    const depositResult = await createTransaction("deposit", 10000, 0);
+    const depositResult = await createTransfer("deposit", 10000, 0);
     expect(depositResult.status).toBe(201);
 
-    const withdrawalResult = await createTransaction("withdrawal", 6000, 0);
+    const withdrawalResult = await createTransfer("withdrawal", 6000, 0);
     expect(withdrawalResult.status).toBe(201);
     expect(await getCashBalance()).toBe(4000);
 
-    const res = await deleteTransaction(depositResult.data!.id);
+    const res = await deleteTransfer(depositResult.data!.id);
     expect(res.status).toBe(400);
 
     expect(await getCashBalance()).toBe(4000);
@@ -204,7 +221,7 @@ describe("Cash Transactions", () => {
   });
 
   it("[UC-PORTFOLIO-006-S11] deposit with fee deducts fee from credited amount", async () => {
-    const result = await createTransaction("deposit", 10000, 50);
+    const result = await createTransfer("deposit", 10000, 50);
     expect(result.status).toBe(201);
 
     expect(await getCashBalance()).toBe(9950);
@@ -216,7 +233,7 @@ describe("Cash Transactions", () => {
       .bind(portfolioId)
       .run();
 
-    const result = await createTransaction("withdrawal", 1000, 25);
+    const result = await createTransfer("withdrawal", 1000, 25);
     expect(result.status).toBe(201);
 
     expect(await getCashBalance()).toBe(3975);

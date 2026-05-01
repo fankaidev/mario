@@ -17,19 +17,40 @@ export interface CreatePortfolioRequest {
   currency: "USD" | "HKD" | "CNY";
 }
 
-export type TransactionType = "buy" | "sell" | "dividend" | "initial" | "deposit" | "withdrawal";
+export type TransactionType = "buy" | "sell" | "dividend" | "initial";
 
 export interface Transaction {
   id: number;
   portfolio_id: number;
-  symbol: string | null;
+  symbol: string;
   type: TransactionType;
-  quantity: number | null;
+  quantity: number;
   price: number;
   fee: number;
   date: string;
   created_at: string;
   name: string | null;
+}
+
+export type TransferType = "deposit" | "withdrawal";
+
+export interface Transfer {
+  id: number;
+  portfolio_id: number;
+  type: TransferType;
+  amount: number;
+  fee: number;
+  date: string;
+  note: string | null;
+  created_at: string;
+}
+
+export interface CreateTransferRequest {
+  type: TransferType;
+  amount: number;
+  fee?: number;
+  date: string;
+  note?: string;
 }
 
 export interface Holding {
@@ -44,9 +65,9 @@ export interface Holding {
 }
 
 export interface CreateTransactionRequest {
-  symbol?: string;
+  symbol: string;
   type: TransactionType;
-  quantity?: number;
+  quantity: number;
   price: number;
   fee: number;
   date: string;

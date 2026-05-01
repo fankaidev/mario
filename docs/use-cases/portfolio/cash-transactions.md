@@ -1,6 +1,6 @@
 # UC-PORTFOLIO-006: Cash Transactions
 
-> Users deposit and withdraw cash to track portfolio cash balance.
+> Users deposit and withdraw cash to track portfolio cash balance. Cash transfers are stored in a separate `transfers` table.
 
 ## Rules
 
@@ -12,8 +12,8 @@
 | R4 | Buy transaction decreases cash_balance by (price × quantity + fee); negative cash_balance allowed (margin/unsettled) |
 | R5 | Sell transaction increases cash_balance by (price × quantity - fee) |
 | R6 | Dividend transaction increases cash_balance by (price - fee) |
-| R7 | Deleting a transaction reverses its cash_balance effect; for deposit, deletion blocked if it would result in insufficient cash for subsequent withdrawals |
-| R8 | Cash transactions (deposit/withdrawal) have symbol=NULL, quantity=NULL, use price field as amount |
+| R7 | Deleting a transfer reverses its cash_balance effect; for deposit, deletion blocked if it would result in insufficient cash for subsequent withdrawals |
+| R8 | Transfers (deposit/withdrawal) are stored in the `transfers` table with amount, fee, date, and optional note |
 
 ## Scenarios
 

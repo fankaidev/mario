@@ -42,7 +42,7 @@ function authHeaders(): Record<string, string> {
 async function seedDeposit(amount: number) {
   await db
     .prepare(
-      "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, NULL, 'deposit', NULL, ?, 0, '2024-01-01')",
+      "INSERT INTO transfers (portfolio_id, type, amount, fee, date) VALUES (?, 'deposit', ?, 0, '2024-01-01')",
     )
     .bind(portfolioId, amount)
     .run();
@@ -51,7 +51,7 @@ async function seedDeposit(amount: number) {
 async function seedWithdrawal(amount: number) {
   await db
     .prepare(
-      "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, NULL, 'withdrawal', NULL, ?, 0, '2024-01-01')",
+      "INSERT INTO transfers (portfolio_id, type, amount, fee, date) VALUES (?, 'withdrawal', ?, 0, '2024-01-01')",
     )
     .bind(portfolioId, amount)
     .run();
