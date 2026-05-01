@@ -35,7 +35,7 @@ function authHeaders(): Record<string, string> {
 }
 
 describe("Corporate Actions", () => {
-  it("processes stock split updating lot quantities", async () => {
+  it("[UC-PORTFOLIO-010-S01] processes stock split updating lot quantities", async () => {
     const txRes = await db
       .prepare(
         "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, 'AAPL', 'buy', 100, 150, 5, '2024-01-01')",
@@ -72,7 +72,7 @@ describe("Corporate Actions", () => {
     expect(lot!.cost_basis).toBe(15005);
   });
 
-  it("only affects open lots", async () => {
+  it("[UC-PORTFOLIO-010-S02] only affects open lots", async () => {
     const txRes = await db
       .prepare(
         "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, 'AAPL', 'buy', 100, 150, 5, '2024-01-01')",

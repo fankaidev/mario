@@ -123,7 +123,7 @@ describe("Price Update", () => {
     expect(updated).toBe(0);
   });
 
-  it("HTTP endpoint requires auth", async () => {
+  it("[UC-PORTFOLIO-005-S05] returns 401 when unauthenticated", async () => {
     const res = await worker.fetch("http://localhost/api/prices/update", {
       method: "POST",
     });

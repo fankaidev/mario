@@ -43,7 +43,7 @@ function authHeaders(): Record<string, string> {
 }
 
 describe("Portfolio Snapshots", () => {
-  it("[UC-PORTFOLIO-003-S01] creates a snapshot", async () => {
+  it("[UC-PORTFOLIO-008-S01] creates a snapshot", async () => {
     const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/snapshots`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
@@ -71,7 +71,7 @@ describe("Portfolio Snapshots", () => {
     expect(body.data.id).toBeGreaterThan(0);
   });
 
-  it("[UC-PORTFOLIO-003-S02] rejects duplicate date", async () => {
+  it("[UC-PORTFOLIO-008-S02] rejects duplicate date", async () => {
     await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/snapshots`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
@@ -88,7 +88,7 @@ describe("Portfolio Snapshots", () => {
     expect(body.error).toContain("already exists");
   });
 
-  it("[UC-PORTFOLIO-003-S03] lists snapshots sorted by date DESC", async () => {
+  it("[UC-PORTFOLIO-008-S03] lists snapshots sorted by date DESC", async () => {
     const dates = ["2024-01-15", "2024-06-30", "2024-12-31"];
     for (const date of dates) {
       await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/snapshots`, {
@@ -109,7 +109,7 @@ describe("Portfolio Snapshots", () => {
     expect(body.data[2].date).toBe("2024-01-15");
   });
 
-  it("[UC-PORTFOLIO-003-S04] deletes a snapshot", async () => {
+  it("[UC-PORTFOLIO-008-S04] deletes a snapshot", async () => {
     const createRes = await worker.fetch(
       `http://localhost/api/portfolios/${portfolioId}/snapshots`,
       {
@@ -137,7 +137,7 @@ describe("Portfolio Snapshots", () => {
     expect(listBody.data).toHaveLength(0);
   });
 
-  it("[UC-PORTFOLIO-003-S05] returns 404 for other user's portfolio", async () => {
+  it("[UC-PORTFOLIO-008-S05] returns 404 for other user's portfolio", async () => {
     const otherUserResult = await db
       .prepare("INSERT INTO users (email) VALUES (?) RETURNING id")
       .bind("other@example.com")

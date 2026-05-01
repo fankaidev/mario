@@ -1,4 +1,4 @@
-# UC-PORTFOLIO-003: Manage Portfolio Snapshots
+# UC-PORTFOLIO-008: Manage Portfolio Snapshots
 
 > Users can record historical portfolio snapshots for tracking total investment and market value over time. Weekly cron job auto-generates snapshots for active portfolios.
 
@@ -19,11 +19,11 @@
 
 | ID | Priority | Status | Scenario | Rules |
 |----|----------|--------|----------|-------|
-| UC-PORTFOLIO-003-S01 | P0 | ✅ | Given portfolio exists with no snapshots, When creating snapshot with date, total investment, and market value, Then return 201 with snapshot data | R1, R2, R3 |
-| UC-PORTFOLIO-003-S02 | P0 | ✅ | Given snapshot exists for 2024-12-31, When creating another snapshot for same date, Then return 409 conflict | R1 |
-| UC-PORTFOLIO-003-S03 | P1 | ✅ | Given multiple snapshots exist, When fetching all snapshots, Then return snapshots sorted by date DESC | |
-| UC-PORTFOLIO-003-S04 | P1 | ✅ | Given snapshot exists, When deleting snapshot, Then return 200 and snapshot no longer in list | R6 |
-| UC-PORTFOLIO-003-S05 | P1 | ✅ | Given portfolio belongs to another user, When attempting to create snapshot, Then return 404 not found | |
+| UC-PORTFOLIO-008-S01 | P0 | ✅ | Given portfolio exists with no snapshots, When creating snapshot with date, total investment, and market value, Then return 201 with snapshot data | R1, R2, R3 |
+| UC-PORTFOLIO-008-S02 | P0 | ✅ | Given snapshot exists for 2024-12-31, When creating another snapshot for same date, Then return 409 conflict | R1 |
+| UC-PORTFOLIO-008-S03 | P1 | ✅ | Given multiple snapshots exist, When fetching all snapshots, Then return snapshots sorted by date DESC | |
+| UC-PORTFOLIO-008-S04 | P1 | ✅ | Given snapshot exists, When deleting snapshot, Then return 200 and snapshot no longer in list | R6 |
+| UC-PORTFOLIO-008-S05 | P1 | ✅ | Given portfolio belongs to another user, When attempting to create snapshot, Then return 404 not found | |
 
 ### ai-e2e
 (none)
