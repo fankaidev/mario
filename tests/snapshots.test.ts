@@ -51,6 +51,7 @@ describe("Portfolio Snapshots", () => {
         date: "2024-12-31",
         total_investment: 100000,
         market_value: 120000,
+        cash_balance: 5000,
         note: "Year end",
       }),
     });
@@ -61,12 +62,14 @@ describe("Portfolio Snapshots", () => {
         date: string;
         total_investment: number;
         market_value: number;
+        cash_balance: number;
         note: string | null;
       };
     };
     expect(body.data.date).toBe("2024-12-31");
     expect(body.data.total_investment).toBe(100000);
     expect(body.data.market_value).toBe(120000);
+    expect(body.data.cash_balance).toBe(5000);
     expect(body.data.note).toBe("Year end");
     expect(body.data.id).toBeGreaterThan(0);
   });
@@ -75,13 +78,23 @@ describe("Portfolio Snapshots", () => {
     await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/snapshots`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({ date: "2024-12-31", total_investment: 100000, market_value: 120000 }),
+      body: JSON.stringify({
+        date: "2024-12-31",
+        total_investment: 100000,
+        market_value: 120000,
+        cash_balance: 5000,
+      }),
     });
 
     const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/snapshots`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({ date: "2024-12-31", total_investment: 110000, market_value: 130000 }),
+      body: JSON.stringify({
+        date: "2024-12-31",
+        total_investment: 110000,
+        market_value: 130000,
+        cash_balance: 6000,
+      }),
     });
     expect(res.status).toBe(409);
     const body = (await res.json()) as { error: string };
@@ -94,7 +107,12 @@ describe("Portfolio Snapshots", () => {
       await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/snapshots`, {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ date, total_investment: 100000, market_value: 120000 }),
+        body: JSON.stringify({
+          date,
+          total_investment: 100000,
+          market_value: 120000,
+          cash_balance: 5000,
+        }),
       });
     }
 
@@ -119,6 +137,7 @@ describe("Portfolio Snapshots", () => {
           date: "2024-12-31",
           total_investment: 100000,
           market_value: 120000,
+          cash_balance: 5000,
         }),
       },
     );
@@ -158,6 +177,7 @@ describe("Portfolio Snapshots", () => {
           date: "2024-12-31",
           total_investment: 100000,
           market_value: 120000,
+          cash_balance: 5000,
         }),
       },
     );
