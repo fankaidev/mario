@@ -3,4 +3,5 @@ export type Bindings = {
   ACCESS_AUD?: string;
   ACCESS_ISSUER?: string;
   ACCESS_JWKS_URL?: string;
+  FINNHUB_API_KEY?: string;
 };
