@@ -198,14 +198,40 @@ function HoldingsTab({
   onSelectSymbol: (symbol: string) => void;
 }) {
   const [sort, setSort] = useState<SortState>({ field: "unrealizedPnlRate", direction: "desc" });
+  const [tagFilter, setTagFilter] = useState<number | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["holdings", id],
     queryFn: () => get<{ data: Holding[] }>(`/portfolios/${id}/holdings`),
   });
 
+  const { data: tagsData } = useQuery({
+    queryKey: ["tags", id],
+    queryFn: () => get<{ data: Tag[] }>(`/portfolios/${id}/tags?include_stocks=true`),
+  });
+
+  const tags = tagsData?.data ?? [];
+  const symbolTags = (() => {
+    const map = new Map<string, Array<{ id: number; name: string }>>();
+    for (const tag of tags) {
+      for (const symbol of tag.symbols ?? []) {
+        const list = map.get(symbol) ?? [];
+        list.push({ id: tag.id, name: tag.name });
+        map.set(symbol, list);
+      }
+    }
+    return map;
+  })();
+
+  const filteredTagSymbols = new Set(
+    tagFilter !== null ? (tags.find((t) => t.id === tagFilter)?.symbols ?? []) : [],
+  );
+
   const sortedHoldings = useMemo(() => {
-    const holdings = data?.data ?? [];
+    let holdings = data?.data ?? [];
+    if (tagFilter !== null) {
+      holdings = holdings.filter((h) => filteredTagSymbols.has(h.symbol));
+    }
     const { field, direction } = sort;
 
     return [...holdings].sort((a, b) => {
@@ -250,12 +276,31 @@ function HoldingsTab({
 
       return direction === "desc" ? -cmp : cmp;
     });
-  }, [data?.data, sort]);
+  }, [data?.data, sort, tagFilter, filteredTagSymbols]);
 
   if (isLoading) return <p className="text-sm text-gray-500">Loading...</p>;
 
   return (
     <div>
+      {tags.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-1">
+          <button
+            className={`px-2 py-1 text-xs rounded cursor-pointer ${tagFilter === null ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+            onClick={() => setTagFilter(null)}
+          >
+            All
+          </button>
+          {tags.map((tag) => (
+            <button
+              key={tag.id}
+              className={`px-2 py-1 text-xs rounded cursor-pointer ${tagFilter === tag.id ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+              onClick={() => setTagFilter(tag.id === tagFilter ? null : tag.id)}
+            >
+              {tag.name}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -279,6 +324,18 @@ function HoldingsTab({
                     {h.symbol}
                   </button>
                   <div className="text-xs text-gray-500">{h.name}</div>
+                  {symbolTags.has(h.symbol) && (
+                    <div className="flex flex-wrap gap-0.5 mt-0.5">
+                      {symbolTags.get(h.symbol)!.map((tag) => (
+                        <span
+                          key={tag.id}
+                          className="px-1 py-0.5 bg-blue-50 text-blue-600 rounded text-xs"
+                        >
+                          {tag.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </td>
                 <td className="py-2">{h.quantity}</td>
                 <td className="py-2">{h.cost.toLocaleString()}</td>
@@ -311,6 +368,18 @@ function HoldingsTab({
                   {h.symbol}
                 </button>
                 <div className="text-xs text-gray-500">{h.name}</div>
+                {symbolTags.has(h.symbol) && (
+                  <div className="flex flex-wrap gap-0.5 mt-0.5">
+                    {symbolTags.get(h.symbol)!.map((tag) => (
+                      <span
+                        key={tag.id}
+                        className="px-1 py-0.5 bg-blue-50 text-blue-600 rounded text-xs"
+                      >
+                        {tag.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               <span className="text-sm text-gray-500">{h.quantity} shares</span>
             </div>
