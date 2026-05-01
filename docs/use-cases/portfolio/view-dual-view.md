@@ -1,4 +1,4 @@
-# UC-PORTFOLIO-005: View Portfolio with Dual-View
+# UC-PORTFOLIO-009: View Portfolio with Dual-View
 
 > Users can view portfolio holdings, snapshots, and return curves through a responsive tabbed interface with mobile-first design.
 
@@ -18,9 +18,9 @@
 
 | ID | Priority | Status | Scenario | Rules |
 |----|----------|--------|----------|-------|
-| UC-PORTFOLIO-005-S01 | P1 | ❌ | Given a portfolio with holdings and snapshots, When viewing portfolio detail, Then summary card shows key metrics and all tabs are accessible | R1, R5 |
-| UC-PORTFOLIO-005-S02 | P1 | ❌ | Given snapshots exist for a portfolio, When viewing the Return tab, Then return curve chart displays market value and return rate over time | R4 |
-| UC-PORTFOLIO-005-S03 | P1 | ❌ | Given a portfolio with no snapshots, When viewing the Return tab, Then a message indicates no data is available | R4 |
+| UC-PORTFOLIO-009-S01 | P1 | ❌ | Given a portfolio with holdings and snapshots, When viewing portfolio detail, Then summary card shows key metrics and all tabs are accessible | R1, R5 |
+| UC-PORTFOLIO-009-S02 | P1 | ❌ | Given snapshots exist for a portfolio, When viewing the Return tab, Then return curve chart displays market value and return rate over time | R4 |
+| UC-PORTFOLIO-009-S03 | P1 | ❌ | Given a portfolio with no snapshots, When viewing the Return tab, Then a message indicates no data is available | R4 |
 
 ### ai-e2e
 (none)
