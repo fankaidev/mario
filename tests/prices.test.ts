@@ -123,4 +123,21 @@ describe("Price Update", () => {
     });
     expect(res.status).toBe(401);
   });
+
+  it("[UC-PORTFOLIO-005-S06] stores stock name in stocks table", async () => {
+    await seedLot("AAPL");
+
+    const fetcher = new FakePriceFetcher();
+    fetcher.setPrice("AAPL", 180);
+    fetcher.setName("AAPL", "Apple Inc");
+
+    const updated = await updatePrices(db, fetcher);
+    expect(updated).toBe(1);
+
+    const row = await db
+      .prepare("SELECT name FROM stocks WHERE symbol = ?")
+      .bind("AAPL")
+      .first<{ name: string }>();
+    expect(row!.name).toBe("Apple Inc");
+  });
 });

@@ -6,6 +6,7 @@ import { get, post, del } from "../lib/api";
 
 interface Holding {
   symbol: string;
+  name: string;
   quantity: number;
   cost: number;
   price: number | null;
@@ -17,6 +18,7 @@ interface Holding {
 interface Transaction {
   id: number;
   symbol: string;
+  name: string;
   type: string;
   quantity: number;
   price: number;
@@ -268,6 +270,7 @@ function HoldingsTab({
                   >
                     {h.symbol}
                   </button>
+                  <div className="text-xs text-gray-500">{h.name}</div>
                 </td>
                 <td className="py-2">{h.quantity}</td>
                 <td className="py-2">{h.cost.toLocaleString()}</td>
@@ -292,12 +295,15 @@ function HoldingsTab({
         {sortedHoldings.map((h) => (
           <div key={h.symbol} className="bg-white rounded-lg border p-3">
             <div className="flex justify-between items-center mb-2">
-              <button
-                className="font-semibold text-blue-600 cursor-pointer"
-                onClick={() => onSelectSymbol(h.symbol)}
-              >
-                {h.symbol}
-              </button>
+              <div>
+                <button
+                  className="font-semibold text-blue-600 cursor-pointer"
+                  onClick={() => onSelectSymbol(h.symbol)}
+                >
+                  {h.symbol}
+                </button>
+                <div className="text-xs text-gray-500">{h.name}</div>
+              </div>
               <span className="text-sm text-gray-500">{h.quantity} shares</span>
             </div>
             <div className="flex justify-between text-sm">
@@ -410,6 +416,7 @@ function TransactionsTab({
           <div key={tx.id} className="flex items-center justify-between py-2 border-b text-sm">
             <div>
               <span className="font-medium">{tx.symbol}</span>
+              <span className="ml-2 text-xs text-gray-500">{tx.name}</span>
               <span
                 className={`ml-2 px-1.5 py-0.5 rounded text-xs ${
                   tx.type === "buy"

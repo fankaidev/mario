@@ -128,4 +128,30 @@ describe("View Holdings", () => {
     const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/holdings`);
     expect(res.status).toBe(401);
   });
+
+  it("[UC-PORTFOLIO-003-S08] returns stock name from stocks table", async () => {
+    await seedLot("AAPL", 100, 15000, 100);
+    await db
+      .prepare("INSERT INTO stocks (symbol, name) VALUES (?, ?)")
+      .bind("AAPL", "Apple Inc")
+      .run();
+
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/holdings`, {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: Array<{ symbol: string; name: string }> };
+    expect(body.data[0].name).toBe("Apple Inc");
+  });
+
+  it("[UC-PORTFOLIO-003-S09] falls back to symbol when stocks table has no name", async () => {
+    await seedLot("AAPL", 100, 15000, 100);
+
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/holdings`, {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: Array<{ symbol: string; name: string }> };
+    expect(body.data[0].name).toBe("AAPL");
+  });
 });
