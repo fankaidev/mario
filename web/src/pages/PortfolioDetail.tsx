@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
 import { LineChart } from "../components/LineChart";
@@ -169,6 +169,19 @@ function MetricBox({
   );
 }
 
+type SortField =
+  | "symbol"
+  | "quantity"
+  | "cost"
+  | "marketValue"
+  | "unrealizedPnl"
+  | "unrealizedPnlRate";
+type SortDirection = "asc" | "desc";
+interface SortState {
+  field: SortField;
+  direction: SortDirection;
+}
+
 function HoldingsTab({
   id,
   onSelectSymbol,
@@ -176,12 +189,60 @@ function HoldingsTab({
   id: string;
   onSelectSymbol: (symbol: string) => void;
 }) {
-  const [sort, setSort] = useState("unrealizedPnlRate");
+  const [sort, setSort] = useState<SortState>({ field: "unrealizedPnlRate", direction: "desc" });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["holdings", id, sort],
-    queryFn: () => get<{ data: Holding[] }>(`/portfolios/${id}/holdings?sort=${sort}`),
+    queryKey: ["holdings", id],
+    queryFn: () => get<{ data: Holding[] }>(`/portfolios/${id}/holdings`),
   });
+
+  const sortedHoldings = useMemo(() => {
+    const holdings = data?.data ?? [];
+    const { field, direction } = sort;
+
+    return [...holdings].sort((a, b) => {
+      let aVal: number | string | null;
+      let bVal: number | string | null;
+
+      switch (field) {
+        case "symbol":
+          aVal = a.symbol;
+          bVal = b.symbol;
+          break;
+        case "quantity":
+          aVal = a.quantity;
+          bVal = b.quantity;
+          break;
+        case "cost":
+          aVal = a.cost;
+          bVal = b.cost;
+          break;
+        case "marketValue":
+          aVal = a.market_value;
+          bVal = b.market_value;
+          break;
+        case "unrealizedPnl":
+          aVal = a.unrealized_pnl;
+          bVal = b.unrealized_pnl;
+          break;
+        case "unrealizedPnlRate":
+          aVal = a.unrealized_pnl_rate;
+          bVal = b.unrealized_pnl_rate;
+          break;
+      }
+
+      if (aVal === null && bVal === null) return 0;
+      if (aVal === null) return 1;
+      if (bVal === null) return -1;
+
+      const cmp =
+        typeof aVal === "string" && typeof bVal === "string"
+          ? aVal.localeCompare(bVal)
+          : (aVal as number) - (bVal as number);
+
+      return direction === "desc" ? -cmp : cmp;
+    });
+  }, [data?.data, sort]);
 
   if (isLoading) return <p className="text-sm text-gray-500">Loading...</p>;
 
@@ -200,7 +261,7 @@ function HoldingsTab({
             </tr>
           </thead>
           <tbody>
-            {data?.data.map((h) => (
+            {sortedHoldings.map((h) => (
               <tr key={h.symbol} className="border-b">
                 <td className="py-2">
                   <button
@@ -231,7 +292,7 @@ function HoldingsTab({
       </div>
 
       <div className="md:hidden space-y-2">
-        {data?.data.map((h) => (
+        {sortedHoldings.map((h) => (
           <div key={h.symbol} className="bg-white rounded-lg border p-3">
             <div className="flex justify-between items-center mb-2">
               <div>
@@ -262,7 +323,7 @@ function HoldingsTab({
         ))}
       </div>
 
-      {data?.data.length === 0 && (
+      {sortedHoldings.length === 0 && (
         <p className="text-sm text-gray-500 text-center py-4">No holdings</p>
       )}
     </div>
@@ -276,13 +337,24 @@ function Th({
   onSort,
 }: {
   label: string;
-  field: string;
-  sort: string;
-  onSort: (f: string) => void;
+  field: SortField;
+  sort: SortState;
+  onSort: (s: SortState) => void;
 }) {
+  const isActive = sort.field === field;
+  const arrow = isActive ? (sort.direction === "asc" ? "↑" : "↓") : "";
+
   return (
-    <th className="py-2 pr-4 cursor-pointer select-none" onClick={() => onSort(field)}>
-      {label} {sort === field ? "↓" : ""}
+    <th
+      className="py-2 pr-4 cursor-pointer select-none"
+      onClick={() =>
+        onSort({
+          field,
+          direction: isActive && sort.direction === "asc" ? "desc" : "asc",
+        })
+      }
+    >
+      {label} {arrow}
     </th>
   );
 }

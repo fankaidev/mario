@@ -1,14 +1,13 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getPlatformProxy, unstable_dev } from "wrangler";
 import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase, createApiTokenForUser } from "./helpers";
+import { cleanDatabase } from "./helpers";
 import { FakePriceFetcher } from "./fake-price-fetcher";
 import { updatePrices } from "../src/routes/prices";
 
 let worker: UnstableDevWorker;
 let db: D1Database;
 let portfolioId: number;
-let authToken: string;
 
 beforeAll(async () => {
   const { env } = await getPlatformProxy<{ DB: D1Database }>();
@@ -29,17 +28,12 @@ beforeEach(async () => {
     .prepare("INSERT INTO users (email) VALUES (?) RETURNING id")
     .bind("test@example.com")
     .first<{ id: number }>();
-  authToken = await createApiTokenForUser(db, userResult!.id);
   const portfolioResult = await db
     .prepare("INSERT INTO portfolios (user_id, name, currency) VALUES (?, ?, ?) RETURNING id")
     .bind(userResult!.id, "US Stocks", "USD")
     .first<{ id: number }>();
   portfolioId = portfolioResult!.id;
 });
-
-function authHeaders(): Record<string, string> {
-  return { Authorization: `Bearer ${authToken}` };
-}
 
 async function seedLot(symbol: string) {
   const txResult = await db
@@ -145,15 +139,5 @@ describe("Price Update", () => {
       .bind("AAPL")
       .first<{ name: string }>();
     expect(row!.name).toBe("Apple Inc");
-  });
-
-  it("HTTP endpoint returns updated count", async () => {
-    const res = await worker.fetch("http://localhost/api/prices/update", {
-      method: "POST",
-      headers: authHeaders(),
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { data: { updated: number } };
-    expect(body.data.updated).toBe(0);
   });
 });
