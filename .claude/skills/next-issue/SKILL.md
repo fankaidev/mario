@@ -18,9 +18,17 @@ Pick and start work on a GitHub issue.
    - Priority label first (P0 > P1 > P2 > no priority)
    - Then by issue number (lowest first)
 2. **Add label** - mark issue as `in-progress`
-3. **Create branch** - `issue-{ID}` from `origin/main`
-4. **Show details** - display issue title and body
-5. **Enter plan mode** - start planning the implementation
+3. **Ensure checklist** - check if issue body contains the required checklist. If missing, append it:
+   ```markdown
+   ## Checklist
+   - [ ] Use cases and tests updated
+   - [ ] CI passes
+   - [ ] Sub-agent review submitted on PR
+   - [ ] All PR comments resolved
+   ```
+4. **Create branch** - `issue-{ID}` from `origin/main`
+5. **Show details** - display issue title and body
+6. **Start design phase** - carefully design use case updates and implementation approach before writing any code
 
 ## Commands
 
