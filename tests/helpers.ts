@@ -16,7 +16,7 @@ export async function cleanDatabase(db: D1Database) {
       await db.exec("CREATE TABLE transactions_new AS SELECT * FROM transactions");
       await db.exec("DROP TABLE transactions");
       await db.exec(
-        "CREATE TABLE transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, portfolio_id INTEGER NOT NULL REFERENCES portfolios(id), symbol TEXT, type TEXT NOT NULL CHECK (type IN ('buy','sell','dividend','initial','deposit','withdrawal')), quantity REAL CHECK (quantity >= 0), price REAL NOT NULL CHECK (price >= 0), fee REAL NOT NULL DEFAULT 0 CHECK (fee >= 0), date TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))",
+        "CREATE TABLE transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, portfolio_id INTEGER NOT NULL REFERENCES portfolios(id), symbol TEXT, type TEXT NOT NULL CHECK (type IN ('buy','sell','dividend','initial','deposit','withdrawal')), quantity REAL CHECK (quantity >= 0), price REAL NOT NULL CHECK (price >= 0), fee REAL NOT NULL DEFAULT 0 CHECK (fee >= 0), date TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), CHECK ((type IN ('deposit', 'withdrawal') AND symbol IS NULL AND quantity IS NULL) OR (type NOT IN ('deposit', 'withdrawal') AND symbol IS NOT NULL AND quantity IS NOT NULL)))",
       );
       await db.exec("INSERT INTO transactions SELECT * FROM transactions_new");
       await db.exec("DROP TABLE transactions_new");

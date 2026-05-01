@@ -39,6 +39,24 @@ function authHeaders(): Record<string, string> {
   return { Authorization: `Bearer ${authToken}` };
 }
 
+async function seedDeposit(amount: number) {
+  await db
+    .prepare(
+      "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, NULL, 'deposit', NULL, ?, 0, '2024-01-01')",
+    )
+    .bind(portfolioId, amount)
+    .run();
+}
+
+async function seedWithdrawal(amount: number) {
+  await db
+    .prepare(
+      "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, NULL, 'withdrawal', NULL, ?, 0, '2024-01-01')",
+    )
+    .bind(portfolioId, amount)
+    .run();
+}
+
 async function seedBuy(symbol: string, quantity: number, price: number, fee: number) {
   const txRes = await db
     .prepare(
@@ -110,6 +128,7 @@ async function getSummary() {
 
 describe("Portfolio Summary", () => {
   it("[UC-PORTFOLIO-006-S01] calculates all metrics correctly", async () => {
+    await seedDeposit(20000);
     await seedBuy("AAPL", 100, 150, 5);
     await seedBuy("TSLA", 50, 100, 3);
     await db
@@ -119,14 +138,16 @@ describe("Portfolio Summary", () => {
       .run();
 
     const { data } = await getSummary();
-    expect(data.total_investment).toBe(15005 + 5003);
+    expect(data.total_investment).toBe(20000);
     expect(data.total_market_value).toBe(18000 + 4500);
     expect(data.unrealized_pnl).toBeCloseTo(2492, 0);
     expect(data.realized_pnl).toBe(0);
     expect(data.total_pnl).toBeCloseTo(2492, 0);
+    expect(data.return_rate).toBeCloseTo((2492 / 20000) * 100, 0);
   });
 
   it("[UC-PORTFOLIO-006-S02] includes realized P&L from sells", async () => {
+    await seedDeposit(25000);
     await seedBuy("MSFT", 100, 200, 5);
     const lotRow = await db.prepare("SELECT id FROM lots").first<{ id: number }>();
     await seedSell("MSFT", 50, 220, 5, lotRow!.id, 50);
@@ -135,6 +156,7 @@ describe("Portfolio Summary", () => {
       .run();
 
     const { data } = await getSummary();
+    expect(data.total_investment).toBe(25000);
     expect(data.realized_pnl).toBeGreaterThan(0);
   });
 
@@ -159,5 +181,14 @@ describe("Portfolio Summary", () => {
     expect(data.realized_pnl).toBe(0);
     expect(data.dividend_income).toBe(0);
     expect(data.total_pnl).toBe(0);
+  });
+
+  it("[UC-PORTFOLIO-006-S06] calculates total_investment from deposits minus withdrawals", async () => {
+    await seedDeposit(50000);
+    await seedDeposit(20000);
+    await seedWithdrawal(10000);
+
+    const { data } = await getSummary();
+    expect(data.total_investment).toBe(60000);
   });
 });

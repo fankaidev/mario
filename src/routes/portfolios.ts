@@ -130,8 +130,8 @@ portfolios.get("/:id/summary", async (c) => {
     .first();
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
 
-  const buyRow = await c.env.DB.prepare(
-    "SELECT SUM(quantity * price + fee) AS total FROM transactions WHERE portfolio_id = ? AND type IN ('buy', 'initial')",
+  const investmentRow = await c.env.DB.prepare(
+    "SELECT SUM(CASE WHEN type = 'deposit' THEN price ELSE -price END) AS total FROM transactions WHERE portfolio_id = ? AND type IN ('deposit', 'withdrawal')",
   )
     .bind(portfolioId)
     .first<{ total: number | null }>();
@@ -172,7 +172,7 @@ portfolios.get("/:id/summary", async (c) => {
     .bind(portfolioId)
     .first<{ buy_fees: number | null; sell_fees: number | null; withholding_tax: number | null }>();
 
-  const totalInvestment = buyRow?.total ?? 0;
+  const totalInvestment = investmentRow?.total ?? 0;
   const unrealizedPnl = totalMarketValue - totalCost;
   const realizedPnl = realizedPnlRow?.total ?? 0;
   const realizedWithFee = realizedPnl - (feeRow?.sell_fees ?? 0);

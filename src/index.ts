@@ -77,8 +77,8 @@ export default {
         .first();
       if (existing) continue;
 
-      const buyRow = await env.DB.prepare(
-        "SELECT COALESCE(SUM(quantity * price + fee), 0) AS total FROM transactions WHERE portfolio_id = ? AND type IN ('buy', 'initial')",
+      const investmentRow = await env.DB.prepare(
+        "SELECT COALESCE(SUM(CASE WHEN type = 'deposit' THEN price ELSE -price END), 0) AS total FROM transactions WHERE portfolio_id = ? AND type IN ('deposit', 'withdrawal')",
       )
         .bind(portfolioId)
         .first<{ total: number }>();
@@ -102,7 +102,7 @@ export default {
       await env.DB.prepare(
         "INSERT INTO portfolio_snapshots (portfolio_id, date, total_investment, market_value) VALUES (?, ?, ?, ?)",
       )
-        .bind(portfolioId, today, buyRow?.total ?? 0, marketValue)
+        .bind(portfolioId, today, investmentRow?.total ?? 0, marketValue)
         .run();
     }
     console.log(`Scheduled snapshots generated for ${portfolios.results.length} portfolios`);
