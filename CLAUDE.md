@@ -16,37 +16,42 @@ A personal portfolio tracker for US, HK, and China A-share markets. Deployed on 
    - **Checklist** (must complete before merge):
      ```markdown
      ## Checklist
-     - [ ] Use cases updated
-     - [ ] Tests match use cases  
+     - [ ] Use cases and tests updated
      - [ ] CI passes
      - [ ] Sub-agent review submitted on PR
      - [ ] All PR comments resolved
      ```
 
 2. **Audit & Update Use Cases** — Before writing code:
-   - Audit existing use cases for accuracy against current behavior
-   - Find or create the relevant use case in `docs/use-cases/`
-   - **Delete** scenarios that are no longer valid
-   - **Add** new scenarios for new behavior
-   - **Scenario ID rule**: Only reuse an existing ID for wording-only changes. If the scenario logic changes, assign a new ID
-   - Define Rules (business invariants)
-   - Define Scenarios (Given/When/Then) with priorities (P0/P1/P2)
-   - Mark execution strategy: `api-test` or `e2e-test`
+   - Find relevant use cases in `docs/use-cases/{domain}/`
+   - **Use Case level**: Delete obsolete use cases, create new ones, or merge/split as needed. Only reuse UC ID if core intent unchanged
+   - **Rules**: Add/remove/modify business invariants
+   - **Scenarios**:
+     - Delete scenarios no longer valid
+     - Add new scenarios for new behavior
+     - Only reuse scenario ID for wording-only changes; new logic = new ID
+     - Mark priority: P0 (must test) / P1 (should test) / P2 (can defer)
+     - Mark strategy: `api-test` or `ai-e2e`
+     - Mark status: ❌ (not implemented) → ✅ (implemented and tested)
 
-3. **Implement with Tests** — For each scenario:
-   - P0 scenarios: must have automated tests before PR merge
-   - P1 scenarios: should be automated, can follow shortly after
-   - P2 scenarios: can defer automation
+3. **Implement with Tests** — Keep tests in sync with use cases:
+   - Delete tests for removed scenarios
+   - Add tests for new scenarios
+   - Update test names when scenario IDs change
+   - Test coverage requirements: P0 (must before merge) / P1 (should) / P2 (can defer)
    - `api-test` → vitest integration tests
-   - `e2e-test` → AI-driven browser tests
-   - **Test names must include UC scenario ID**, e.g.:
+   - `ai-e2e` → AI-driven browser tests
+   - **Test names must include scenario ID**, e.g.:
      ```typescript
      it('[UC-PORTFOLIO-001-S01] user creates portfolio and sees it in list', async () => {
      ```
 
 4. **Run pre-PR checks** — Before creating a PR, run `pnpm check`, inspect `git diff --stat origin/main...`, and inspect `git diff origin/main... -- docs/use-cases` when use cases may be affected. Confirm the diff scope matches the Issue and no required BDD updates are missing
 
-5. **Create PR for the Issue** — After implementation is complete, commit the changes, push the branch, and open a PR. Include `Closes #{issue_number}` in PR body to auto-close issue on merge
+5. **Create PR for the Issue** — After implementation is complete:
+   - Create branch `issue-{ID}` from `origin/main` (or use `/next-issue` skill which does this automatically)
+   - Commit changes, push branch, and open a PR
+   - Include `Closes #{issue_number}` in PR body to auto-close issue on merge
 
 6. **Wait for PR checks** — Wait for all PR checks to finish. If any check fails, investigate, fix the issue, commit and push the fix to the same PR branch, and wait for checks again until they pass
 
