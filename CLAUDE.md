@@ -68,6 +68,8 @@ A personal portfolio tracker for US, HK, and China A-share markets. Deployed on 
 
 9. **Merge** — Before merging, verify all Issue checklist items are checked. Then merge with `gh pr merge --squash --delete-branch`. The linked issue will auto-close via `Closes #XX` keyword
 
+10. **Wait for CD** — After merge, wait for the CD workflow to complete successfully. Development is only considered done when the change is deployed to production. If CD fails, investigate and fix immediately.
+
 This ensures all work is traceable, specified, tested, and documented.
 
 **Exception for trivial changes:** Typos, dependency updates, and config tweaks can skip the full workflow — commit directly to main with a clear commit message.
