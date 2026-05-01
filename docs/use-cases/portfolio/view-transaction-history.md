@@ -12,6 +12,7 @@
 | R4 | Export API returns complete transaction list in JSON format, including all fields |
 | R5 | Transaction history can be filtered by symbol to show only transactions for a specific stock |
 | R6 | Each transaction includes stock name from stocks table, fallback to symbol if not yet populated |
+| R7 | Transaction history can be filtered by date range using startDate and endDate query parameters (YYYY-MM-DD format), inclusive on both ends |
 
 ## Scenarios
 
@@ -28,6 +29,9 @@
 | UC-PORTFOLIO-004-S07 | P1 | ✅ | Given portfolio has AAPL (buy, sell, dividend) and TSLA (buy) transactions, When viewing transactions filtered by symbol=AAPL, Then return only AAPL transactions in date descending order | R5 |
 | UC-PORTFOLIO-004-S08 | P0 | ✅ | Given portfolio has AAPL buy transaction and stocks table has AAPL name "Apple Inc", When viewing transactions, Then AAPL transaction returns name "Apple Inc" | R6 |
 | UC-PORTFOLIO-004-S09 | P1 | ✅ | Given portfolio has AAPL transaction but stocks table has no entry, When viewing transactions, Then AAPL transaction returns name "AAPL" (symbol fallback) | R6 |
+| UC-PORTFOLIO-004-S10 | P0 | ✅ | Given portfolio has 3 transactions (dates 2024-01-15, 2024-03-01, 2024-06-20), When filtering with startDate=2024-02-01 and endDate=2024-05-01, Then return only 2024-03-01 transaction | R7 |
+| UC-PORTFOLIO-004-S11 | P1 | ✅ | Given portfolio has 3 transactions (dates 2024-01-15, 2024-03-01, 2024-06-20), When filtering with startDate=2024-03-01 (no endDate), Then return 2024-03-01 and 2024-06-20 transactions | R7 |
+| UC-PORTFOLIO-004-S12 | P1 | ✅ | Given portfolio has 3 transactions (dates 2024-01-15, 2024-03-01, 2024-06-20), When filtering with endDate=2024-02-01 (no startDate), Then return only 2024-01-15 transaction | R7 |
 
 ### ai-e2e
 (none)

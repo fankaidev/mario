@@ -362,6 +362,14 @@ describe("Transaction History", () => {
     return (await res.json()) as { data: Array<{ id: number; type: string; date: string }> };
   }
 
+  async function getTransactionsWithParams(params: string) {
+    const res = await worker.fetch(
+      `http://localhost/api/portfolios/${portfolioId}/transactions${params}`,
+      { headers: authHeaders() },
+    );
+    return (await res.json()) as { data: Array<{ id: number; type: string; date: string }> };
+  }
+
   async function deleteTransaction(txId: number) {
     return worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions/${txId}`, {
       method: "DELETE",
@@ -517,5 +525,36 @@ describe("Transaction History", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: Array<{ symbol: string; name: string }> };
     expect(body.data[0].name).toBe("AAPL");
+  });
+
+  it("[UC-PORTFOLIO-004-S10] filters by date range with startDate and endDate", async () => {
+    await makeBuy("AAPL", 10, 150, "2024-01-15");
+    await makeBuy("TSLA", 5, 200, "2024-03-01");
+    await makeBuy("NVDA", 8, 100, "2024-06-20");
+
+    const body = await getTransactionsWithParams("?startDate=2024-02-01&endDate=2024-05-01");
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].symbol).toBe("TSLA");
+  });
+
+  it("[UC-PORTFOLIO-004-S11] filters with startDate only", async () => {
+    await makeBuy("AAPL", 10, 150, "2024-01-15");
+    await makeBuy("TSLA", 5, 200, "2024-03-01");
+    await makeBuy("NVDA", 8, 100, "2024-06-20");
+
+    const body = await getTransactionsWithParams("?startDate=2024-03-01");
+    expect(body.data).toHaveLength(2);
+    expect(body.data[0].date).toBe("2024-06-20");
+    expect(body.data[1].date).toBe("2024-03-01");
+  });
+
+  it("[UC-PORTFOLIO-004-S12] filters with endDate only", async () => {
+    await makeBuy("AAPL", 10, 150, "2024-01-15");
+    await makeBuy("TSLA", 5, 200, "2024-03-01");
+    await makeBuy("NVDA", 8, 100, "2024-06-20");
+
+    const body = await getTransactionsWithParams("?endDate=2024-02-01");
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].date).toBe("2024-01-15");
   });
 });
