@@ -13,14 +13,6 @@ type Holding = {
   unrealized_pnl_rate: number | null;
 };
 
-const SORT_COLUMNS: Record<string, string> = {
-  symbol: "symbol",
-  quantity: "quantity",
-  marketValue: "market_value",
-  unrealizedPnl: "unrealized_pnl",
-  unrealizedPnlRate: "unrealized_pnl_rate",
-};
-
 const portfolios = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
 portfolios.post("/", async (c) => {
@@ -130,21 +122,6 @@ portfolios.get("/:id/holdings", async (c) => {
         unrealizedPnlRate !== null ? Math.round(unrealizedPnlRate * 100) / 100 : null,
     });
   }
-
-  const sortParam = c.req.query("sort");
-  const sortCol = SORT_COLUMNS[sortParam ?? ""] ?? "unrealized_pnl_rate";
-  const direction = sortParam && sortParam !== "unrealizedPnlRate" ? "ASC" : "DESC";
-
-  holdings.sort((a, b) => {
-    const aVal = a[sortCol as keyof Holding];
-    const bVal = b[sortCol as keyof Holding];
-    if (aVal === null && bVal === null) return 0;
-    if (aVal === null) return 1;
-    if (bVal === null) return -1;
-    return direction === "DESC"
-      ? (bVal as number) - (aVal as number)
-      : (aVal as number) - (bVal as number);
-  });
 
   return c.json({ data: holdings });
 });

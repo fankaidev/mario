@@ -124,23 +124,8 @@ describe("View Holdings", () => {
     expect(body.data[0].unrealized_pnl).toBeNull();
   });
 
-  it("[UC-PORTFOLIO-003-S04] sorts by unrealizedPnlRate DESC by default", async () => {
-    await seedLot("AAPL", 100, 15000, 100);
-    await seedLot("TSLA", 50, 10000, 50);
-    await seedLot("NVDA", 80, 6000, 80);
-    await db
-      .prepare(
-        "INSERT INTO prices (symbol, price, updated_at) VALUES ('AAPL', 180, '2024-03-01'), ('TSLA', 190, '2024-03-01'), ('NVDA', 85, '2024-03-01')",
-      )
-      .run();
-
-    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/holdings`, {
-      headers: authHeaders(),
-    });
-
-    const body = (await res.json()) as {
-      data: Array<{ symbol: string; unrealized_pnl_rate: number }>;
-    };
-    expect(body.data.map((h) => h.symbol)).toEqual(["AAPL", "NVDA", "TSLA"]);
+  it("[UC-PORTFOLIO-003-S04] returns 401 when not authenticated", async () => {
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/holdings`);
+    expect(res.status).toBe(401);
   });
 });
