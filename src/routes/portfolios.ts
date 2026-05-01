@@ -212,7 +212,7 @@ portfolios.get("/:id/summary", async (c) => {
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
 
   const investmentRow = await c.env.DB.prepare(
-    "SELECT SUM(CASE WHEN type = 'deposit' THEN price ELSE -price END) AS total FROM transactions WHERE portfolio_id = ? AND type IN ('deposit', 'withdrawal')",
+    "SELECT SUM(CASE WHEN type = 'deposit' THEN amount - fee ELSE -(amount + fee) END) AS total FROM transfers WHERE portfolio_id = ?",
   )
     .bind(portfolioId)
     .first<{ total: number | null }>();

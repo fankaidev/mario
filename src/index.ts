@@ -3,6 +3,7 @@ import { auth, type AuthVariables } from "./middleware/auth";
 import type { Bindings } from "./types";
 import portfolios from "./routes/portfolios";
 import transactions from "./routes/transactions";
+import transfers from "./routes/transfers";
 import prices, { updatePrices } from "./routes/prices";
 import tokens from "./routes/tokens";
 import tags from "./routes/tags";
@@ -23,6 +24,7 @@ app.get("/api/me", (c) => {
 
 app.route("/api/portfolios", portfolios);
 app.route("/api/portfolios/:portfolioId/transactions", transactions);
+app.route("/api/portfolios/:portfolioId/transfers", transfers);
 app.route("/api/prices", prices);
 app.route("/api/tokens", tokens);
 app.route("/api/portfolios/:portfolioId/tags", tags);
@@ -81,7 +83,7 @@ export default {
       if (existing) continue;
 
       const investmentRow = await env.DB.prepare(
-        "SELECT COALESCE(SUM(CASE WHEN type = 'deposit' THEN price ELSE -price END), 0) AS total FROM transactions WHERE portfolio_id = ? AND type IN ('deposit', 'withdrawal')",
+        "SELECT COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount - fee ELSE -(amount + fee) END), 0) AS total FROM transfers WHERE portfolio_id = ?",
       )
         .bind(portfolioId)
         .first<{ total: number }>();
