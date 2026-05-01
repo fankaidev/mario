@@ -14,3 +14,4 @@ crons = ["0 0 * * SUN"]
 binding = "DB"
 database_name = "mario"
 database_id = "6acd872c-2230-477b-82f3-f3471451084f"
+

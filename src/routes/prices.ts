@@ -36,10 +36,15 @@ export async function updatePrices(db: D1Database, fetcher: PriceFetcher): Promi
 const prices = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
 prices.post("/update", async (c) => {
+  const apiKey = c.env.FINNHUB_API_KEY;
+  if (!apiKey) {
+    return c.json({ error: "FINNHUB_API_KEY not configured" }, 500);
+  }
+
   const fetcher: PriceFetcher = {
     async fetchPrice(symbol: string) {
       const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}`, {
-        headers: { "X-Finnhub-Token": "sandbox" },
+        headers: { "X-Finnhub-Token": apiKey },
       });
       if (res.ok) {
         const body = (await res.json()) as { c: number };

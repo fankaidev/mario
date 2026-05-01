@@ -32,10 +32,16 @@ app.route("/api/portfolios/:portfolioId/snapshots", snapshots);
 export default {
   fetch: app.fetch,
   async scheduled(_event: ScheduledEvent, env: Bindings) {
+    const apiKey = env.FINNHUB_API_KEY;
+    if (!apiKey) {
+      console.error("Scheduled price update skipped: FINNHUB_API_KEY not configured");
+      return;
+    }
+
     const fetcher: PriceFetcher = {
       async fetchPrice(symbol: string) {
         const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}`, {
-          headers: { "X-Finnhub-Token": "sandbox" },
+          headers: { "X-Finnhub-Token": apiKey },
         });
         if (res.ok) {
           const body = (await res.json()) as { c: number };
