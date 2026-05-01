@@ -3,6 +3,7 @@ import { auth, type AuthVariables } from "./middleware/auth";
 import type { Bindings } from "./types";
 import portfolios from "./routes/portfolios";
 import transactions from "./routes/transactions";
+import transfers from "./routes/transfers";
 import prices, { updatePrices } from "./routes/prices";
 import tokens from "./routes/tokens";
 import tags from "./routes/tags";
@@ -23,6 +24,7 @@ app.get("/api/me", (c) => {
 
 app.route("/api/portfolios", portfolios);
 app.route("/api/portfolios/:portfolioId/transactions", transactions);
+app.route("/api/portfolios/:portfolioId/transfers", transfers);
 app.route("/api/prices", prices);
 app.route("/api/tokens", tokens);
 app.route("/api/portfolios/:portfolioId/tags", tags);
@@ -64,12 +66,15 @@ export default {
     const updated = await updatePrices(env.DB, fetcher);
     console.log(`Scheduled price update: ${updated} stocks updated`);
 
-    const portfolios = await env.DB.prepare("SELECT id FROM portfolios WHERE archived = 0").all<{
+    const portfolios = await env.DB.prepare(
+      "SELECT id, cash_balance FROM portfolios WHERE archived = 0",
+    ).all<{
       id: number;
+      cash_balance: number;
     }>();
     const today = new Date().toISOString().split("T")[0];
 
-    for (const { id: portfolioId } of portfolios.results) {
+    for (const { id: portfolioId, cash_balance: cashBalance } of portfolios.results) {
       const existing = await env.DB.prepare(
         "SELECT id FROM portfolio_snapshots WHERE portfolio_id = ? AND date = ?",
       )
@@ -77,8 +82,8 @@ export default {
         .first();
       if (existing) continue;
 
-      const buyRow = await env.DB.prepare(
-        "SELECT COALESCE(SUM(quantity * price + fee), 0) AS total FROM transactions WHERE portfolio_id = ? AND type IN ('buy', 'initial')",
+      const investmentRow = await env.DB.prepare(
+        "SELECT COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount - fee ELSE -(amount + fee) END), 0) AS total FROM transfers WHERE portfolio_id = ?",
       )
         .bind(portfolioId)
         .first<{ total: number }>();
@@ -100,9 +105,9 @@ export default {
       }
 
       await env.DB.prepare(
-        "INSERT INTO portfolio_snapshots (portfolio_id, date, total_investment, market_value) VALUES (?, ?, ?, ?)",
+        "INSERT INTO portfolio_snapshots (portfolio_id, date, total_investment, market_value, cash_balance) VALUES (?, ?, ?, ?, ?)",
       )
-        .bind(portfolioId, today, buyRow?.total ?? 0, marketValue)
+        .bind(portfolioId, today, investmentRow?.total ?? 0, marketValue, cashBalance)
         .run();
     }
     console.log(`Scheduled snapshots generated for ${portfolios.results.length} portfolios`);

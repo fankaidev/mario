@@ -17,19 +17,40 @@ export interface CreatePortfolioRequest {
   currency: "USD" | "HKD" | "CNY";
 }
 
-export type TransactionType = "buy" | "sell" | "dividend" | "initial" | "deposit" | "withdrawal";
+export type TransactionType = "buy" | "sell" | "dividend" | "initial";
 
 export interface Transaction {
   id: number;
   portfolio_id: number;
-  symbol: string | null;
+  symbol: string;
   type: TransactionType;
-  quantity: number | null;
+  quantity: number;
   price: number;
   fee: number;
   date: string;
   created_at: string;
   name: string | null;
+}
+
+export type TransferType = "deposit" | "withdrawal";
+
+export interface Transfer {
+  id: number;
+  portfolio_id: number;
+  type: TransferType;
+  amount: number;
+  fee: number;
+  date: string;
+  note: string | null;
+  created_at: string;
+}
+
+export interface CreateTransferRequest {
+  type: TransferType;
+  amount: number;
+  fee?: number;
+  date: string;
+  note?: string;
 }
 
 export interface Holding {
@@ -44,9 +65,9 @@ export interface Holding {
 }
 
 export interface CreateTransactionRequest {
-  symbol?: string;
+  symbol: string;
   type: TransactionType;
-  quantity?: number;
+  quantity: number;
   price: number;
   fee: number;
   date: string;
@@ -70,6 +91,7 @@ export interface PortfolioSnapshot {
   date: string;
   total_investment: number;
   market_value: number;
+  cash_balance: number;
   note: string | null;
   created_at: string;
 }
@@ -78,6 +100,7 @@ export interface CreatePortfolioSnapshotRequest {
   date: string;
   total_investment: number;
   market_value: number;
+  cash_balance: number;
   note?: string;
 }
 
@@ -89,6 +112,26 @@ export interface Tag {
 
 export interface TagWithStocks extends Tag {
   symbols: string[];
+}
+
+export interface LotDetail {
+  id: number;
+  date: string;
+  buy_price: number;
+  quantity: number;
+  remaining_quantity: number;
+  cost_basis: number;
+  current_value: number | null;
+  unrealized_pnl: number | null;
+  unrealized_pnl_rate: number | null;
+  status: "open" | "closed";
+}
+
+export interface HoldingLots {
+  symbol: string;
+  name: string;
+  total_quantity: number;
+  lots: LotDetail[];
 }
 
 export interface CreateTagRequest {

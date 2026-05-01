@@ -8,8 +8,8 @@
 |----|------|
 | R1 | Each portfolio can have at most one snapshot per date |
 | R2 | Snapshot date must not be empty |
-| R3 | Snapshot total_investment and market_value must be non-negative |
-| R4 | Weekly cron auto-generates snapshot with current total investment and market value for each active portfolio |
+| R3 | Snapshot total_investment, market_value, and cash_balance must be non-negative |
+| R4 | Weekly cron auto-generates snapshot with current total investment (net deposits - withdrawals), market value, and cash balance for each active portfolio |
 | R5 | P&L for a snapshot = market_value - total_investment |
 | R6 | Snapshot deletion is immediate and irreversible |
 
