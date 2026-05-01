@@ -28,6 +28,18 @@ export interface Transaction {
   fee: number;
   date: string;
   created_at: string;
+  name: string;
+}
+
+export interface Holding {
+  symbol: string;
+  name: string;
+  quantity: number;
+  cost: number;
+  price: number | null;
+  market_value: number | null;
+  unrealized_pnl: number | null;
+  unrealized_pnl_rate: number | null;
 }
 
 export interface CreateTransactionRequest {

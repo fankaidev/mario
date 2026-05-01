@@ -1,17 +1,7 @@
 import { Hono } from "hono";
 import type { AuthVariables } from "../middleware/auth";
 import type { Bindings } from "../types";
-import type { Portfolio } from "../../shared/types/api";
-
-type Holding = {
-  symbol: string;
-  quantity: number;
-  cost: number;
-  price: number | null;
-  market_value: number | null;
-  unrealized_pnl: number | null;
-  unrealized_pnl_rate: number | null;
-};
+import type { Holding, Portfolio } from "../../shared/types/api";
 
 const SORT_COLUMNS: Record<string, string> = {
   symbol: "symbol",
@@ -114,6 +104,9 @@ portfolios.get("/:id/holdings", async (c) => {
     const priceRow = await c.env.DB.prepare("SELECT price FROM prices WHERE symbol = ?")
       .bind(lot.symbol)
       .first<{ price: number | null }>();
+    const nameRow = await c.env.DB.prepare("SELECT name FROM stocks WHERE symbol = ?")
+      .bind(lot.symbol)
+      .first<{ name: string }>();
     const price = priceRow?.price ?? null;
     const marketValue = price !== null ? lot.quantity * price : null;
     const unrealizedPnl = marketValue !== null ? marketValue - lot.cost : null;
@@ -121,6 +114,7 @@ portfolios.get("/:id/holdings", async (c) => {
 
     holdings.push({
       symbol: lot.symbol,
+      name: nameRow?.name ?? lot.symbol,
       quantity: lot.quantity,
       cost: Math.round(lot.cost * 100) / 100,
       price,

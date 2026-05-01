@@ -1,4 +1,5 @@
 export async function cleanDatabase(db: D1Database) {
+  await db.exec("CREATE TABLE IF NOT EXISTS stocks (symbol TEXT PRIMARY KEY, name TEXT NOT NULL)");
   await db.exec("DELETE FROM stock_tags");
   await db.exec("DELETE FROM realized_pnl");
   await db.exec("DELETE FROM lots");
@@ -6,6 +7,7 @@ export async function cleanDatabase(db: D1Database) {
   await db.exec("DELETE FROM portfolio_snapshots");
   await db.exec("DELETE FROM prices");
   await db.exec("DELETE FROM corporate_actions");
+  await db.exec("DELETE FROM stocks");
   await db.exec("DELETE FROM tags");
   await db.exec("DELETE FROM api_tokens");
   await db.exec("DELETE FROM portfolios");

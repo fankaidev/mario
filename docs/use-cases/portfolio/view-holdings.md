@@ -14,6 +14,7 @@
 | R6 | P&L and rate rounded to two decimal places |
 | R7 | Supported sort fields: symbol (alphabetical), quantity (holding quantity), marketValue, unrealizedPnl (P&L amount), unrealizedPnlRate (P&L rate) |
 | R8 | Default sort: unrealizedPnlRate descending |
+| R9 | Each holding includes stock name from stocks table, fallback to symbol if not yet populated |
 
 ## Scenarios
 
@@ -28,6 +29,8 @@
 | UC-PORTFOLIO-003-S05 | P1 | ❌ | Given holdings list contains multiple stocks, When viewing by symbol ascending, Then arranged alphabetically A-Z | R7 |
 | UC-PORTFOLIO-003-S06 | P1 | ❌ | Given holdings list contains multiple stocks, When viewing by marketValue descending, Then arranged by market value high to low | R7 |
 | UC-PORTFOLIO-003-S07 | P1 | ❌ | Given user is not logged in, When viewing holdings, Then return 401 unauthorized |
+| UC-PORTFOLIO-003-S08 | P0 | ✅ | Given portfolio holds AAPL and stocks table has AAPL name "Apple Inc", When viewing holdings, Then AAPL holding returns name "Apple Inc" | R9 |
+| UC-PORTFOLIO-003-S09 | P1 | ✅ | Given portfolio holds AAPL but stocks table has no entry for AAPL, When viewing holdings, Then AAPL holding returns name "AAPL" (symbol fallback) | R9 |
 
 ### ai-e2e
 (none)

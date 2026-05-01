@@ -49,6 +49,16 @@ export default {
         }
         return null;
       },
+      async fetchName(symbol: string) {
+        const res = await fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}`, {
+          headers: { "X-Finnhub-Token": apiKey },
+        });
+        if (res.ok) {
+          const body = (await res.json()) as { name: string };
+          if (typeof body.name === "string" && body.name.length > 0) return body.name;
+        }
+        return null;
+      },
     };
 
     const updated = await updatePrices(env.DB, fetcher);

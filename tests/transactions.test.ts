@@ -492,4 +492,30 @@ describe("Transaction History", () => {
     const body = (await res.json()) as { data: unknown[] };
     expect(body.data).toHaveLength(0);
   });
+
+  it("[UC-PORTFOLIO-004-S08] returns stock name from stocks table", async () => {
+    await makeBuy("AAPL", 100, 150, "2024-01-15");
+    await db
+      .prepare("INSERT INTO stocks (symbol, name) VALUES (?, ?)")
+      .bind("AAPL", "Apple Inc")
+      .run();
+
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: Array<{ symbol: string; name: string }> };
+    expect(body.data[0].name).toBe("Apple Inc");
+  });
+
+  it("[UC-PORTFOLIO-004-S09] falls back to symbol when stocks table has no name", async () => {
+    await makeBuy("AAPL", 100, 150, "2024-01-15");
+
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: Array<{ symbol: string; name: string }> };
+    expect(body.data[0].name).toBe("AAPL");
+  });
 });

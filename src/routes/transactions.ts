@@ -120,11 +120,11 @@ transactions.get("/", async (c) => {
   const symbol = c.req.query("symbol")?.trim().toUpperCase();
 
   let query =
-    "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ?";
+    "SELECT t.id, t.portfolio_id, t.symbol, t.type, t.quantity, t.price, t.fee, t.date, t.created_at, COALESCE(s.name, t.symbol) AS name FROM transactions t LEFT JOIN stocks s ON t.symbol = s.symbol WHERE t.portfolio_id = ?";
   const params: (number | string)[] = [portfolioId];
 
   if (symbol) {
-    query += " AND symbol = ?";
+    query += " AND t.symbol = ?";
     params.push(symbol);
   }
 
