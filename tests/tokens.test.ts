@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getPlatformProxy, unstable_dev } from "wrangler";
 import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase } from "./helpers";
+import { cleanDatabase, createApiTokenForUser } from "./helpers";
 
 let worker: UnstableDevWorker;
 let db: D1Database;
 let userId: number;
+let authToken: string;
 
 beforeAll(async () => {
   const { env } = await getPlatformProxy<{ DB: D1Database }>();
@@ -27,10 +28,11 @@ beforeEach(async () => {
     .bind("test@example.com")
     .first<{ id: number }>();
   userId = result!.id;
+  authToken = await createApiTokenForUser(db, userId, "Auth Token");
 });
 
-function authHeaders(email = "test@example.com"): Record<string, string> {
-  return { "CF-Access-Authenticated-User-Email": email };
+function authHeaders(): Record<string, string> {
+  return { Authorization: `Bearer ${authToken}` };
 }
 
 function apiHeaders(token: string): Record<string, string> {
@@ -51,8 +53,8 @@ describe("API Token Management", () => {
     expect(body.data.token.length).toBeGreaterThan(0);
 
     const rows = await db
-      .prepare("SELECT token_hash FROM api_tokens WHERE user_id = ?")
-      .bind(userId)
+      .prepare("SELECT token_hash FROM api_tokens WHERE user_id = ? AND name = ?")
+      .bind(userId, "CLI Tool")
       .all<{ token_hash: string }>();
     expect(rows.results).toHaveLength(1);
     expect(rows.results[0].token_hash).not.toBe(body.data.token);
@@ -72,9 +74,9 @@ describe("API Token Management", () => {
     const body = (await res.json()) as {
       data: Array<{ name: string; created_at: string; token_hash?: string }>;
     };
-    expect(body.data).toHaveLength(1);
-    expect(body.data[0].name).toBe("CLI Tool");
-    expect(body.data[0].token_hash).toBeUndefined();
+    const cliToken = body.data.find((token) => token.name === "CLI Tool");
+    expect(cliToken).toBeDefined();
+    expect(cliToken!.token_hash).toBeUndefined();
   });
 
   it("[UC-AUTH-001-S04] revoked token returns 401", async () => {
@@ -88,8 +90,8 @@ describe("API Token Management", () => {
     } = (await createRes.json()) as { data: { token: string } };
 
     const tokenRow = await db
-      .prepare("SELECT id FROM api_tokens WHERE user_id = ?")
-      .bind(userId)
+      .prepare("SELECT id FROM api_tokens WHERE user_id = ? AND name = ?")
+      .bind(userId, "CLI Tool")
       .first<{ id: number }>();
 
     await worker.fetch(`http://localhost/api/tokens/${tokenRow!.id}`, {
@@ -123,10 +125,11 @@ describe("API Token Management", () => {
     } = (await res2.json()) as { data: { token: string } };
 
     const rows = await db
-      .prepare("SELECT id FROM api_tokens WHERE user_id = ? ORDER BY id")
-      .bind(userId)
-      .all<{ id: number }>();
-    await worker.fetch(`http://localhost/api/tokens/${rows.results[0].id}`, {
+      .prepare("SELECT id, name FROM api_tokens WHERE user_id = ? AND name IN (?, ?) ORDER BY id")
+      .bind(userId, "Token A", "Token B")
+      .all<{ id: number; name: string }>();
+    const tokenARow = rows.results.find((row) => row.name === "Token A");
+    await worker.fetch(`http://localhost/api/tokens/${tokenARow!.id}`, {
       method: "DELETE",
       headers: authHeaders(),
     });

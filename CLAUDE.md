@@ -132,8 +132,9 @@ All backend tests are **RESTful integration tests** against real API endpoints.
 Dual-auth approach supporting both web UI and remote API access:
 
 1. **Web UI (behind Cloudflare Access)**
-   - Trust `CF-Access-Authenticated-User-Email` header directly
-   - CF Access validates user before request reaches Workers
+   - Browser requests use a Cloudflare Access JWT from `CF_Authorization` cookie or `Cf-Access-Jwt-Assertion` header
+   - Worker verifies JWT signature, issuer, and `ACCESS_AUD` before using the email claim
+   - First successful verified Access JWT auth auto-creates the user record
 
 2. **Remote API (scripts, CLI, external services)**
    - User generates API tokens in the app UI
@@ -141,9 +142,11 @@ Dual-auth approach supporting both web UI and remote API access:
    - Tokens stored as SHA-256 hashes in `api_tokens` table
 
 **Auth middleware priority:**
-1. If `CF-Access-Authenticated-User-Email` header exists → use it
-2. Else if `Authorization: Bearer <token>` exists → validate token hash, get user
+1. If `Authorization: Bearer <token>` exists → validate token hash, get user
+2. Else if a Cloudflare Access JWT exists → verify JWT, issuer, and audience, then get or create user
 3. Else → 401 Unauthorized
+
+`CF-Access-Authenticated-User-Email` is never sufficient to authenticate a request.
 
 ### Symbol Format
 

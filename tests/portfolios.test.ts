@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getPlatformProxy, unstable_dev } from "wrangler";
 import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase } from "./helpers";
+import { cleanDatabase, createApiTokenForUser } from "./helpers";
 
 let worker: UnstableDevWorker;
 let db: D1Database;
 let userId: number;
+let authToken: string;
 
 beforeAll(async () => {
   const { env } = await getPlatformProxy<{ DB: D1Database }>();
@@ -27,10 +28,11 @@ beforeEach(async () => {
     .bind("test@example.com")
     .first<{ id: number }>();
   userId = result!.id;
+  authToken = await createApiTokenForUser(db, userId);
 });
 
-function authHeaders(email = "test@example.com"): Record<string, string> {
-  return { "CF-Access-Authenticated-User-Email": email };
+function authHeaders(): Record<string, string> {
+  return { Authorization: `Bearer ${authToken}` };
 }
 
 describe("Portfolio CRUD", () => {
