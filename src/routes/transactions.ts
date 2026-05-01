@@ -1,7 +1,11 @@
 import { Hono } from "hono";
 import type { AuthVariables } from "../middleware/auth";
 import type { Bindings } from "../types";
-import type { CreateTransactionRequest, Transaction } from "../../shared/types/api";
+import type {
+  CreateTransactionRequest,
+  Transaction,
+  TransactionType,
+} from "../../shared/types/api";
 
 const transactions = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
@@ -19,13 +23,18 @@ function parseBody(body: unknown): CreateTransactionRequest {
     date?: unknown;
   };
 
-  if (!symbol || typeof symbol !== "string" || symbol.trim().length === 0) {
-    throw { status: 400, message: "Symbol is required" };
-  }
-
-  if (type !== "buy" && type !== "sell" && type !== "dividend" && type !== "initial") {
+  const validTypes: TransactionType[] = [
+    "buy",
+    "sell",
+    "dividend",
+    "initial",
+    "deposit",
+    "withdrawal",
+  ];
+  if (!validTypes.includes(type as TransactionType)) {
     throw { status: 400, message: "Invalid transaction type" };
   }
+  const txType = type as TransactionType;
 
   const parsedFee = ((): number => {
     if (fee === undefined || fee === null) return 0;
@@ -44,11 +53,22 @@ function parseBody(body: unknown): CreateTransactionRequest {
     throw { status: 400, message: "Date cannot be in the future" };
   }
 
-  if (type === "dividend") {
+  if (txType === "deposit" || txType === "withdrawal") {
+    if (typeof price !== "number" || price <= 0) {
+      throw { status: 400, message: "Amount must be greater than 0" };
+    }
+    return { type: txType, price, fee: parsedFee, date };
+  }
+
+  if (!symbol || typeof symbol !== "string" || symbol.trim().length === 0) {
+    throw { status: 400, message: "Symbol is required" };
+  }
+
+  if (txType === "dividend") {
     if (typeof price !== "number" || price < 0) {
       throw { status: 400, message: "Price must be 0 or greater" };
     }
-    return { symbol: symbol.trim(), type, quantity: 0, price, fee: parsedFee, date };
+    return { symbol: symbol.trim(), type: txType, quantity: 0, price, fee: parsedFee, date };
   }
 
   if (typeof quantity !== "number" || quantity <= 0) {
@@ -59,7 +79,7 @@ function parseBody(body: unknown): CreateTransactionRequest {
     throw { status: 400, message: "Price must be 0 or greater" };
   }
 
-  return { symbol: symbol.trim(), type, quantity, price, fee: parsedFee, date };
+  return { symbol: symbol.trim(), type: txType, quantity, price, fee: parsedFee, date };
 }
 
 function parsePortfolioId(c: { req: { param: (name: string) => string | undefined } }): number {
@@ -79,9 +99,11 @@ transactions.post("/", async (c) => {
     return c.json({ error: err.message }, err.status as 400);
   }
 
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id, cash_balance FROM portfolios WHERE id = ? AND user_id = ?",
+  )
     .bind(portfolioId, user.id)
-    .first();
+    .first<{ id: number; cash_balance: number }>();
   if (!portfolio) {
     return c.json({ error: "Portfolio not found" }, 404);
   }
@@ -94,6 +116,12 @@ transactions.post("/", async (c) => {
     return c.json({ error: err.message }, err.status as 400);
   }
 
+  if (body.type === "deposit") {
+    return handleDeposit(c, portfolioId, body);
+  }
+  if (body.type === "withdrawal") {
+    return handleWithdrawal(c, portfolioId, portfolio.cash_balance, body);
+  }
   if (body.type === "buy" || body.type === "initial") {
     return handleBuy(c, portfolioId, body);
   }
@@ -145,35 +173,63 @@ transactions.delete("/:txId", async (c) => {
     return c.json({ error: "Invalid ID" }, 400);
   }
 
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id, cash_balance FROM portfolios WHERE id = ? AND user_id = ?",
+  )
     .bind(portfolioId, user.id)
-    .first();
+    .first<{ id: number; cash_balance: number }>();
   if (!portfolio) {
     return c.json({ error: "Portfolio not found" }, 404);
   }
 
   const tx = await c.env.DB.prepare(
-    "SELECT id, type FROM transactions WHERE id = ? AND portfolio_id = ?",
+    "SELECT id, type, price, fee, quantity FROM transactions WHERE id = ? AND portfolio_id = ?",
   )
     .bind(txId, portfolioId)
-    .first<{ id: number; type: string }>();
+    .first<{ id: number; type: string; price: number; fee: number; quantity: number | null }>();
   if (!tx) {
     return c.json({ error: "Transaction not found" }, 404);
   }
 
-  if (tx.type === "buy" || tx.type === "initial") {
-    await c.env.DB.batch([
+  const statements: D1PreparedStatement[] = [];
+
+  if (tx.type === "deposit") {
+    const cashChange = tx.price - tx.fee;
+    if (portfolio.cash_balance < cashChange) {
+      return c.json({ error: "Would result in negative cash balance" }, 400);
+    }
+    statements.push(
+      c.env.DB.prepare("UPDATE portfolios SET cash_balance = cash_balance - ? WHERE id = ?").bind(
+        cashChange,
+        portfolioId,
+      ),
+    );
+  } else if (tx.type === "withdrawal") {
+    const cashChange = tx.price + tx.fee;
+    statements.push(
+      c.env.DB.prepare("UPDATE portfolios SET cash_balance = cash_balance + ? WHERE id = ?").bind(
+        cashChange,
+        portfolioId,
+      ),
+    );
+  } else if (tx.type === "buy" || tx.type === "initial") {
+    const costBasis = tx.quantity! * tx.price + tx.fee;
+    statements.push(
       c.env.DB.prepare("DELETE FROM lots WHERE transaction_id = ?").bind(txId),
-      c.env.DB.prepare("DELETE FROM transactions WHERE id = ?").bind(txId),
-    ]);
+      c.env.DB.prepare("UPDATE portfolios SET cash_balance = cash_balance + ? WHERE id = ?").bind(
+        costBasis,
+        portfolioId,
+      ),
+    );
   } else if (tx.type === "sell") {
+    const proceeds = tx.quantity! * tx.price - tx.fee;
+
     const pnlRows = await c.env.DB.prepare(
       "SELECT lot_id, quantity FROM realized_pnl WHERE sell_transaction_id = ?",
     )
       .bind(txId)
       .all<{ lot_id: number; quantity: number }>();
 
-    const statements: D1PreparedStatement[] = [];
     for (const row of pnlRows.results) {
       statements.push(
         c.env.DB.prepare(
@@ -183,24 +239,91 @@ transactions.delete("/:txId", async (c) => {
     }
     statements.push(
       c.env.DB.prepare("DELETE FROM realized_pnl WHERE sell_transaction_id = ?").bind(txId),
-      c.env.DB.prepare("DELETE FROM transactions WHERE id = ?").bind(txId),
+      c.env.DB.prepare("UPDATE portfolios SET cash_balance = cash_balance - ? WHERE id = ?").bind(
+        proceeds,
+        portfolioId,
+      ),
     );
-
-    await c.env.DB.batch(statements);
-    return c.json({ data: null });
+  } else if (tx.type === "dividend") {
+    const cashChange = tx.price - tx.fee;
+    statements.push(
+      c.env.DB.prepare("UPDATE portfolios SET cash_balance = cash_balance - ? WHERE id = ?").bind(
+        cashChange,
+        portfolioId,
+      ),
+    );
   }
 
-  await c.env.DB.prepare("DELETE FROM transactions WHERE id = ?").bind(txId).run();
+  statements.push(c.env.DB.prepare("DELETE FROM transactions WHERE id = ?").bind(txId));
+
+  await c.env.DB.batch(statements);
 
   return c.json({ data: null });
 });
 
-async function handleBuy(
-  c: { env: { DB: D1Database } },
+async function handleDeposit(
+  c: { env: { DB: D1Database }; json: (obj: unknown, status: number) => Response },
   portfolioId: number,
   body: CreateTransactionRequest,
 ) {
-  const costBasis = body.quantity * body.price + body.fee;
+  const cashChange = body.price - body.fee;
+
+  const txResult = await c.env.DB.prepare(
+    "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, NULL, ?, NULL, ?, ?, ?)",
+  )
+    .bind(portfolioId, body.type, body.price, body.fee, body.date)
+    .run();
+
+  await c.env.DB.prepare("UPDATE portfolios SET cash_balance = cash_balance + ? WHERE id = ?")
+    .bind(cashChange, portfolioId)
+    .run();
+
+  const transaction = await c.env.DB.prepare(
+    "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE id = ?",
+  )
+    .bind(txResult.meta.last_row_id)
+    .first<Transaction>();
+
+  return c.json({ data: transaction }, 201);
+}
+
+async function handleWithdrawal(
+  c: { env: { DB: D1Database }; json: (obj: unknown, status: number) => Response },
+  portfolioId: number,
+  cashBalance: number,
+  body: CreateTransactionRequest,
+) {
+  const cashChange = body.price + body.fee;
+
+  if (cashBalance < cashChange) {
+    return c.json({ error: "Insufficient cash balance" }, 400);
+  }
+
+  const txResult = await c.env.DB.prepare(
+    "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, NULL, ?, NULL, ?, ?, ?)",
+  )
+    .bind(portfolioId, body.type, body.price, body.fee, body.date)
+    .run();
+
+  await c.env.DB.prepare("UPDATE portfolios SET cash_balance = cash_balance - ? WHERE id = ?")
+    .bind(cashChange, portfolioId)
+    .run();
+
+  const transaction = await c.env.DB.prepare(
+    "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE id = ?",
+  )
+    .bind(txResult.meta.last_row_id)
+    .first<Transaction>();
+
+  return c.json({ data: transaction }, 201);
+}
+
+async function handleBuy(
+  c: { env: { DB: D1Database }; json: (obj: unknown, status: number) => Response },
+  portfolioId: number,
+  body: CreateTransactionRequest,
+) {
+  const costBasis = body.quantity! * body.price + body.fee;
 
   const txResult = await c.env.DB.prepare(
     "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -214,6 +337,10 @@ async function handleBuy(
     c.env.DB.prepare(
       "INSERT INTO lots (transaction_id, portfolio_id, symbol, quantity, remaining_quantity, cost_basis) VALUES (?, ?, ?, ?, ?, ?)",
     ).bind(txId, portfolioId, body.symbol, body.quantity, body.quantity, costBasis),
+    c.env.DB.prepare("UPDATE portfolios SET cash_balance = cash_balance - ? WHERE id = ?").bind(
+      costBasis,
+      portfolioId,
+    ),
   ]);
 
   const transaction = await c.env.DB.prepare(
@@ -240,7 +367,7 @@ async function handleSell(
     .all<{ id: number; quantity: number; remaining_quantity: number; cost_basis: number }>();
 
   const totalRemaining = lots.results.reduce((sum, l) => sum + l.remaining_quantity, 0);
-  if (totalRemaining < body.quantity) {
+  if (totalRemaining < body.quantity!) {
     return c.json({ error: "Insufficient quantity" }, 400);
   }
 
@@ -252,8 +379,10 @@ async function handleSell(
 
   const txId = txResult.meta.last_row_id;
 
+  const proceeds = body.quantity! * body.price - body.fee;
+
   const statements: D1PreparedStatement[] = [];
-  let remainingToSell = body.quantity;
+  let remainingToSell = body.quantity!;
   for (const lot of lots.results) {
     if (remainingToSell <= 0) break;
 
@@ -269,19 +398,26 @@ async function handleSell(
       ),
     );
 
-    const proceeds = body.price * consumed - body.fee * (consumed / body.quantity);
+    const lotProceeds = body.price * consumed - body.fee * (consumed / body.quantity!);
     const cost = (lot.cost_basis / lot.quantity) * consumed;
-    const pnl = proceeds - cost;
+    const pnl = lotProceeds - cost;
     const costPerShare = lot.cost_basis / lot.quantity;
 
     statements.push(
       c.env.DB.prepare(
         "INSERT INTO realized_pnl (sell_transaction_id, lot_id, quantity, proceeds, cost, pnl, sell_price, cost_per_share) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      ).bind(txId, lot.id, consumed, proceeds, cost, pnl, body.price, costPerShare),
+      ).bind(txId, lot.id, consumed, lotProceeds, cost, pnl, body.price, costPerShare),
     );
 
     remainingToSell -= consumed;
   }
+
+  statements.push(
+    c.env.DB.prepare("UPDATE portfolios SET cash_balance = cash_balance + ? WHERE id = ?").bind(
+      proceeds,
+      portfolioId,
+    ),
+  );
 
   await c.env.DB.batch(statements);
 
@@ -299,10 +435,16 @@ async function handleDividend(
   portfolioId: number,
   body: CreateTransactionRequest,
 ) {
+  const cashChange = body.price - body.fee;
+
   const txResult = await c.env.DB.prepare(
     "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, ?, ?, ?, ?, ?, ?)",
   )
     .bind(portfolioId, body.symbol, body.type, body.quantity, body.price, body.fee, body.date)
+    .run();
+
+  await c.env.DB.prepare("UPDATE portfolios SET cash_balance = cash_balance + ? WHERE id = ?")
+    .bind(cashChange, portfolioId)
     .run();
 
   const transaction = await c.env.DB.prepare(

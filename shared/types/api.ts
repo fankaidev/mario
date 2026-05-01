@@ -9,6 +9,7 @@ export interface Portfolio {
   currency: "USD" | "HKD" | "CNY";
   created_at: string;
   archived: number;
+  cash_balance: number;
 }
 
 export interface CreatePortfolioRequest {
@@ -16,19 +17,19 @@ export interface CreatePortfolioRequest {
   currency: "USD" | "HKD" | "CNY";
 }
 
-export type TransactionType = "buy" | "sell" | "dividend" | "initial";
+export type TransactionType = "buy" | "sell" | "dividend" | "initial" | "deposit" | "withdrawal";
 
 export interface Transaction {
   id: number;
   portfolio_id: number;
-  symbol: string;
+  symbol: string | null;
   type: TransactionType;
-  quantity: number;
+  quantity: number | null;
   price: number;
   fee: number;
   date: string;
   created_at: string;
-  name: string;
+  name: string | null;
 }
 
 export interface Holding {
@@ -43,9 +44,9 @@ export interface Holding {
 }
 
 export interface CreateTransactionRequest {
-  symbol: string;
+  symbol?: string;
   type: TransactionType;
-  quantity: number;
+  quantity?: number;
   price: number;
   fee: number;
   date: string;
