@@ -46,6 +46,12 @@ interface Snapshot {
   note: string | null;
 }
 
+interface Portfolio {
+  id: number;
+  name: string;
+  currency: string;
+}
+
 type TabName = "holdings" | "transactions" | "snapshots" | "return" | "summary";
 
 export function PortfolioDetail() {
@@ -53,13 +59,22 @@ export function PortfolioDetail() {
   const [tab, setTab] = useState<TabName>("holdings");
   const [symbolFilter, setSymbolFilter] = useState("");
 
+  const { data: portfolioData } = useQuery({
+    queryKey: ["portfolio", id],
+    queryFn: () => get<{ data: Portfolio }>(`/portfolios/${id}`),
+  });
+
+  const portfolio = portfolioData?.data;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="p-4 md:p-6 max-w-5xl mx-auto">
         <Link to="/" className="text-blue-600 hover:underline text-sm">
           ← Back to Portfolios
         </Link>
-        <h1 className="text-xl md:text-2xl font-bold mt-2 mb-4">Portfolio {id}</h1>
+        <h1 className="text-xl md:text-2xl font-bold mt-2 mb-4">
+          {portfolio ? `${portfolio.name} (${portfolio.currency})` : "Loading..."}
+        </h1>
 
         <SummaryCard id={id!} />
 
