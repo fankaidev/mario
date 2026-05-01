@@ -91,6 +91,26 @@ export interface TagWithStocks extends Tag {
   symbols: string[];
 }
 
+export interface LotDetail {
+  id: number;
+  date: string;
+  buy_price: number;
+  quantity: number;
+  remaining_quantity: number;
+  cost_basis: number;
+  current_value: number | null;
+  unrealized_pnl: number | null;
+  unrealized_pnl_rate: number | null;
+  status: "open" | "closed";
+}
+
+export interface HoldingLots {
+  symbol: string;
+  name: string;
+  total_quantity: number;
+  lots: LotDetail[];
+}
+
 export interface CreateTagRequest {
   name: string;
 }

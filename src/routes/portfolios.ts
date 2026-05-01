@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { AuthVariables } from "../middleware/auth";
 import type { Bindings } from "../types";
-import type { Holding, Portfolio } from "../../shared/types/api";
+import type { Holding, HoldingLots, LotDetail, Portfolio } from "../../shared/types/api";
 
 const portfolios = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
@@ -118,6 +118,87 @@ portfolios.get("/:id/holdings", async (c) => {
   }
 
   return c.json({ data: holdings });
+});
+
+portfolios.get("/:id/holdings/:symbol/lots", async (c) => {
+  const user = c.get("user");
+  const portfolioId = parseInt(c.req.param("id") ?? "", 10);
+  if (isNaN(portfolioId)) {
+    return c.json({ error: "Invalid portfolio ID" }, 400);
+  }
+
+  const symbol = c.req.param("symbol")?.toUpperCase();
+  if (!symbol) {
+    return c.json({ error: "Symbol is required" }, 400);
+  }
+
+  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+    .bind(portfolioId, user.id)
+    .first();
+  if (!portfolio) {
+    return c.json({ error: "Portfolio not found" }, 404);
+  }
+
+  const nameRow = await c.env.DB.prepare("SELECT name FROM stocks WHERE symbol = ?")
+    .bind(symbol)
+    .first<{ name: string }>();
+
+  const priceRow = await c.env.DB.prepare("SELECT price FROM prices WHERE symbol = ?")
+    .bind(symbol)
+    .first<{ price: number | null }>();
+  const currentPrice = priceRow?.price ?? null;
+
+  const lots = await c.env.DB.prepare(
+    "SELECT l.id, l.quantity, l.remaining_quantity, l.cost_basis, l.closed, l.created_at, t.date, t.price AS buy_price FROM lots l JOIN transactions t ON l.transaction_id = t.id WHERE l.portfolio_id = ? AND l.symbol = ? ORDER BY l.created_at ASC",
+  )
+    .bind(portfolioId, symbol)
+    .all<{
+      id: number;
+      quantity: number;
+      remaining_quantity: number;
+      cost_basis: number;
+      closed: number;
+      created_at: string;
+      date: string;
+      buy_price: number;
+    }>();
+
+  const totalQuantity = lots.results
+    .filter((l) => l.closed === 0)
+    .reduce((sum, l) => sum + l.remaining_quantity, 0);
+
+  const lotDetails: LotDetail[] = lots.results.map((l) => {
+    const proportionalCost = (l.cost_basis / l.quantity) * l.remaining_quantity;
+    const currentValue = currentPrice !== null ? l.remaining_quantity * currentPrice : null;
+    const unrealizedPnl = currentValue !== null ? currentValue - proportionalCost : null;
+    const unrealizedPnlRate =
+      unrealizedPnl !== null && proportionalCost > 0
+        ? (unrealizedPnl / proportionalCost) * 100
+        : null;
+
+    return {
+      id: l.id,
+      date: l.date,
+      buy_price: Math.round(l.buy_price * 100) / 100,
+      quantity: l.quantity,
+      remaining_quantity: l.remaining_quantity,
+      cost_basis: Math.round(proportionalCost * 100) / 100,
+      current_value: currentValue !== null ? Math.round(currentValue * 100) / 100 : null,
+      unrealized_pnl: unrealizedPnl !== null ? Math.round(unrealizedPnl * 100) / 100 : null,
+      unrealized_pnl_rate:
+        unrealizedPnlRate !== null ? Math.round(unrealizedPnlRate * 100) / 100 : null,
+      status: l.closed === 0 ? ("open" as const) : ("closed" as const),
+    };
+  });
+
+  const holdingLots: HoldingLots = {
+    symbol,
+    name: nameRow?.name ?? symbol,
+    total_quantity: Math.round(totalQuantity * 100) / 100,
+    lots: lotDetails,
+  };
+
+  return c.json({ data: holdingLots });
 });
 
 portfolios.get("/:id/summary", async (c) => {
