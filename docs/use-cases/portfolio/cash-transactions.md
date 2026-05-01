@@ -11,7 +11,7 @@
 | R3 | Withdrawal cannot exceed current cash_balance |
 | R4 | Buy transaction decreases cash_balance by (price × quantity + fee); negative cash_balance allowed (margin/unsettled) |
 | R5 | Sell transaction increases cash_balance by (price × quantity - fee) |
-| R6 | Dividend transaction increases cash_balance by (price × quantity - fee) |
+| R6 | Dividend transaction increases cash_balance by (price - fee) |
 | R7 | Deleting a transaction reverses its cash_balance effect; for deposit, deletion blocked if it would result in insufficient cash for subsequent withdrawals |
 | R8 | Cash transactions (deposit/withdrawal) have symbol=NULL, quantity=NULL, use price field as amount |
 
