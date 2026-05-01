@@ -5,6 +5,13 @@ export async function cleanDatabase(db: D1Database) {
   } catch {
     // column may already exist
   }
+  try {
+    await db.exec(
+      "ALTER TABLE portfolio_snapshots ADD COLUMN cash_balance REAL NOT NULL DEFAULT 0",
+    );
+  } catch {
+    // column may already exist
+  }
 
   // Apply 0007 migration schema changes for tests
   try {

@@ -19,6 +19,7 @@ snapshots.post("/", async (c) => {
     date?: string;
     total_investment?: number;
     market_value?: number;
+    cash_balance?: number;
     note?: string;
   }>();
   if (!body.date || typeof body.date !== "string")
@@ -27,6 +28,8 @@ snapshots.post("/", async (c) => {
     return c.json({ error: "Total investment is required" }, 400);
   if (typeof body.market_value !== "number" || body.market_value < 0)
     return c.json({ error: "Market value is required" }, 400);
+  if (typeof body.cash_balance !== "number" || body.cash_balance < 0)
+    return c.json({ error: "Cash balance is required" }, 400);
 
   const existing = await c.env.DB.prepare(
     "SELECT id FROM portfolio_snapshots WHERE portfolio_id = ? AND date = ?",
@@ -36,13 +39,20 @@ snapshots.post("/", async (c) => {
   if (existing) return c.json({ error: "Snapshot already exists for this date" }, 409);
 
   const result = await c.env.DB.prepare(
-    "INSERT INTO portfolio_snapshots (portfolio_id, date, total_investment, market_value, note) VALUES (?, ?, ?, ?, ?)",
+    "INSERT INTO portfolio_snapshots (portfolio_id, date, total_investment, market_value, cash_balance, note) VALUES (?, ?, ?, ?, ?, ?)",
   )
-    .bind(portfolioId, body.date, body.total_investment, body.market_value, body.note ?? null)
+    .bind(
+      portfolioId,
+      body.date,
+      body.total_investment,
+      body.market_value,
+      body.cash_balance,
+      body.note ?? null,
+    )
     .run();
 
   const snapshot = await c.env.DB.prepare(
-    "SELECT id, portfolio_id, date, total_investment, market_value, note, created_at FROM portfolio_snapshots WHERE id = ?",
+    "SELECT id, portfolio_id, date, total_investment, market_value, cash_balance, note, created_at FROM portfolio_snapshots WHERE id = ?",
   )
     .bind(result.meta.last_row_id)
     .first<PortfolioSnapshot>();
@@ -61,7 +71,7 @@ snapshots.get("/", async (c) => {
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
 
   const rows = await c.env.DB.prepare(
-    "SELECT id, portfolio_id, date, total_investment, market_value, note, created_at FROM portfolio_snapshots WHERE portfolio_id = ? ORDER BY date DESC",
+    "SELECT id, portfolio_id, date, total_investment, market_value, cash_balance, note, created_at FROM portfolio_snapshots WHERE portfolio_id = ? ORDER BY date DESC",
   )
     .bind(portfolioId)
     .all<PortfolioSnapshot>();

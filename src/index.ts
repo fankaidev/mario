@@ -64,12 +64,15 @@ export default {
     const updated = await updatePrices(env.DB, fetcher);
     console.log(`Scheduled price update: ${updated} stocks updated`);
 
-    const portfolios = await env.DB.prepare("SELECT id FROM portfolios WHERE archived = 0").all<{
+    const portfolios = await env.DB.prepare(
+      "SELECT id, cash_balance FROM portfolios WHERE archived = 0",
+    ).all<{
       id: number;
+      cash_balance: number;
     }>();
     const today = new Date().toISOString().split("T")[0];
 
-    for (const { id: portfolioId } of portfolios.results) {
+    for (const { id: portfolioId, cash_balance: cashBalance } of portfolios.results) {
       const existing = await env.DB.prepare(
         "SELECT id FROM portfolio_snapshots WHERE portfolio_id = ? AND date = ?",
       )
@@ -100,9 +103,9 @@ export default {
       }
 
       await env.DB.prepare(
-        "INSERT INTO portfolio_snapshots (portfolio_id, date, total_investment, market_value) VALUES (?, ?, ?, ?)",
+        "INSERT INTO portfolio_snapshots (portfolio_id, date, total_investment, market_value, cash_balance) VALUES (?, ?, ?, ?, ?)",
       )
-        .bind(portfolioId, today, investmentRow?.total ?? 0, marketValue)
+        .bind(portfolioId, today, investmentRow?.total ?? 0, marketValue, cashBalance)
         .run();
     }
     console.log(`Scheduled snapshots generated for ${portfolios.results.length} portfolios`);

@@ -70,6 +70,7 @@ export interface PortfolioSnapshot {
   date: string;
   total_investment: number;
   market_value: number;
+  cash_balance: number;
   note: string | null;
   created_at: string;
 }
@@ -78,6 +79,7 @@ export interface CreatePortfolioSnapshotRequest {
   date: string;
   total_investment: number;
   market_value: number;
+  cash_balance: number;
   note?: string;
 }
 
