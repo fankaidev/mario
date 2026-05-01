@@ -1,6 +1,19 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Button } from "../components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { Select } from "../components/ui/select";
 import { get, post } from "../lib/api";
 import type { Portfolio } from "../../../shared/types/api";
 
@@ -22,37 +35,44 @@ export function PortfolioList() {
     },
   });
 
-  if (isLoading) return <p className="p-4 text-gray-500">Loading...</p>;
-  if (error) return <p className="p-4 text-red-500">Failed to load portfolios</p>;
+  if (isLoading) return <p className="p-4 text-muted-foreground">Loading...</p>;
+  if (error) return <p className="p-4 text-destructive">Failed to load portfolios</p>;
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Portfolios</h1>
-        <button
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer"
-          onClick={() => setShowCreate(true)}
-        >
+    <div className="mx-auto max-w-5xl p-4 md:p-6">
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-normal">Portfolios</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Track assets by market and currency.</p>
+        </div>
+        <Button onClick={() => setShowCreate(true)}>
+          <Plus className="h-4 w-4" />
           New Portfolio
-        </button>
+        </Button>
       </div>
 
       {data?.data.length === 0 && (
-        <p className="text-gray-500">No portfolios yet. Create one to get started.</p>
+        <Card>
+          <CardContent className="p-6 text-sm text-muted-foreground">
+            No portfolios yet. Create one to get started.
+          </CardContent>
+        </Card>
       )}
 
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {data?.data.map((p) => (
-          <Link
-            key={p.id}
-            to={`/portfolios/${p.id}`}
-            className="p-4 border rounded shadow-sm hover:shadow-md transition block"
-          >
-            <h2 className="text-lg font-semibold">{p.name}</h2>
-            <p className="text-sm text-gray-500">{p.currency}</p>
-            <p className="text-xs text-gray-400 mt-2">
-              Created {new Date(p.created_at).toLocaleDateString()}
-            </p>
+          <Link key={p.id} to={`/portfolios/${p.id}`} className="block">
+            <Card className="h-full transition-colors hover:bg-accent">
+              <CardHeader>
+                <CardTitle className="text-lg">{p.name}</CardTitle>
+                <CardDescription>{p.currency}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">
+                  Created {new Date(p.created_at).toLocaleDateString()}
+                </p>
+              </CardContent>
+            </Card>
           </Link>
         ))}
       </div>
@@ -81,43 +101,42 @@ function CreatePortfolioModal({
   const [currency, setCurrency] = useState("USD");
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl">
-        <h2 className="text-xl font-semibold mb-4">New Portfolio</h2>
-        {error && <p className="mb-3 text-red-500 text-sm">{error}</p>}
-        <label className="block mb-2 text-sm font-medium">Name</label>
-        <input
-          className="w-full border rounded px-3 py-2 mb-4"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="My Portfolio"
-        />
-        <label className="block mb-2 text-sm font-medium">Currency</label>
-        <select
-          className="w-full border rounded px-3 py-2 mb-4"
-          value={currency}
-          onChange={(e) => setCurrency(e.target.value)}
-        >
-          <option value="USD">USD</option>
-          <option value="HKD">HKD</option>
-          <option value="CNY">CNY</option>
-        </select>
-        <div className="flex justify-end gap-3">
-          <button
-            className="px-4 py-2 text-gray-600 rounded hover:bg-gray-100 cursor-pointer"
-            onClick={onClose}
-          >
-            Cancel
-          </button>
-          <button
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer disabled:opacity-50"
-            disabled={!name.trim()}
-            onClick={() => onCreate(name.trim(), currency)}
-          >
-            Create
-          </button>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>New Portfolio</DialogTitle>
+        </DialogHeader>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <div className="grid gap-2">
+          <Label htmlFor="portfolio-name">Name</Label>
+          <Input
+            id="portfolio-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="My Portfolio"
+          />
         </div>
-      </div>
-    </div>
+        <div className="grid gap-2">
+          <Label htmlFor="portfolio-currency">Currency</Label>
+          <Select
+            id="portfolio-currency"
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+          >
+            <option value="USD">USD</option>
+            <option value="HKD">HKD</option>
+            <option value="CNY">CNY</option>
+          </Select>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button disabled={!name.trim()} onClick={() => onCreate(name.trim(), currency)}>
+            Create
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

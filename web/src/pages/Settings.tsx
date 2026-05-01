@@ -1,5 +1,18 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Copy, KeyRound, Plus, Trash2 } from "lucide-react";
+import { Button } from "../components/ui/button";
+import { Card, CardContent } from "../components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
 import { get, post, del } from "../lib/api";
 
 interface Token {
@@ -27,44 +40,56 @@ export function Settings() {
     },
   });
 
-  if (isLoading) return <p className="p-4 text-gray-500">Loading...</p>;
-  if (error) return <p className="p-4 text-red-500">Failed to load tokens</p>;
+  if (isLoading) return <p className="p-4 text-muted-foreground">Loading...</p>;
+  if (error) return <p className="p-4 text-destructive">Failed to load tokens</p>;
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Settings</h1>
+    <div className="mx-auto max-w-3xl p-4 md:p-6">
+      <h1 className="mb-6 text-2xl font-semibold tracking-normal">Settings</h1>
 
       <section>
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold">API Tokens</h2>
-          <button
-            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 cursor-pointer"
-            onClick={() => setShowCreate(true)}
-          >
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">API Tokens</h2>
+            <p className="text-sm text-muted-foreground">Manage bearer tokens for remote access.</p>
+          </div>
+          <Button size="sm" onClick={() => setShowCreate(true)}>
+            <Plus className="h-4 w-4" />
             Create Token
-          </button>
+          </Button>
         </div>
 
-        {data?.data.length === 0 && <p className="text-gray-500 text-sm">No tokens created yet.</p>}
+        {data?.data.length === 0 && (
+          <Card>
+            <CardContent className="p-6 text-sm text-muted-foreground">
+              No tokens created yet.
+            </CardContent>
+          </Card>
+        )}
 
         <div className="space-y-2">
           {data?.data.map((t) => (
-            <div key={t.id} className="flex items-center justify-between p-3 border rounded">
-              <div>
-                <p className="font-medium">{t.name}</p>
-                <p className="text-xs text-gray-400">
-                  Created {new Date(t.created_at).toLocaleDateString()}
-                  {t.last_used_at &&
-                    ` · Last used ${new Date(t.last_used_at).toLocaleDateString()}`}
-                </p>
-              </div>
-              <button
-                className="text-red-500 text-sm hover:underline cursor-pointer"
-                onClick={() => setDeleteId(t.id)}
-              >
-                Revoke
-              </button>
-            </div>
+            <Card key={t.id}>
+              <CardContent className="flex items-center justify-between gap-3 p-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="rounded-md bg-secondary p-2 text-secondary-foreground">
+                    <KeyRound className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium">{t.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Created {new Date(t.created_at).toLocaleDateString()}
+                      {t.last_used_at &&
+                        ` · Last used ${new Date(t.last_used_at).toLocaleDateString()}`}
+                    </p>
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setDeleteId(t.id)}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                  Revoke
+                </Button>
+              </CardContent>
+            </Card>
           ))}
         </div>
       </section>
@@ -109,59 +134,56 @@ function CreateTokenModal({ onClose }: { onClose: () => void }) {
 
   if (token) {
     return (
-      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl">
-          <h2 className="text-xl font-semibold mb-2">Token Created</h2>
-          <p className="text-sm text-gray-500 mb-4">
-            Copy this token now — it won't be shown again.
-          </p>
-          <div className="bg-gray-100 p-3 rounded mb-4 text-sm font-mono break-all">{token}</div>
-          <button
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer mb-2"
-            onClick={copy}
-          >
-            {copied ? "Copied!" : "Copy to Clipboard"}
-          </button>
-          <button
-            className="w-full px-4 py-2 text-gray-600 rounded hover:bg-gray-100 cursor-pointer"
-            onClick={onClose}
-          >
-            Done
-          </button>
-        </div>
-      </div>
+      <Dialog open onOpenChange={(open) => !open && onClose()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Token Created</DialogTitle>
+            <DialogDescription>Copy this token now — it won't be shown again.</DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md bg-muted p-3 font-mono text-sm break-all">{token}</div>
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>
+              Done
+            </Button>
+            <Button onClick={copy}>
+              <Copy className="h-4 w-4" />
+              {copied ? "Copied!" : "Copy to Clipboard"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl">
-        <h2 className="text-xl font-semibold mb-4">Create API Token</h2>
-        {mutation.error && <p className="mb-3 text-red-500 text-sm">{mutation.error.message}</p>}
-        <label className="block mb-2 text-sm font-medium">Token Name</label>
-        <input
-          className="w-full border rounded px-3 py-2 mb-4"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. CLI Tool"
-        />
-        <div className="flex justify-end gap-3">
-          <button
-            className="px-4 py-2 text-gray-600 rounded hover:bg-gray-100 cursor-pointer"
-            onClick={onClose}
-          >
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create API Token</DialogTitle>
+        </DialogHeader>
+        {mutation.error && <p className="text-sm text-destructive">{mutation.error.message}</p>}
+        <div className="grid gap-2">
+          <Label htmlFor="token-name">Token Name</Label>
+          <Input
+            id="token-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. CLI Tool"
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer disabled:opacity-50"
+          </Button>
+          <Button
             disabled={!name.trim() || mutation.isPending}
             onClick={() => mutation.mutate({ name: name.trim() })}
           >
             Create
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -175,24 +197,21 @@ function ConfirmDelete({
   onCancel: () => void;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-sm shadow-xl">
-        <p className="mb-4">{message}</p>
-        <div className="flex justify-end gap-3">
-          <button
-            className="px-4 py-2 text-gray-600 rounded hover:bg-gray-100 cursor-pointer"
-            onClick={onCancel}
-          >
+    <Dialog open onOpenChange={(open) => !open && onCancel()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Revoke Token</DialogTitle>
+          <DialogDescription>{message}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel}>
             Cancel
-          </button>
-          <button
-            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 cursor-pointer"
-            onClick={onConfirm}
-          >
+          </Button>
+          <Button variant="destructive" onClick={onConfirm}>
             Revoke
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

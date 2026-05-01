@@ -2,6 +2,29 @@ import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
 import { LineChart } from "../components/LineChart";
+import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
+import { Card, CardContent } from "../components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { Select } from "../components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { get, post, del } from "../lib/api";
 
 interface Tag {
@@ -75,19 +98,19 @@ export function PortfolioDetail() {
   const portfolio = portfolioData?.data;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="p-4 md:p-6 max-w-5xl mx-auto">
-        <Link to="/" className="text-blue-600 hover:underline text-sm">
-          ← Back to Portfolios
-        </Link>
-        <h1 className="text-xl md:text-2xl font-bold mt-2 mb-4">
+    <div className="min-h-screen bg-muted/40">
+      <div className="mx-auto max-w-5xl p-4 md:p-6">
+        <Button asChild variant="link" className="h-auto p-0">
+          <Link to="/">Back to Portfolios</Link>
+        </Button>
+        <h1 className="mt-2 mb-4 text-xl font-semibold tracking-normal md:text-2xl">
           {portfolio ? `${portfolio.name} (${portfolio.currency})` : "Loading..."}
         </h1>
 
         <SummaryCard id={id!} />
 
-        <div className="mt-6">
-          <div className="flex gap-1 border-b mb-4 overflow-x-auto">
+        <Tabs value={tab} onValueChange={(value) => setTab(value as TabName)} className="mt-6">
+          <TabsList className="mb-4 w-full justify-start overflow-x-auto">
             {(
               [
                 ["holdings", "Holdings"],
@@ -98,15 +121,11 @@ export function PortfolioDetail() {
                 ["tags", "Tags"],
               ] as [TabName, string][]
             ).map(([key, label]) => (
-              <button
-                key={key}
-                className={`px-3 md:px-4 py-2 text-sm whitespace-nowrap cursor-pointer ${tab === key ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500"}`}
-                onClick={() => setTab(key)}
-              >
+              <TabsTrigger key={key} value={key}>
                 {label}
-              </button>
+              </TabsTrigger>
             ))}
-          </div>
+          </TabsList>
 
           {tab === "holdings" && (
             <HoldingsTab
@@ -128,7 +147,7 @@ export function PortfolioDetail() {
           {tab === "return" && <ReturnCurveTab id={id!} />}
           {tab === "summary" && <SummaryTab id={id!} />}
           {tab === "tags" && <TagsTab id={id!} />}
-        </div>
+        </Tabs>
       </div>
     </div>
   );
@@ -145,14 +164,16 @@ function SummaryCard({ id }: { id: string }) {
   if (!s) return null;
 
   return (
-    <div className="bg-white rounded-lg border p-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <MetricBox label="Total Investment" value={s.total_investment} />
-        <MetricBox label="Market Value" value={s.total_market_value} />
-        <MetricBox label="Total P&L" value={s.total_pnl} highlight />
-        <MetricBox label="Return Rate" value={`${s.return_rate}%`} />
-      </div>
-    </div>
+    <Card>
+      <CardContent className="p-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <MetricBox label="Total Investment" value={s.total_investment} />
+          <MetricBox label="Market Value" value={s.total_market_value} />
+          <MetricBox label="Total P&L" value={s.total_pnl} highlight />
+          <MetricBox label="Return Rate" value={`${s.return_rate}%`} />
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -167,7 +188,7 @@ function MetricBox({
 }) {
   return (
     <div>
-      <p className="text-xs text-gray-500">{label}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
       <p
         className={`text-base md:text-lg font-medium ${highlight ? "font-bold" : ""} ${typeof value === "number" && value >= 0 ? "text-green-700" : typeof value === "number" ? "text-red-700" : ""}`}
       >
@@ -278,130 +299,130 @@ function HoldingsTab({
     });
   }, [data?.data, sort, tagFilter, filteredTagSymbols]);
 
-  if (isLoading) return <p className="text-sm text-gray-500">Loading...</p>;
+  if (isLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
 
   return (
     <div>
       {tags.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-1">
-          <button
-            className={`px-2 py-1 text-xs rounded cursor-pointer ${tagFilter === null ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+          <Button
+            size="sm"
+            variant={tagFilter === null ? "default" : "secondary"}
             onClick={() => setTagFilter(null)}
           >
             All
-          </button>
+          </Button>
           {tags.map((tag) => (
-            <button
+            <Button
               key={tag.id}
-              className={`px-2 py-1 text-xs rounded cursor-pointer ${tagFilter === tag.id ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+              size="sm"
+              variant={tagFilter === tag.id ? "default" : "secondary"}
               onClick={() => setTagFilter(tag.id === tagFilter ? null : tag.id)}
             >
               {tag.name}
-            </button>
+            </Button>
           ))}
         </div>
       )}
-      <div className="hidden md:block overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b text-left">
+      <div className="hidden md:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
               <Th label="Symbol" field="symbol" sort={sort} onSort={setSort} />
               <Th label="Qty" field="quantity" sort={sort} onSort={setSort} />
               <Th label="Cost" field="cost" sort={sort} onSort={setSort} />
               <Th label="Price" field="marketValue" sort={sort} onSort={setSort} />
               <Th label="P&L" field="unrealizedPnl" sort={sort} onSort={setSort} />
               <Th label="P&L%" field="unrealizedPnlRate" sort={sort} onSort={setSort} />
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {sortedHoldings.map((h) => (
-              <tr key={h.symbol} className="border-b">
-                <td className="py-2">
-                  <button
-                    className="font-medium text-blue-600 hover:underline cursor-pointer"
+              <TableRow key={h.symbol}>
+                <TableCell>
+                  <Button
+                    variant="link"
+                    className="h-auto p-0 font-medium"
                     onClick={() => onSelectSymbol(h.symbol)}
                   >
                     {h.symbol}
-                  </button>
-                  <div className="text-xs text-gray-500">{h.name}</div>
+                  </Button>
+                  <div className="text-xs text-muted-foreground">{h.name}</div>
                   {symbolTags.has(h.symbol) && (
-                    <div className="flex flex-wrap gap-0.5 mt-0.5">
+                    <div className="mt-0.5 flex flex-wrap gap-0.5">
                       {symbolTags.get(h.symbol)!.map((tag) => (
-                        <span
-                          key={tag.id}
-                          className="px-1 py-0.5 bg-blue-50 text-blue-600 rounded text-xs"
-                        >
+                        <Badge key={tag.id} variant="secondary">
                           {tag.name}
-                        </span>
+                        </Badge>
                       ))}
                     </div>
                   )}
-                </td>
-                <td className="py-2">{h.quantity}</td>
-                <td className="py-2">{h.cost.toLocaleString()}</td>
-                <td className="py-2">{h.market_value?.toLocaleString() ?? "-"}</td>
-                <td
+                </TableCell>
+                <TableCell>{h.quantity}</TableCell>
+                <TableCell>{h.cost.toLocaleString()}</TableCell>
+                <TableCell>{h.market_value?.toLocaleString() ?? "-"}</TableCell>
+                <TableCell
                   className={`py-2 ${(h.unrealized_pnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}
                 >
                   {h.unrealized_pnl?.toLocaleString() ?? "-"}
-                </td>
-                <td
+                </TableCell>
+                <TableCell
                   className={`py-2 ${(h.unrealized_pnl_rate ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}
                 >
                   {h.unrealized_pnl_rate != null ? `${h.unrealized_pnl_rate}%` : "-"}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
-      <div className="md:hidden space-y-2">
+      <div className="space-y-2 md:hidden">
         {sortedHoldings.map((h) => (
-          <div key={h.symbol} className="bg-white rounded-lg border p-3">
-            <div className="flex justify-between items-center mb-2">
-              <div>
-                <button
-                  className="font-semibold text-blue-600 cursor-pointer"
-                  onClick={() => onSelectSymbol(h.symbol)}
-                >
-                  {h.symbol}
-                </button>
-                <div className="text-xs text-gray-500">{h.name}</div>
-                {symbolTags.has(h.symbol) && (
-                  <div className="flex flex-wrap gap-0.5 mt-0.5">
-                    {symbolTags.get(h.symbol)!.map((tag) => (
-                      <span
-                        key={tag.id}
-                        className="px-1 py-0.5 bg-blue-50 text-blue-600 rounded text-xs"
-                      >
-                        {tag.name}
-                      </span>
-                    ))}
-                  </div>
-                )}
+          <Card key={h.symbol}>
+            <CardContent className="p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <div>
+                  <Button
+                    variant="link"
+                    className="h-auto p-0 font-semibold"
+                    onClick={() => onSelectSymbol(h.symbol)}
+                  >
+                    {h.symbol}
+                  </Button>
+                  <div className="text-xs text-muted-foreground">{h.name}</div>
+                  {symbolTags.has(h.symbol) && (
+                    <div className="mt-0.5 flex flex-wrap gap-0.5">
+                      {symbolTags.get(h.symbol)!.map((tag) => (
+                        <Badge key={tag.id} variant="secondary">
+                          {tag.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <span className="text-sm text-muted-foreground">{h.quantity} shares</span>
               </div>
-              <span className="text-sm text-gray-500">{h.quantity} shares</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Cost: {h.cost.toLocaleString()}</span>
-              <span
-                className={
-                  h.unrealized_pnl != null && h.unrealized_pnl >= 0
-                    ? "text-green-600"
-                    : "text-red-600"
-                }
-              >
-                P&L: {h.unrealized_pnl?.toLocaleString() ?? "-"} (
-                {h.unrealized_pnl_rate != null ? `${h.unrealized_pnl_rate}%` : "-"})
-              </span>
-            </div>
-          </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Cost: {h.cost.toLocaleString()}</span>
+                <span
+                  className={
+                    h.unrealized_pnl != null && h.unrealized_pnl >= 0
+                      ? "text-green-600"
+                      : "text-red-600"
+                  }
+                >
+                  P&L: {h.unrealized_pnl?.toLocaleString() ?? "-"} (
+                  {h.unrealized_pnl_rate != null ? `${h.unrealized_pnl_rate}%` : "-"})
+                </span>
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
       {sortedHoldings.length === 0 && (
-        <p className="text-sm text-gray-500 text-center py-4">No holdings</p>
+        <p className="py-4 text-center text-sm text-muted-foreground">No holdings</p>
       )}
     </div>
   );
@@ -422,8 +443,8 @@ function Th({
   const arrow = isActive ? (sort.direction === "asc" ? "↑" : "↓") : "";
 
   return (
-    <th
-      className="py-2 pr-4 cursor-pointer select-none"
+    <TableHead
+      className="cursor-pointer select-none"
       onClick={() =>
         onSort({
           field,
@@ -432,7 +453,7 @@ function Th({
       }
     >
       {label} {arrow}
-    </th>
+    </TableHead>
   );
 }
 
@@ -506,59 +527,58 @@ function TransactionsTab({
     },
   });
 
-  if (isLoading) return <p className="text-sm text-gray-500">Loading...</p>;
+  if (isLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
 
   return (
     <div>
-      <div className="flex justify-between mb-4">
+      <div className="mb-4 flex justify-between">
         <h3 className="font-semibold">Transactions</h3>
-        <button
-          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 cursor-pointer"
-          onClick={() => setShowAdd(true)}
-        >
+        <Button size="sm" onClick={() => setShowAdd(true)}>
           Add Transaction
-        </button>
+        </Button>
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2 items-center">
-        <input
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Input
           type="text"
           value={symbolFilter}
           onChange={(e) => onSymbolFilterChange(e.target.value.toUpperCase())}
           placeholder="Filter by symbol"
-          className="w-full max-w-xs border rounded px-3 py-2 text-sm"
+          className="w-full max-w-xs"
         />
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex flex-wrap gap-1">
           {Object.entries(presets).map(([key, label]) => (
-            <button
+            <Button
               key={key}
-              className={`px-2 py-1 text-xs rounded cursor-pointer ${datePreset === key ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+              size="sm"
+              variant={datePreset === key ? "default" : "secondary"}
               onClick={() => setDatePreset(key)}
             >
               {label}
-            </button>
+            </Button>
           ))}
-          <button
-            className={`px-2 py-1 text-xs rounded cursor-pointer ${datePreset === "CUSTOM" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+          <Button
+            size="sm"
+            variant={datePreset === "CUSTOM" ? "default" : "secondary"}
             onClick={() => setDatePreset("CUSTOM")}
           >
             Custom
-          </button>
+          </Button>
         </div>
         {datePreset === "CUSTOM" && (
-          <div className="flex gap-2 items-center">
-            <input
+          <div className="flex items-center gap-2">
+            <Input
               type="date"
               value={customStart}
               onChange={(e) => setCustomStart(e.target.value)}
-              className="border rounded px-2 py-1 text-xs"
+              className="h-8 w-auto text-xs"
             />
-            <span className="text-xs text-gray-500">to</span>
-            <input
+            <span className="text-xs text-muted-foreground">to</span>
+            <Input
               type="date"
               value={customEnd}
               onChange={(e) => setCustomEnd(e.target.value)}
-              className="border rounded px-2 py-1 text-xs"
+              className="h-8 w-auto text-xs"
             />
           </div>
         )}
@@ -566,40 +586,31 @@ function TransactionsTab({
 
       <div className="space-y-1">
         {data?.data.map((tx) => (
-          <div key={tx.id} className="flex items-center justify-between py-2 border-b text-sm">
+          <div key={tx.id} className="flex items-center justify-between border-b py-2 text-sm">
             <div>
               <span className="font-medium">{tx.symbol}</span>
-              <span className="ml-2 text-xs text-gray-500">{tx.name}</span>
-              <span
-                className={`ml-2 px-1.5 py-0.5 rounded text-xs ${
-                  tx.type === "buy"
-                    ? "bg-green-100 text-green-700"
-                    : tx.type === "sell"
-                      ? "bg-red-100 text-red-700"
-                      : tx.type === "initial"
-                        ? "bg-amber-100 text-amber-700"
-                        : "bg-blue-100 text-blue-700"
-                }`}
-              >
-                {tx.type}
-              </span>
-              <span className="ml-2 text-gray-500">{tx.date}</span>
+              <span className="ml-2 text-xs text-muted-foreground">{tx.name}</span>
+              <TransactionTypeBadge type={tx.type} />
+              <span className="ml-2 text-muted-foreground">{tx.date}</span>
             </div>
             <div className="flex items-center gap-3">
               <span>
                 {tx.quantity} × {tx.price}
               </span>
-              {tx.fee > 0 && <span className="text-gray-400">fee {tx.fee}</span>}
-              <button
-                className="text-red-500 text-xs hover:underline cursor-pointer"
+              {tx.fee > 0 && <span className="text-muted-foreground">fee {tx.fee}</span>}
+              <Button
+                variant="link"
+                className="h-auto p-0 text-xs text-destructive"
                 onClick={() => setDeleteId(tx.id)}
               >
                 Delete
-              </button>
+              </Button>
             </div>
           </div>
         ))}
-        {data?.data.length === 0 && <p className="text-sm text-gray-500">No transactions yet.</p>}
+        {data?.data.length === 0 && (
+          <p className="text-sm text-muted-foreground">No transactions yet.</p>
+        )}
       </div>
 
       {showAdd && (
@@ -620,6 +631,23 @@ function TransactionsTab({
         />
       )}
     </div>
+  );
+}
+
+function TransactionTypeBadge({ type }: { type: string }) {
+  const className =
+    type === "buy"
+      ? "bg-green-100 text-green-700"
+      : type === "sell"
+        ? "bg-red-100 text-red-700"
+        : type === "initial"
+          ? "bg-amber-100 text-amber-700"
+          : "bg-blue-100 text-blue-700";
+
+  return (
+    <Badge variant="secondary" className={`ml-2 border-transparent ${className}`}>
+      {type}
+    </Badge>
   );
 }
 
@@ -656,24 +684,26 @@ function AddTransactionModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl">
-        <h3 className="text-lg font-semibold mb-4">Add Transaction</h3>
-        {mutation.error && <p className="mb-3 text-red-500 text-sm">{mutation.error.message}</p>}
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add Transaction</DialogTitle>
+        </DialogHeader>
+        {mutation.error && <p className="text-sm text-destructive">{mutation.error.message}</p>}
         <div className="space-y-3">
           <div>
-            <label className="block text-sm mb-1">Symbol</label>
-            <input
-              className="w-full border rounded px-3 py-2"
+            <Label htmlFor="transaction-symbol">Symbol</Label>
+            <Input
+              id="transaction-symbol"
               value={symbol}
               onChange={(e) => setSymbol(e.target.value)}
               placeholder="AAPL"
             />
           </div>
           <div>
-            <label className="block text-sm mb-1">Type</label>
-            <select
-              className="w-full border rounded px-3 py-2"
+            <Label htmlFor="transaction-type">Type</Label>
+            <Select
+              id="transaction-type"
               value={type}
               onChange={(e) => setType(e.target.value as "buy" | "sell" | "dividend" | "initial")}
             >
@@ -681,13 +711,13 @@ function AddTransactionModal({
               <option value="sell">Sell</option>
               <option value="dividend">Dividend</option>
               <option value="initial">Initial</option>
-            </select>
+            </Select>
           </div>
           {type !== "dividend" && (
             <div>
-              <label className="block text-sm mb-1">Quantity</label>
-              <input
-                className="w-full border rounded px-3 py-2"
+              <Label htmlFor="transaction-quantity">Quantity</Label>
+              <Input
+                id="transaction-quantity"
                 type="number"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
@@ -695,52 +725,45 @@ function AddTransactionModal({
             </div>
           )}
           <div>
-            <label className="block text-sm mb-1">{type === "dividend" ? "Amount" : "Price"}</label>
-            <input
-              className="w-full border rounded px-3 py-2"
+            <Label htmlFor="transaction-price">{type === "dividend" ? "Amount" : "Price"}</Label>
+            <Input
+              id="transaction-price"
               type="number"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
             />
           </div>
           <div>
-            <label className="block text-sm mb-1">
+            <Label htmlFor="transaction-fee">
               {type === "dividend" ? "Withholding Tax" : "Fee"}
-            </label>
-            <input
-              className="w-full border rounded px-3 py-2"
+            </Label>
+            <Input
+              id="transaction-fee"
               type="number"
               value={fee}
               onChange={(e) => setFee(e.target.value)}
             />
           </div>
           <div>
-            <label className="block text-sm mb-1">Date</label>
-            <input
-              className="w-full border rounded px-3 py-2"
+            <Label htmlFor="transaction-date">Date</Label>
+            <Input
+              id="transaction-date"
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
             />
           </div>
         </div>
-        <div className="flex justify-end gap-3 mt-4">
-          <button
-            className="px-4 py-2 text-gray-600 rounded hover:bg-gray-100 cursor-pointer"
-            onClick={onClose}
-          >
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer"
-            disabled={!symbol.trim() || mutation.isPending}
-            onClick={handleSubmit}
-          >
+          </Button>
+          <Button disabled={!symbol.trim() || mutation.isPending} onClick={handleSubmit}>
             Add
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -759,31 +782,30 @@ function SnapshotsTab({ id }: { id: string }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["snapshots", id] }),
   });
 
-  if (isLoading) return <p className="text-sm text-gray-500">Loading...</p>;
+  if (isLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
 
   return (
     <div>
-      <div className="flex justify-between mb-4">
+      <div className="mb-4 flex justify-between">
         <h3 className="font-semibold">Snapshots</h3>
-        <button
-          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 cursor-pointer"
-          onClick={() => setShowAdd(true)}
-        >
+        <Button size="sm" onClick={() => setShowAdd(true)}>
           Add Snapshot
-        </button>
+        </Button>
       </div>
 
-      {data?.data.length === 0 && <p className="text-sm text-gray-500">No snapshots yet.</p>}
+      {data?.data.length === 0 && (
+        <p className="text-sm text-muted-foreground">No snapshots yet.</p>
+      )}
 
       <div className="space-y-1">
         {data?.data.map((s) => {
           const pnl = s.market_value - s.total_investment;
           const rate = s.total_investment > 0 ? (pnl / s.total_investment) * 100 : 0;
           return (
-            <div key={s.id} className="flex items-center justify-between py-2 border-b text-sm">
+            <div key={s.id} className="flex items-center justify-between border-b py-2 text-sm">
               <div>
                 <span className="font-medium">{s.date}</span>
-                {s.note && <span className="ml-2 text-gray-400">{s.note}</span>}
+                {s.note && <span className="ml-2 text-muted-foreground">{s.note}</span>}
               </div>
               <div className="flex items-center gap-3">
                 <span>Inv: {s.total_investment.toLocaleString()}</span>
@@ -792,12 +814,13 @@ function SnapshotsTab({ id }: { id: string }) {
                   P&L: {pnl.toLocaleString()} ({rate >= 0 ? "+" : ""}
                   {rate.toFixed(1)}%)
                 </span>
-                <button
-                  className="text-red-500 text-xs hover:underline cursor-pointer"
+                <Button
+                  variant="link"
+                  className="h-auto p-0 text-xs text-destructive"
                   onClick={() => deleteMutation.mutate(s.id)}
                 >
                   Delete
-                </button>
+                </Button>
               </div>
             </div>
           );
@@ -847,24 +870,26 @@ function AddSnapshotModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl">
-        <h3 className="text-lg font-semibold mb-4">Add Snapshot</h3>
-        {mutation.error && <p className="mb-3 text-red-500 text-sm">{mutation.error.message}</p>}
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add Snapshot</DialogTitle>
+        </DialogHeader>
+        {mutation.error && <p className="text-sm text-destructive">{mutation.error.message}</p>}
         <div className="space-y-3">
           <div>
-            <label className="block text-sm mb-1">Date</label>
-            <input
-              className="w-full border rounded px-3 py-2"
+            <Label htmlFor="snapshot-date">Date</Label>
+            <Input
+              id="snapshot-date"
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
             />
           </div>
           <div>
-            <label className="block text-sm mb-1">Total Investment</label>
-            <input
-              className="w-full border rounded px-3 py-2"
+            <Label htmlFor="snapshot-investment">Total Investment</Label>
+            <Input
+              id="snapshot-investment"
               type="number"
               value={investment}
               onChange={(e) => setInvestment(e.target.value)}
@@ -872,9 +897,9 @@ function AddSnapshotModal({
             />
           </div>
           <div>
-            <label className="block text-sm mb-1">Market Value</label>
-            <input
-              className="w-full border rounded px-3 py-2"
+            <Label htmlFor="snapshot-market-value">Market Value</Label>
+            <Input
+              id="snapshot-market-value"
               type="number"
               value={marketValue}
               onChange={(e) => setMarketValue(e.target.value)}
@@ -882,32 +907,25 @@ function AddSnapshotModal({
             />
           </div>
           <div>
-            <label className="block text-sm mb-1">Note (optional)</label>
-            <input
-              className="w-full border rounded px-3 py-2"
+            <Label htmlFor="snapshot-note">Note (optional)</Label>
+            <Input
+              id="snapshot-note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Year end snapshot"
             />
           </div>
         </div>
-        <div className="flex justify-end gap-3 mt-4">
-          <button
-            className="px-4 py-2 text-gray-600 rounded hover:bg-gray-100 cursor-pointer"
-            onClick={onClose}
-          >
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer"
-            disabled={mutation.isPending}
-            onClick={handleSubmit}
-          >
+          </Button>
+          <Button disabled={mutation.isPending} onClick={handleSubmit}>
             Add
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -922,7 +940,8 @@ function ReturnCurveTab({ id }: { id: string }) {
     queryFn: () => get<{ data: Summary }>(`/portfolios/${id}/summary`),
   });
 
-  if (isLoading || summary.isLoading) return <p className="text-sm text-gray-500">Loading...</p>;
+  if (isLoading || summary.isLoading)
+    return <p className="text-sm text-muted-foreground">Loading...</p>;
 
   const snapshots = data?.data ?? [];
   const currentSummary = summary.data?.data;
@@ -969,40 +988,44 @@ function ReturnCurveTab({ id }: { id: string }) {
 
   return (
     <div>
-      <h3 className="font-semibold mb-4">Market Value Over Time</h3>
-      <div className="bg-white rounded-lg border p-4 mb-6">
-        <LineChart
-          data={points.map((p) => ({
-            label: p.date,
-            values: [
-              { key: "mv", value: p.marketValue, color: "#2563eb" },
-              { key: "inv", value: p.investment, color: "#9ca3af" },
-            ],
-          }))}
-          height={250}
-          formatValue={(v) => v.toLocaleString()}
-        />
-        <div className="flex gap-4 mt-2 text-xs text-gray-500">
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-0.5 bg-blue-600 inline-block" /> Market Value
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-0.5 bg-gray-400 inline-block" /> Investment
-          </span>
-        </div>
-      </div>
+      <h3 className="mb-4 font-semibold">Market Value Over Time</h3>
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <LineChart
+            data={points.map((p) => ({
+              label: p.date,
+              values: [
+                { key: "mv", value: p.marketValue, color: "#2563eb" },
+                { key: "inv", value: p.investment, color: "#9ca3af" },
+              ],
+            }))}
+            height={250}
+            formatValue={(v) => v.toLocaleString()}
+          />
+          <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-0.5 w-3 bg-blue-600" /> Market Value
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-0.5 w-3 bg-gray-400" /> Investment
+            </span>
+          </div>
+        </CardContent>
+      </Card>
 
-      <h3 className="font-semibold mb-4">Return Rate Over Time</h3>
-      <div className="bg-white rounded-lg border p-4">
-        <LineChart
-          data={points.map((p) => ({
-            label: p.date,
-            values: [{ key: "rate", value: p.returnRate, color: "#059669" }],
-          }))}
-          height={250}
-          formatValue={(v) => `${v.toFixed(1)}%`}
-        />
-      </div>
+      <h3 className="mb-4 font-semibold">Return Rate Over Time</h3>
+      <Card>
+        <CardContent className="p-4">
+          <LineChart
+            data={points.map((p) => ({
+              label: p.date,
+              values: [{ key: "rate", value: p.returnRate, color: "#059669" }],
+            }))}
+            height={250}
+            formatValue={(v) => `${v.toFixed(1)}%`}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -1020,23 +1043,20 @@ function SummaryTab({ id }: { id: string }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["summary", id] }),
   });
 
-  if (isLoading) return <p className="text-sm text-gray-500">Loading...</p>;
+  if (isLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
 
   const s = data?.data;
   if (!s) return null;
 
   return (
     <div>
-      <div className="flex justify-between mb-4">
+      <div className="mb-4 flex justify-between">
         <h3 className="font-semibold">Summary</h3>
-        <button
-          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 cursor-pointer"
-          onClick={() => priceMutation.mutate()}
-        >
+        <Button size="sm" onClick={() => priceMutation.mutate()}>
           Update Prices
-        </button>
+        </Button>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
         <Metric label="Total Investment" value={s.total_investment} />
         <Metric label="Market Value" value={s.total_market_value} />
         <Metric label="Unrealized P&L" value={s.unrealized_pnl} />
@@ -1045,21 +1065,21 @@ function SummaryTab({ id }: { id: string }) {
         <Metric label="Total P&L" value={s.total_pnl} highlight />
         <Metric label="Return Rate" value={`${s.return_rate}%`} />
       </div>
-      <h4 className="font-semibold mt-6 mb-2">Fees</h4>
+      <h4 className="mt-6 mb-2 font-semibold">Fees</h4>
       <div className="grid grid-cols-2 gap-4 text-sm">
-        <div className="flex justify-between p-2 bg-gray-100 rounded">
+        <div className="flex justify-between rounded-md bg-muted p-2">
           <span>Buy Fees</span>
           <span>{s.cumulative_buy_fees}</span>
         </div>
-        <div className="flex justify-between p-2 bg-gray-100 rounded">
+        <div className="flex justify-between rounded-md bg-muted p-2">
           <span>Sell Fees</span>
           <span>{s.cumulative_sell_fees}</span>
         </div>
-        <div className="flex justify-between p-2 bg-gray-100 rounded">
+        <div className="flex justify-between rounded-md bg-muted p-2">
           <span>Withholding Tax</span>
           <span>{s.cumulative_withholding_tax}</span>
         </div>
-        <div className="flex justify-between p-2 bg-gray-100 rounded font-medium">
+        <div className="flex justify-between rounded-md bg-muted p-2 font-medium">
           <span>Total Fees</span>
           <span>{s.cumulative_total_fees}</span>
         </div>
@@ -1078,14 +1098,16 @@ function Metric({
   highlight?: boolean;
 }) {
   return (
-    <div className="p-3 border rounded">
-      <p className="text-xs text-gray-500">{label}</p>
-      <p
-        className={`text-lg ${highlight ? "font-bold" : "font-medium"} ${typeof value === "number" && value >= 0 ? "text-green-700" : "text-red-700"}`}
-      >
-        {typeof value === "number" ? value.toLocaleString() : value}
-      </p>
-    </div>
+    <Card>
+      <CardContent className="p-3">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p
+          className={`text-lg ${highlight ? "font-bold" : "font-medium"} ${typeof value === "number" && value >= 0 ? "text-green-700" : "text-red-700"}`}
+        >
+          {typeof value === "number" ? value.toLocaleString() : value}
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -1140,7 +1162,7 @@ function TagsTab({ id }: { id: string }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tags", id] }),
   });
 
-  if (tagsLoading) return <p className="text-sm text-gray-500">Loading...</p>;
+  if (tagsLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
 
   const tags = tagsData?.data ?? [];
   const holdings = holdingsData?.data ?? [];
@@ -1171,156 +1193,164 @@ function TagsTab({ id }: { id: string }) {
 
   return (
     <div>
-      <h3 className="font-semibold mb-4">Tags</h3>
+      <h3 className="mb-4 font-semibold">Tags</h3>
 
-      <div className="flex gap-2 mb-4">
-        <input
+      <div className="mb-4 flex gap-2">
+        <Input
           type="text"
           value={newTagName}
           onChange={(e) => setNewTagName(e.target.value)}
           placeholder="New tag name"
-          className="border rounded px-3 py-2 text-sm flex-1"
+          className="flex-1"
           onKeyDown={(e) => {
             if (e.key === "Enter" && newTagName.trim()) {
               createMutation.mutate(newTagName.trim());
             }
           }}
         />
-        <button
-          className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 cursor-pointer disabled:opacity-50"
+        <Button
           disabled={!newTagName.trim() || createMutation.isPending}
           onClick={() => createMutation.mutate(newTagName.trim())}
         >
           Add
-        </button>
+        </Button>
       </div>
 
       {createMutation.error && (
-        <p className="text-red-500 text-sm mb-3">{createMutation.error.message}</p>
+        <p className="mb-3 text-sm text-destructive">{createMutation.error.message}</p>
       )}
 
       {tagAggregates.length > 0 && (
         <div className="mb-6">
-          <h4 className="text-sm font-semibold mb-2">Aggregated P&L by Tag</h4>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left">
-                  <th className="py-1 pr-2">Tag</th>
-                  <th className="py-1 pr-2">Cost</th>
-                  <th className="py-1 pr-2">Mkt Value</th>
-                  <th className="py-1 pr-2">P&L</th>
-                  <th className="py-1">P&L%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tagAggregates.map((tag) => (
-                  <tr key={tag.id} className="border-b">
-                    <td className="py-1 pr-2">{tag.name}</td>
-                    <td className="py-1 pr-2">{tag.cost.toLocaleString()}</td>
-                    <td className="py-1 pr-2">{tag.marketValue.toLocaleString()}</td>
-                    <td className={`py-1 pr-2 ${tag.pnl >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {tag.pnl.toLocaleString()}
-                    </td>
-                    <td className={`py-1 ${tag.pnlRate >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {tag.pnlRate >= 0 ? "+" : ""}
-                      {tag.pnlRate.toFixed(1)}%
-                    </td>
-                  </tr>
-                ))}
-                {untaggedHoldings.length > 0 && (
-                  <tr className="border-b">
-                    <td className="py-1 pr-2 text-gray-400">Untagged</td>
-                    <td className="py-1 pr-2 text-gray-400">{untaggedCost.toLocaleString()}</td>
-                    <td className="py-1 pr-2 text-gray-400">{untaggedMV.toLocaleString()}</td>
-                    <td
-                      className={`py-1 pr-2 text-gray-400 ${untaggedMV - untaggedCost >= 0 ? "text-green-600" : "text-red-600"}`}
-                    >
-                      {(untaggedMV - untaggedCost).toLocaleString()}
-                    </td>
-                    <td
-                      className={`py-1 text-gray-400 ${untaggedCost > 0 && untaggedMV - untaggedCost >= 0 ? "text-green-600" : "text-red-600"}`}
-                    >
-                      {untaggedCost > 0
-                        ? `${untaggedMV - untaggedCost >= 0 ? "+" : ""}${(((untaggedMV - untaggedCost) / untaggedCost) * 100).toFixed(1)}%`
-                        : "-"}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <h4 className="mb-2 text-sm font-semibold">Aggregated P&L by Tag</h4>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tag</TableHead>
+                <TableHead>Cost</TableHead>
+                <TableHead>Mkt Value</TableHead>
+                <TableHead>P&L</TableHead>
+                <TableHead>P&L%</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {tagAggregates.map((tag) => (
+                <TableRow key={tag.id}>
+                  <TableCell>{tag.name}</TableCell>
+                  <TableCell>{tag.cost.toLocaleString()}</TableCell>
+                  <TableCell>{tag.marketValue.toLocaleString()}</TableCell>
+                  <TableCell className={tag.pnl >= 0 ? "text-green-600" : "text-red-600"}>
+                    {tag.pnl.toLocaleString()}
+                  </TableCell>
+                  <TableCell className={tag.pnlRate >= 0 ? "text-green-600" : "text-red-600"}>
+                    {tag.pnlRate >= 0 ? "+" : ""}
+                    {tag.pnlRate.toFixed(1)}%
+                  </TableCell>
+                </TableRow>
+              ))}
+              {untaggedHoldings.length > 0 && (
+                <TableRow>
+                  <TableCell className="text-muted-foreground">Untagged</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {untaggedCost.toLocaleString()}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {untaggedMV.toLocaleString()}
+                  </TableCell>
+                  <TableCell
+                    className={untaggedMV - untaggedCost >= 0 ? "text-green-600" : "text-red-600"}
+                  >
+                    {(untaggedMV - untaggedCost).toLocaleString()}
+                  </TableCell>
+                  <TableCell
+                    className={
+                      untaggedCost > 0 && untaggedMV - untaggedCost >= 0
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }
+                  >
+                    {untaggedCost > 0
+                      ? `${untaggedMV - untaggedCost >= 0 ? "+" : ""}${(((untaggedMV - untaggedCost) / untaggedCost) * 100).toFixed(1)}%`
+                      : "-"}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </div>
       )}
 
       {tags.length === 0 && !tagAggregates.length && (
-        <p className="text-sm text-gray-500">No tags yet.</p>
+        <p className="text-sm text-muted-foreground">No tags yet.</p>
       )}
 
       <div className="space-y-4">
         {tags.map((tag) => (
-          <div key={tag.id} className="bg-white rounded-lg border p-3">
-            <div className="flex justify-between items-center mb-2">
-              <span className="font-medium">{tag.name}</span>
-              <button
-                className="text-red-500 text-xs hover:underline cursor-pointer"
-                onClick={() => deleteMutation.mutate(tag.id)}
-              >
-                Delete
-              </button>
-            </div>
-            {tag.symbols && tag.symbols.length > 0 ? (
-              <div className="flex flex-wrap gap-1 mb-2">
-                {tag.symbols.map((s) => (
-                  <span
-                    key={s}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs"
-                  >
-                    {s}
-                    <button
-                      className="text-blue-400 hover:text-blue-700 cursor-pointer"
-                      onClick={() => unassignMutation.mutate({ tagId: tag.id, symbol: s })}
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
+          <Card key={tag.id}>
+            <CardContent className="p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="font-medium">{tag.name}</span>
+                <Button
+                  variant="link"
+                  className="h-auto p-0 text-xs text-destructive"
+                  onClick={() => deleteMutation.mutate(tag.id)}
+                >
+                  Delete
+                </Button>
               </div>
-            ) : (
-              <p className="text-xs text-gray-400 mb-2">No stocks assigned</p>
-            )}
-            <div className="flex gap-1">
-              <input
-                type="text"
-                value={assignSymbols[tag.id] ?? ""}
-                onChange={(e) =>
-                  setAssignSymbols((prev) => ({ ...prev, [tag.id]: e.target.value.toUpperCase() }))
-                }
-                placeholder="Add symbol"
-                className="border rounded px-2 py-1 text-xs flex-1"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (assignSymbols[tag.id] ?? "").trim()) {
+              {tag.symbols && tag.symbols.length > 0 ? (
+                <div className="mb-2 flex flex-wrap gap-1">
+                  {tag.symbols.map((s) => (
+                    <Badge key={s} variant="secondary" className="gap-1">
+                      {s}
+                      <button
+                        className="cursor-pointer text-muted-foreground hover:text-foreground"
+                        onClick={() => unassignMutation.mutate({ tagId: tag.id, symbol: s })}
+                      >
+                        ×
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="mb-2 text-xs text-muted-foreground">No stocks assigned</p>
+              )}
+              <div className="flex gap-1">
+                <Input
+                  type="text"
+                  value={assignSymbols[tag.id] ?? ""}
+                  onChange={(e) =>
+                    setAssignSymbols((prev) => ({
+                      ...prev,
+                      [tag.id]: e.target.value.toUpperCase(),
+                    }))
+                  }
+                  placeholder="Add symbol"
+                  className="h-8 flex-1 text-xs"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (assignSymbols[tag.id] ?? "").trim()) {
+                      assignMutation.mutate({
+                        tagId: tag.id,
+                        symbol: (assignSymbols[tag.id] ?? "").trim(),
+                      });
+                    }
+                  }}
+                />
+                <Button
+                  size="sm"
+                  disabled={!(assignSymbols[tag.id] ?? "").trim() || assignMutation.isPending}
+                  onClick={() =>
                     assignMutation.mutate({
                       tagId: tag.id,
                       symbol: (assignSymbols[tag.id] ?? "").trim(),
-                    });
+                    })
                   }
-                }}
-              />
-              <button
-                className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 cursor-pointer disabled:opacity-50"
-                disabled={!(assignSymbols[tag.id] ?? "").trim() || assignMutation.isPending}
-                onClick={() =>
-                  assignMutation.mutate({
-                    tagId: tag.id,
-                    symbol: (assignSymbols[tag.id] ?? "").trim(),
-                  })
-                }
-              >
-                +
-              </button>
-            </div>
-          </div>
+                >
+                  +
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
     </div>
@@ -1337,24 +1367,21 @@ function ConfirmModal({
   onCancel: () => void;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-6 w-full max-w-sm shadow-xl">
-        <p className="mb-4">{message}</p>
-        <div className="flex justify-end gap-3">
-          <button
-            className="px-4 py-2 text-gray-600 rounded hover:bg-gray-100 cursor-pointer"
-            onClick={onCancel}
-          >
+    <Dialog open onOpenChange={(open) => !open && onCancel()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Confirm Action</DialogTitle>
+          <DialogDescription>{message}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel}>
             Cancel
-          </button>
-          <button
-            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 cursor-pointer"
-            onClick={onConfirm}
-          >
+          </Button>
+          <Button variant="destructive" onClick={onConfirm}>
             Confirm
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
