@@ -113,4 +113,31 @@ describe("Stock Tags", () => {
     const tagRow = await db.prepare("SELECT * FROM tags WHERE id = ?").bind(tag.id).first();
     expect(tagRow).toBeNull();
   });
+
+  it("[UC-PORTFOLIO-007-S07] list tags includes stock symbols when include_stocks=true", async () => {
+    const { data: tag } = await createTag("Tech");
+
+    await worker.fetch(tagUrl(`/${tag.id}/stocks`), {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ symbol: "AAPL" }),
+    });
+    await worker.fetch(tagUrl(`/${tag.id}/stocks`), {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ symbol: "NVDA" }),
+    });
+
+    const res = await worker.fetch(tagUrl("?include_stocks=true"), {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Array<{ id: number; name: string; symbols: string[] }>;
+    };
+    const techTag = body.data.find((t) => t.name === "Tech");
+    expect(techTag).toBeDefined();
+    expect(techTag!.symbols).toContain("AAPL");
+    expect(techTag!.symbols).toContain("NVDA");
+  });
 });

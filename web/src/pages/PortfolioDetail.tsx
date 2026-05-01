@@ -4,6 +4,12 @@ import { useParams, Link } from "react-router-dom";
 import { LineChart } from "../components/LineChart";
 import { get, post, del } from "../lib/api";
 
+interface Tag {
+  id: number;
+  name: string;
+  symbols?: string[];
+}
+
 interface Holding {
   symbol: string;
   name: string;
@@ -54,7 +60,7 @@ interface Portfolio {
   currency: string;
 }
 
-type TabName = "holdings" | "transactions" | "snapshots" | "return" | "summary";
+type TabName = "holdings" | "transactions" | "snapshots" | "return" | "summary" | "tags";
 
 export function PortfolioDetail() {
   const { id } = useParams<{ id: string }>();
@@ -89,6 +95,7 @@ export function PortfolioDetail() {
                 ["snapshots", "Snapshots"],
                 ["return", "Return"],
                 ["summary", "Summary"],
+                ["tags", "Tags"],
               ] as [TabName, string][]
             ).map(([key, label]) => (
               <button
@@ -120,6 +127,7 @@ export function PortfolioDetail() {
           {tab === "snapshots" && <SnapshotsTab id={id!} />}
           {tab === "return" && <ReturnCurveTab id={id!} />}
           {tab === "summary" && <SummaryTab id={id!} />}
+          {tab === "tags" && <TagsTab id={id!} />}
         </div>
       </div>
     </div>
@@ -190,14 +198,40 @@ function HoldingsTab({
   onSelectSymbol: (symbol: string) => void;
 }) {
   const [sort, setSort] = useState<SortState>({ field: "unrealizedPnlRate", direction: "desc" });
+  const [tagFilter, setTagFilter] = useState<number | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["holdings", id],
     queryFn: () => get<{ data: Holding[] }>(`/portfolios/${id}/holdings`),
   });
 
+  const { data: tagsData } = useQuery({
+    queryKey: ["tags", id],
+    queryFn: () => get<{ data: Tag[] }>(`/portfolios/${id}/tags?include_stocks=true`),
+  });
+
+  const tags = tagsData?.data ?? [];
+  const symbolTags = (() => {
+    const map = new Map<string, Array<{ id: number; name: string }>>();
+    for (const tag of tags) {
+      for (const symbol of tag.symbols ?? []) {
+        const list = map.get(symbol) ?? [];
+        list.push({ id: tag.id, name: tag.name });
+        map.set(symbol, list);
+      }
+    }
+    return map;
+  })();
+
+  const filteredTagSymbols = new Set(
+    tagFilter !== null ? (tags.find((t) => t.id === tagFilter)?.symbols ?? []) : [],
+  );
+
   const sortedHoldings = useMemo(() => {
-    const holdings = data?.data ?? [];
+    let holdings = data?.data ?? [];
+    if (tagFilter !== null) {
+      holdings = holdings.filter((h) => filteredTagSymbols.has(h.symbol));
+    }
     const { field, direction } = sort;
 
     return [...holdings].sort((a, b) => {
@@ -242,12 +276,31 @@ function HoldingsTab({
 
       return direction === "desc" ? -cmp : cmp;
     });
-  }, [data?.data, sort]);
+  }, [data?.data, sort, tagFilter, filteredTagSymbols]);
 
   if (isLoading) return <p className="text-sm text-gray-500">Loading...</p>;
 
   return (
     <div>
+      {tags.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-1">
+          <button
+            className={`px-2 py-1 text-xs rounded cursor-pointer ${tagFilter === null ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+            onClick={() => setTagFilter(null)}
+          >
+            All
+          </button>
+          {tags.map((tag) => (
+            <button
+              key={tag.id}
+              className={`px-2 py-1 text-xs rounded cursor-pointer ${tagFilter === tag.id ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+              onClick={() => setTagFilter(tag.id === tagFilter ? null : tag.id)}
+            >
+              {tag.name}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -271,6 +324,18 @@ function HoldingsTab({
                     {h.symbol}
                   </button>
                   <div className="text-xs text-gray-500">{h.name}</div>
+                  {symbolTags.has(h.symbol) && (
+                    <div className="flex flex-wrap gap-0.5 mt-0.5">
+                      {symbolTags.get(h.symbol)!.map((tag) => (
+                        <span
+                          key={tag.id}
+                          className="px-1 py-0.5 bg-blue-50 text-blue-600 rounded text-xs"
+                        >
+                          {tag.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </td>
                 <td className="py-2">{h.quantity}</td>
                 <td className="py-2">{h.cost.toLocaleString()}</td>
@@ -303,6 +368,18 @@ function HoldingsTab({
                   {h.symbol}
                 </button>
                 <div className="text-xs text-gray-500">{h.name}</div>
+                {symbolTags.has(h.symbol) && (
+                  <div className="flex flex-wrap gap-0.5 mt-0.5">
+                    {symbolTags.get(h.symbol)!.map((tag) => (
+                      <span
+                        key={tag.id}
+                        className="px-1 py-0.5 bg-blue-50 text-blue-600 rounded text-xs"
+                      >
+                        {tag.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               <span className="text-sm text-gray-500">{h.quantity} shares</span>
             </div>
@@ -1008,6 +1085,244 @@ function Metric({
       >
         {typeof value === "number" ? value.toLocaleString() : value}
       </p>
+    </div>
+  );
+}
+
+function TagsTab({ id }: { id: string }) {
+  const queryClient = useQueryClient();
+  const [newTagName, setNewTagName] = useState("");
+  const [assignSymbols, setAssignSymbols] = useState<Record<number, string>>({});
+
+  const { data: tagsData, isLoading: tagsLoading } = useQuery({
+    queryKey: ["tags", id],
+    queryFn: () => get<{ data: Tag[] }>(`/portfolios/${id}/tags?include_stocks=true`),
+  });
+
+  const { data: holdingsData } = useQuery({
+    queryKey: ["holdings", id, "unrealizedPnlRate"],
+    queryFn: () =>
+      get<{
+        data: Array<{
+          symbol: string;
+          cost: number;
+          market_value: number | null;
+          unrealized_pnl: number | null;
+        }>;
+      }>(`/portfolios/${id}/holdings?sort=unrealizedPnlRate`),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (name: string) => post<{ data: Tag }>(`/portfolios/${id}/tags`, { name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tags", id] });
+      setNewTagName("");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (tagId: number) => del<{ data: null }>(`/portfolios/${id}/tags/${tagId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tags", id] }),
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: ({ tagId, symbol }: { tagId: number; symbol: string }) =>
+      post(`/portfolios/${id}/tags/${tagId}/stocks`, { symbol }),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["tags", id] });
+      setAssignSymbols((prev) => ({ ...prev, [vars.tagId]: "" }));
+    },
+  });
+
+  const unassignMutation = useMutation({
+    mutationFn: ({ tagId, symbol }: { tagId: number; symbol: string }) =>
+      del<{ data: null }>(`/portfolios/${id}/tags/${tagId}/stocks/${encodeURIComponent(symbol)}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tags", id] }),
+  });
+
+  if (tagsLoading) return <p className="text-sm text-gray-500">Loading...</p>;
+
+  const tags = tagsData?.data ?? [];
+  const holdings = holdingsData?.data ?? [];
+
+  const holdingBySymbol = new Map(holdings.map((h) => [h.symbol, h]));
+  const taggedSymbols = new Set(tags.flatMap((t) => t.symbols ?? []));
+
+  const tagAggregates = tags
+    .filter((t) => t.symbols && t.symbols.length > 0)
+    .map((tag) => {
+      let cost = 0;
+      let marketValue = 0;
+      for (const symbol of tag.symbols ?? []) {
+        const h = holdingBySymbol.get(symbol);
+        if (h) {
+          cost += h.cost;
+          marketValue += h.market_value ?? 0;
+        }
+      }
+      const pnl = marketValue - cost;
+      const pnlRate = cost > 0 ? (pnl / cost) * 100 : 0;
+      return { ...tag, cost, marketValue, pnl, pnlRate };
+    });
+
+  const untaggedHoldings = holdings.filter((h) => !taggedSymbols.has(h.symbol));
+  const untaggedCost = untaggedHoldings.reduce((sum, h) => sum + h.cost, 0);
+  const untaggedMV = untaggedHoldings.reduce((sum, h) => sum + (h.market_value ?? 0), 0);
+
+  return (
+    <div>
+      <h3 className="font-semibold mb-4">Tags</h3>
+
+      <div className="flex gap-2 mb-4">
+        <input
+          type="text"
+          value={newTagName}
+          onChange={(e) => setNewTagName(e.target.value)}
+          placeholder="New tag name"
+          className="border rounded px-3 py-2 text-sm flex-1"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && newTagName.trim()) {
+              createMutation.mutate(newTagName.trim());
+            }
+          }}
+        />
+        <button
+          className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 cursor-pointer disabled:opacity-50"
+          disabled={!newTagName.trim() || createMutation.isPending}
+          onClick={() => createMutation.mutate(newTagName.trim())}
+        >
+          Add
+        </button>
+      </div>
+
+      {createMutation.error && (
+        <p className="text-red-500 text-sm mb-3">{createMutation.error.message}</p>
+      )}
+
+      {tagAggregates.length > 0 && (
+        <div className="mb-6">
+          <h4 className="text-sm font-semibold mb-2">Aggregated P&L by Tag</h4>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left">
+                  <th className="py-1 pr-2">Tag</th>
+                  <th className="py-1 pr-2">Cost</th>
+                  <th className="py-1 pr-2">Mkt Value</th>
+                  <th className="py-1 pr-2">P&L</th>
+                  <th className="py-1">P&L%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tagAggregates.map((tag) => (
+                  <tr key={tag.id} className="border-b">
+                    <td className="py-1 pr-2">{tag.name}</td>
+                    <td className="py-1 pr-2">{tag.cost.toLocaleString()}</td>
+                    <td className="py-1 pr-2">{tag.marketValue.toLocaleString()}</td>
+                    <td className={`py-1 pr-2 ${tag.pnl >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {tag.pnl.toLocaleString()}
+                    </td>
+                    <td className={`py-1 ${tag.pnlRate >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {tag.pnlRate >= 0 ? "+" : ""}
+                      {tag.pnlRate.toFixed(1)}%
+                    </td>
+                  </tr>
+                ))}
+                {untaggedHoldings.length > 0 && (
+                  <tr className="border-b">
+                    <td className="py-1 pr-2 text-gray-400">Untagged</td>
+                    <td className="py-1 pr-2 text-gray-400">{untaggedCost.toLocaleString()}</td>
+                    <td className="py-1 pr-2 text-gray-400">{untaggedMV.toLocaleString()}</td>
+                    <td
+                      className={`py-1 pr-2 text-gray-400 ${untaggedMV - untaggedCost >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
+                      {(untaggedMV - untaggedCost).toLocaleString()}
+                    </td>
+                    <td
+                      className={`py-1 text-gray-400 ${untaggedCost > 0 && untaggedMV - untaggedCost >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
+                      {untaggedCost > 0
+                        ? `${untaggedMV - untaggedCost >= 0 ? "+" : ""}${(((untaggedMV - untaggedCost) / untaggedCost) * 100).toFixed(1)}%`
+                        : "-"}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {tags.length === 0 && !tagAggregates.length && (
+        <p className="text-sm text-gray-500">No tags yet.</p>
+      )}
+
+      <div className="space-y-4">
+        {tags.map((tag) => (
+          <div key={tag.id} className="bg-white rounded-lg border p-3">
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-medium">{tag.name}</span>
+              <button
+                className="text-red-500 text-xs hover:underline cursor-pointer"
+                onClick={() => deleteMutation.mutate(tag.id)}
+              >
+                Delete
+              </button>
+            </div>
+            {tag.symbols && tag.symbols.length > 0 ? (
+              <div className="flex flex-wrap gap-1 mb-2">
+                {tag.symbols.map((s) => (
+                  <span
+                    key={s}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs"
+                  >
+                    {s}
+                    <button
+                      className="text-blue-400 hover:text-blue-700 cursor-pointer"
+                      onClick={() => unassignMutation.mutate({ tagId: tag.id, symbol: s })}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 mb-2">No stocks assigned</p>
+            )}
+            <div className="flex gap-1">
+              <input
+                type="text"
+                value={assignSymbols[tag.id] ?? ""}
+                onChange={(e) =>
+                  setAssignSymbols((prev) => ({ ...prev, [tag.id]: e.target.value.toUpperCase() }))
+                }
+                placeholder="Add symbol"
+                className="border rounded px-2 py-1 text-xs flex-1"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (assignSymbols[tag.id] ?? "").trim()) {
+                    assignMutation.mutate({
+                      tagId: tag.id,
+                      symbol: (assignSymbols[tag.id] ?? "").trim(),
+                    });
+                  }
+                }}
+              />
+              <button
+                className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 cursor-pointer disabled:opacity-50"
+                disabled={!(assignSymbols[tag.id] ?? "").trim() || assignMutation.isPending}
+                onClick={() =>
+                  assignMutation.mutate({
+                    tagId: tag.id,
+                    symbol: (assignSymbols[tag.id] ?? "").trim(),
+                  })
+                }
+              >
+                +
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

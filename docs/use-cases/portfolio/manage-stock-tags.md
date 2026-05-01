@@ -22,6 +22,7 @@
 | UC-PORTFOLIO-007-S03 | P0 | ✅ | Given AAPL already has "High Dividend" tag, When adding "Tech" tag to AAPL, Then AAPL has two tags | R2 |
 | UC-PORTFOLIO-007-S05 | P1 | ✅ | Given tag "High Dividend" is associated with AAPL, When deleting "High Dividend" tag, Then tag is deleted, AAPL is no longer associated with that tag | R3 |
 | UC-PORTFOLIO-007-S06 | P1 | ❌ | Given user is not logged in, When creating tag, Then return 401 unauthorized |
+| UC-PORTFOLIO-007-S07 | P1 | ✅ | Given portfolio has tag "Tech" associated with stocks AAPL and NVDA, When listing tags with include_stocks=true, Then tag returns symbols ["AAPL", "NVDA"] |
 
 ### ai-e2e
 (none)
