@@ -2,6 +2,13 @@ export interface HealthResponse {
   status: "ok";
 }
 
+export interface MeResponse {
+  data: {
+    id: number;
+    email: string;
+  };
+}
+
 export interface Portfolio {
   id: number;
   user_id: number;
