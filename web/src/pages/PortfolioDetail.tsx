@@ -677,11 +677,10 @@ function PriceHistorySection({ symbol, isVisible }: { symbol: string; isVisible:
         start = new Date(today.getFullYear() - 3, today.getMonth(), today.getDate());
         break;
       case "ALL":
-        start = new Date(2000, 0, 1);
-        break;
+        return { startDate: undefined };
     }
     return {
-      startDate: range === "ALL" ? undefined : start.toISOString().split("T")[0],
+      startDate: start.toISOString().split("T")[0],
     };
   }, [range]);
 

@@ -205,6 +205,27 @@ describe("Price Sync", () => {
 });
 
 describe("Price History", () => {
+  it("[UC-PORTFOLIO-003-S12] returns price history for held stock", async () => {
+    await seedLot("AAPL");
+    await db
+      .prepare(
+        "INSERT INTO price_history (symbol, date, close) VALUES ('AAPL', '2024-01-15', 150), ('AAPL', '2024-02-15', 160), ('AAPL', '2024-03-15', 170)",
+      )
+      .run();
+
+    const res = await worker.fetch("http://localhost/api/prices/history/AAPL", {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as {
+      data: { symbol: string; prices: Array<{ date: string; close: number }> };
+    };
+    expect(json.data.symbol).toBe("AAPL");
+    expect(json.data.prices).toHaveLength(3);
+    expect(json.data.prices[0]).toEqual({ date: "2024-01-15", close: 150 });
+    expect(json.data.prices[2]).toEqual({ date: "2024-03-15", close: 170 });
+  });
+
   it("[UC-PORTFOLIO-003-S13] returns price history for symbol within date range", async () => {
     await db
       .prepare(
@@ -250,7 +271,7 @@ describe("Price History", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns empty prices array when no price history exists", async () => {
+  it("[UC-PORTFOLIO-003-S15] returns empty prices array when no price history exists", async () => {
     const res = await worker.fetch("http://localhost/api/prices/history/NVDA", {
       headers: authHeaders(),
     });
