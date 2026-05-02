@@ -15,7 +15,7 @@ export function App() {
 
   return (
     <main className="min-h-screen bg-muted/40 text-foreground">
-      <nav className="border-b bg-background/95 px-4 py-3">
+      <nav className="border-b bg-background/95 px-4 py-3 shadow-sm">
         <div className="mx-auto flex max-w-5xl items-center gap-2">
           <Button asChild variant="ghost" size="sm">
             <Link to="/">Portfolios</Link>
