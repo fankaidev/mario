@@ -98,15 +98,15 @@ describe("Price Sync", () => {
     expect(res.status).toBe(401);
   });
 
-  it("[UC-PORTFOLIO-005-S07] syncs prices for HK/SS/SZ stocks via Yahoo Finance", async () => {
+  it("[UC-PORTFOLIO-005-S07] syncs prices for HK/SS/SZ stocks via Eastmoney", async () => {
     await seedLot("0700.HK");
     await seedLot("600519.SS");
 
     const finnhub = new FakePriceFetcher();
     const yahoo = new FakePriceFetcher();
     const eastmoney = new FakePriceFetcher();
-    yahoo.setHistory("0700.HK", [{ date: "2024-01-15", close: 350.0 }]);
-    yahoo.setHistory("600519.SS", [{ date: "2024-01-15", close: 1500.0 }]);
+    eastmoney.setHistory("0700.HK", [{ date: "2024-01-15", close: 350.0 }]);
+    eastmoney.setHistory("600519.SS", [{ date: "2024-01-15", close: 1500.0 }]);
 
     const router = new FetcherRouter(finnhub, yahoo, eastmoney);
     const records1 = await syncPriceHistory(db, router, "0700.HK", "2024-01-01");
@@ -121,7 +121,7 @@ describe("Price Sync", () => {
     expect(ssPrice).toBe(1500.0);
 
     expect(finnhub.getAccessedSymbols()).toEqual([]);
-    expect(eastmoney.getAccessedSymbols()).toEqual([]);
+    expect(yahoo.getAccessedSymbols()).toEqual([]);
   });
 
   it("[UC-PORTFOLIO-005-S08] routes mixed portfolio to correct fetchers", async () => {
@@ -132,7 +132,7 @@ describe("Price Sync", () => {
     const yahoo = new FakePriceFetcher();
     const eastmoney = new FakePriceFetcher();
     yahoo.setHistory("AAPL", [{ date: "2024-01-15", close: 180.0 }]);
-    yahoo.setHistory("0700.HK", [{ date: "2024-01-15", close: 350.0 }]);
+    eastmoney.setHistory("0700.HK", [{ date: "2024-01-15", close: 350.0 }]);
 
     const router = new FetcherRouter(finnhub, yahoo, eastmoney);
     await syncPriceHistory(db, router, "AAPL", "2024-01-01");
@@ -143,9 +143,9 @@ describe("Price Sync", () => {
     const hkPrice = await getLatestPrice(db, "0700.HK");
     expect(hkPrice).toBe(350.0);
 
-    expect(yahoo.getAccessedSymbols()).toEqual(["AAPL", "0700.HK"]);
+    expect(yahoo.getAccessedSymbols()).toEqual(["AAPL"]);
     expect(finnhub.getAccessedSymbols()).toEqual([]);
-    expect(eastmoney.getAccessedSymbols()).toEqual([]);
+    expect(eastmoney.getAccessedSymbols()).toEqual(["0700.HK"]);
   });
 
   it("[UC-PORTFOLIO-005-S09] syncs NAV for mutual funds via Eastmoney", async () => {
@@ -183,7 +183,7 @@ describe("Price Sync", () => {
     const yahoo = new FakePriceFetcher();
     const eastmoney = new FakePriceFetcher();
     yahoo.setHistory("AAPL", [{ date: "2024-01-15", close: 180.0 }]);
-    yahoo.setHistory("0700.HK", [{ date: "2024-01-15", close: 350.0 }]);
+    eastmoney.setHistory("0700.HK", [{ date: "2024-01-15", close: 350.0 }]);
     eastmoney.setHistory("000979", [{ date: "2024-01-15", close: 1.5 }]);
 
     const router = new FetcherRouter(finnhub, yahoo, eastmoney);
@@ -198,9 +198,9 @@ describe("Price Sync", () => {
     const fundPrice = await getLatestPrice(db, "000979");
     expect(fundPrice).toBe(1.5);
 
-    expect(yahoo.getAccessedSymbols()).toEqual(["AAPL", "0700.HK"]);
+    expect(yahoo.getAccessedSymbols()).toEqual(["AAPL"]);
     expect(finnhub.getAccessedSymbols()).toEqual([]);
-    expect(eastmoney.getAccessedSymbols()).toEqual(["000979"]);
+    expect(eastmoney.getAccessedSymbols()).toEqual(["0700.HK", "000979"]);
   });
 });
 
