@@ -148,6 +148,7 @@ export interface PortfolioSummary {
   cumulative_sell_fees: number;
   cumulative_withholding_tax: number;
   cumulative_total_fees: number;
+  price_updated_at: string | null;
 }
 
 export interface CreateTagRequest {

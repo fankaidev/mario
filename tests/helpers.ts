@@ -18,6 +18,10 @@ export async function cleanDatabase(db: D1Database) {
     "CREATE TABLE IF NOT EXISTS transfers (id INTEGER PRIMARY KEY AUTOINCREMENT, portfolio_id INTEGER NOT NULL REFERENCES portfolios(id), type TEXT NOT NULL CHECK (type IN ('deposit', 'withdrawal')), amount REAL NOT NULL CHECK (amount > 0), fee REAL NOT NULL DEFAULT 0 CHECK (fee >= 0), date TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))",
   );
 
+  await db.exec(
+    "CREATE TABLE IF NOT EXISTS price_history (symbol TEXT NOT NULL, date TEXT NOT NULL, close REAL NOT NULL, PRIMARY KEY (symbol, date))",
+  );
+
   await db.exec("DELETE FROM stock_tags");
   await db.exec("DELETE FROM realized_pnl");
   await db.exec("DELETE FROM lots");

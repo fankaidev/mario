@@ -1449,6 +1449,9 @@ function SummaryTab({ id }: { id: string }) {
           Update Prices
         </Button>
       </div>
+      {s.price_updated_at && (
+        <p className="mb-4 text-xs text-muted-foreground">Prices as of: {s.price_updated_at}</p>
+      )}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
         <Metric label="Total Investment" value={s.total_investment} />
         <Metric label="Securities Value" value={s.securities_value} />

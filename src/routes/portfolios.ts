@@ -291,6 +291,15 @@ portfolios.get("/:id/summary", async (c) => {
   const cashBalance = portfolio.cash_balance;
   const portfolioValue = totalMarketValue + cashBalance;
 
+  const priceUpdatedAtRow =
+    lots.results.length > 0
+      ? await c.env.DB.prepare(
+          "SELECT MIN(latest_date) as price_updated_at FROM (SELECT symbol, MAX(date) as latest_date FROM price_history WHERE symbol IN (SELECT DISTINCT symbol FROM lots WHERE portfolio_id = ? AND closed = 0) GROUP BY symbol)",
+        )
+          .bind(portfolioId)
+          .first<{ price_updated_at: string | null }>()
+      : null;
+
   return c.json({
     data: {
       total_investment: Math.round(totalInvestment * 100) / 100,
@@ -306,6 +315,7 @@ portfolios.get("/:id/summary", async (c) => {
       cumulative_sell_fees: Math.round(sellFees * 100) / 100,
       cumulative_withholding_tax: Math.round(withholdingTax * 100) / 100,
       cumulative_total_fees: Math.round((buyFees + sellFees + withholdingTax) * 100) / 100,
+      price_updated_at: priceUpdatedAtRow?.price_updated_at ?? null,
     },
   });
 });

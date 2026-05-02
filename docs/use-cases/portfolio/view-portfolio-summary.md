@@ -18,6 +18,7 @@
 | R10 | Total cumulative fees = cumulative buy fees + cumulative sell fees + cumulative withholding tax |
 | R11 | Cash balance = current portfolio cash_balance |
 | R12 | Portfolio value = securities value + cash balance |
+| R13 | Price updated at = the oldest latest date among all held symbols' price history; null when no holdings or no price data |
 
 ## Scenarios
 
@@ -33,6 +34,7 @@
 | UC-PORTFOLIO-006-S07 | P1 | ❌ | Given portfolio has holdings but some stocks have no latest price, When viewing portfolio summary, Then securities value and P&L calculated based on stocks with prices, stocks missing prices excluded from calculation and flagged |
 | UC-PORTFOLIO-006-S08 | P1 | ❌ | Given user is not logged in, When viewing portfolio summary, Then return 401 unauthorized |
 | UC-PORTFOLIO-006-S09 | P0 | ✅ | Given portfolio has securities value 22500 and cash balance 198000, When viewing portfolio summary, Then return cash balance 198000 and portfolio value 220500 | R2, R11, R12 |
+| UC-PORTFOLIO-006-S10 | P1 | ❌ | Given portfolio holds AAPL (price updated 2024-03-01) and TSLA (price updated 2024-03-02), When viewing portfolio summary, Then return price_updated_at 2024-03-01 (the oldest latest date) | R13 |
 
 ### ai-e2e
 (none)
