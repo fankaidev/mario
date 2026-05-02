@@ -1424,16 +1424,9 @@ function ReturnCurveTab({ id }: { id: string }) {
 }
 
 function SummaryTab({ id }: { id: string }) {
-  const queryClient = useQueryClient();
-
   const { data, isLoading } = useQuery({
     queryKey: ["summary", id],
     queryFn: () => get<{ data: Summary }>(`/portfolios/${id}/summary`),
-  });
-
-  const priceMutation = useMutation({
-    mutationFn: () => post("/prices/update", {}),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["summary", id] }),
   });
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
@@ -1443,11 +1436,8 @@ function SummaryTab({ id }: { id: string }) {
 
   return (
     <div>
-      <div className="mb-4 flex justify-between">
+      <div className="mb-4">
         <h3 className="font-semibold">Summary</h3>
-        <Button size="sm" onClick={() => priceMutation.mutate()}>
-          Update Prices
-        </Button>
       </div>
       {s.price_updated_at && (
         <p className="mb-4 text-xs text-muted-foreground">Prices as of: {s.price_updated_at}</p>

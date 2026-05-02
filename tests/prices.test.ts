@@ -86,7 +86,7 @@ describe("Price Sync", () => {
   });
 
   it("[UC-PORTFOLIO-005-S05] returns 401 when unauthenticated", async () => {
-    const res = await worker.fetch("http://localhost/api/prices/update", {
+    const res = await worker.fetch("http://localhost/api/prices/sync", {
       method: "POST",
     });
     expect(res.status).toBe(401);
