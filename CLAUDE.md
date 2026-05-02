@@ -106,7 +106,7 @@ Example: `feat: add FIFO lot tracking for sell transactions`
 - **Runtime**: Cloudflare Workers (Hono framework)
 - **Database**: Cloudflare D1 (SQLite)
 - **Auth**: Cloudflare Access + Google OAuth + API tokens (for remote API)
-- **Price Data**: Finnhub API (US stocks) + Yahoo Finance (HK/China A-shares)
+- **Price Data**: Finnhub API (US stocks) + Eastmoney API (HK/CN stocks and funds) + Yahoo Finance (US stock history only)
 - **Frontend**: React 19 SPA served as static assets from Workers
 - **Cron**: Weekly auto price update + manual trigger via API
 

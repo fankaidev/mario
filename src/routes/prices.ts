@@ -4,12 +4,13 @@ import type { Bindings } from "../types";
 import type { PriceFetcher } from "../clients/price-fetcher";
 import { FetcherRouter } from "../clients/fetcher-router";
 
-interface HistoryFetcher {
+interface HistoryAndNameFetcher {
   fetchHistory(
     symbol: string,
     startDate: string,
     endDate: string,
   ): Promise<Array<{ date: string; close: number }>>;
+  fetchName(symbol: string): Promise<string | null>;
 }
 
 export async function getLatestPrice(db: D1Database, symbol: string): Promise<number | null> {
@@ -22,7 +23,7 @@ export async function getLatestPrice(db: D1Database, symbol: string): Promise<nu
 
 export async function syncPriceHistory(
   db: D1Database,
-  fetcher: HistoryFetcher,
+  fetcher: HistoryAndNameFetcher,
   symbol: string,
   startDate: string = "2026-01-01",
 ): Promise<number> {
@@ -49,6 +50,17 @@ export async function syncPriceHistory(
         "INSERT INTO price_history (symbol, date, close) VALUES (?, ?, ?) ON CONFLICT(symbol, date) DO UPDATE SET close = excluded.close",
       )
       .bind(symbol, date, close)
+      .run();
+  }
+
+  // Fetch and store stock name
+  const name = await fetcher.fetchName(symbol);
+  if (name) {
+    await db
+      .prepare(
+        "INSERT INTO stocks (symbol, name) VALUES (?, ?) ON CONFLICT(symbol) DO UPDATE SET name = excluded.name",
+      )
+      .bind(symbol, name)
       .run();
   }
 
