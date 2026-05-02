@@ -145,6 +145,31 @@ curl https://your-app.workers.dev/api/portfolios/{id}/summary \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
+#### Get Holdings
+
+```bash
+curl https://your-app.workers.dev/api/portfolios/{id}/holdings \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+#### List Transactions
+
+```bash
+# List all transactions
+curl https://your-app.workers.dev/api/portfolios/{id}/transactions \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Filter by symbol, date range, and type
+curl "https://your-app.workers.dev/api/portfolios/{id}/transactions?symbol=AAPL&startDate=2024-01-01&endDate=2024-12-31&type=buy,sell" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Query parameters:**
+- `symbol` - Filter by one or more symbols (comma-separated)
+- `startDate` - Filter transactions from this date (YYYY-MM-DD)
+- `endDate` - Filter transactions up to this date (YYYY-MM-DD)
+- `type` - Filter by transaction types: `buy`, `sell`, `dividend`, `initial` (comma-separated)
+
 #### Add Transaction
 
 ```bash
@@ -160,6 +185,21 @@ curl -X POST https://your-app.workers.dev/api/portfolios/{id}/transactions \
     "date": "2024-01-15"
   }'
 ```
+
+#### Create Snapshot
+
+Create a historical snapshot of portfolio state for performance tracking:
+
+```bash
+curl -X POST https://your-app.workers.dev/api/portfolios/{id}/snapshots \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "date": "2024-01-01"
+  }'
+```
+
+Snapshots capture portfolio value, holdings, and P&L at a specific point in time. Used for tracking portfolio performance over time.
 
 ### Response Format
 
@@ -184,5 +224,9 @@ All API responses follow a consistent envelope:
 All endpoints are prefixed with `/api`:
 - Health check: `GET /api/health`
 - Portfolios: `GET /api/portfolios`
-- Transactions: `POST /api/portfolios/:id/transactions`
+- Portfolio summary: `GET /api/portfolios/:id/summary`
+- Holdings: `GET /api/portfolios/:id/holdings`
+- Transactions: `GET /api/portfolios/:id/transactions`
+- Add transaction: `POST /api/portfolios/:id/transactions`
+- Create snapshot: `POST /api/portfolios/:id/snapshots`
 - Price sync: `POST /api/prices/sync`
