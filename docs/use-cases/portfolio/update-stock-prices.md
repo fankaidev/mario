@@ -12,7 +12,7 @@
 | R4 | API failure logs error, does not interrupt the flow |
 | R5 | Manual update and auto update share the same update logic |
 | R6 | Price update also fetches and stores company name in stocks table |
-| R7 | Symbols ending in `.HK`, `.SS`, `.SZ` use Yahoo Finance; all others use Finnhub |
+| R7 | Symbols ending in `.HK`, `.SS`, `.SZ` use Yahoo Finance; 6-digit codes without suffix use Eastmoney; all others use Finnhub |
 
 ## Scenarios
 
@@ -28,6 +28,8 @@
 | UC-PORTFOLIO-005-S06 | P1 | ✅ | Given portfolio holds AAPL, and API returns AAPL name "Apple Inc", When price update completes, Then stocks table shows AAPL name as "Apple Inc" | R6 |
 | UC-PORTFOLIO-005-S07 | P0 | ✅ | Given portfolio holds 0700.HK and 600519.SS, When manually triggering price update, Then Yahoo Finance API is called for both, prices are written to prices table | R1, R7 |
 | UC-PORTFOLIO-005-S08 | P0 | ✅ | Given portfolio holds AAPL and 0700.HK, When manually triggering price update, Then Finnhub is called for AAPL, Yahoo Finance is called for 0700.HK, both prices are updated | R7 |
+| UC-PORTFOLIO-005-S09 | P0 | ✅ | Given portfolio holds mutual funds 000979 and 000217, When manually triggering price update, Then Eastmoney API is called for both, NAVs are written to prices table | R1, R7 |
+| UC-PORTFOLIO-005-S10 | P0 | ✅ | Given portfolio holds AAPL, 0700.HK, and 000979, When manually triggering price update, Then Finnhub is called for AAPL, Yahoo Finance for 0700.HK, Eastmoney for 000979, all prices are updated | R7 |
 
 ### ai-e2e
 (none)
