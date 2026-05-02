@@ -111,6 +111,29 @@ transactions.post("/", async (c) => {
   return handleDividend(c, portfolioId, body);
 });
 
+transactions.get("/symbols", async (c) => {
+  const user = c.get("user");
+  const portfolioId = parseInt(c.req.param("portfolioId") ?? "", 10);
+  if (isNaN(portfolioId)) {
+    return c.json({ error: "Invalid portfolio ID" }, 400);
+  }
+
+  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+    .bind(portfolioId, user.id)
+    .first();
+  if (!portfolio) {
+    return c.json({ error: "Portfolio not found" }, 404);
+  }
+
+  const rows = await c.env.DB.prepare(
+    "SELECT DISTINCT symbol FROM transactions WHERE portfolio_id = ? ORDER BY symbol",
+  )
+    .bind(portfolioId)
+    .all<{ symbol: string }>();
+
+  return c.json({ data: rows.results.map((r) => r.symbol) });
+});
+
 transactions.get("/", async (c) => {
   const user = c.get("user");
   const portfolioId = parseInt(c.req.param("portfolioId") ?? "", 10);
@@ -125,7 +148,13 @@ transactions.get("/", async (c) => {
     return c.json({ error: "Portfolio not found" }, 404);
   }
 
-  const symbol = c.req.query("symbol")?.trim().toUpperCase();
+  const symbolParam = c.req.query("symbol")?.trim().toUpperCase();
+  const symbols = symbolParam
+    ? symbolParam
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
   const startDate = c.req.query("startDate")?.trim();
   const endDate = c.req.query("endDate")?.trim();
 
@@ -133,9 +162,12 @@ transactions.get("/", async (c) => {
     "SELECT t.id, t.portfolio_id, t.symbol, t.type, t.quantity, t.price, t.fee, t.date, t.created_at, COALESCE(s.name, t.symbol) AS name FROM transactions t LEFT JOIN stocks s ON t.symbol = s.symbol WHERE t.portfolio_id = ?";
   const params: (number | string)[] = [portfolioId];
 
-  if (symbol) {
+  if (symbols.length === 1) {
     query += " AND t.symbol = ?";
-    params.push(symbol);
+    params.push(symbols[0]!);
+  } else if (symbols.length > 1) {
+    query += ` AND t.symbol IN (${symbols.map(() => "?").join(", ")})`;
+    params.push(...symbols);
   }
 
   if (startDate) {
