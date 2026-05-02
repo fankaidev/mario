@@ -4,11 +4,11 @@ import type { Bindings } from "./types";
 import portfolios from "./routes/portfolios";
 import transactions from "./routes/transactions";
 import transfers from "./routes/transfers";
-import prices, { getLatestPrice, syncPriceHistory } from "./routes/prices";
+import prices, { syncPriceHistory } from "./routes/prices";
 import tokens from "./routes/tokens";
 import tags from "./routes/tags";
 import corporateActions from "./routes/corporate-actions";
-import snapshots from "./routes/snapshots";
+import snapshots, { calculateSnapshot } from "./routes/snapshots";
 import type { PriceFetcher } from "./clients/price-fetcher";
 import { FetcherRouter } from "./clients/fetcher-router";
 
@@ -77,15 +77,13 @@ export default {
     }
     console.log(`Scheduled price sync: ${totalRecords} records updated`);
 
-    const portfolios = await env.DB.prepare(
-      "SELECT id, cash_balance FROM portfolios WHERE archived = 0",
-    ).all<{
+    const portfolios = await env.DB.prepare("SELECT id FROM portfolios WHERE archived = 0").all<{
       id: number;
-      cash_balance: number;
     }>();
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toISOString().split("T")[0]!;
 
-    for (const { id: portfolioId, cash_balance: cashBalance } of portfolios.results) {
+    let snapshotCount = 0;
+    for (const { id: portfolioId } of portfolios.results) {
       const existing = await env.DB.prepare(
         "SELECT id FROM portfolio_snapshots WHERE portfolio_id = ? AND date = ?",
       )
@@ -93,32 +91,27 @@ export default {
         .first();
       if (existing) continue;
 
-      const investmentRow = await env.DB.prepare(
-        "SELECT COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount - fee ELSE -(amount + fee) END), 0) AS total FROM transfers WHERE portfolio_id = ?",
-      )
-        .bind(portfolioId)
-        .first<{ total: number }>();
-
-      const lots = await env.DB.prepare(
-        "SELECT symbol, remaining_quantity FROM lots WHERE portfolio_id = ? AND closed = 0",
-      )
-        .bind(portfolioId)
-        .all<{ symbol: string; remaining_quantity: number }>();
-
-      let marketValue = 0;
-      for (const lot of lots.results) {
-        const price = await getLatestPrice(env.DB, lot.symbol);
-        if (price !== null) {
-          marketValue += lot.remaining_quantity * price;
-        }
+      const calculated = await calculateSnapshot(env.DB, portfolioId, today);
+      if (calculated.missing_prices.length > 0) {
+        console.warn(
+          `Skipped snapshot for portfolio ${portfolioId}: missing prices for ${calculated.missing_prices.join(", ")}`,
+        );
+        continue;
       }
 
       await env.DB.prepare(
         "INSERT INTO portfolio_snapshots (portfolio_id, date, total_investment, market_value, cash_balance) VALUES (?, ?, ?, ?, ?)",
       )
-        .bind(portfolioId, today, investmentRow?.total ?? 0, marketValue, cashBalance)
+        .bind(
+          portfolioId,
+          today,
+          calculated.total_investment,
+          calculated.market_value,
+          calculated.cash_balance,
+        )
         .run();
+      snapshotCount++;
     }
-    console.log(`Scheduled snapshots generated for ${portfolios.results.length} portfolios`);
+    console.log(`Scheduled snapshots generated for ${snapshotCount} portfolios`);
   },
 };
