@@ -26,7 +26,7 @@ import {
 } from "../components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { get, post, del } from "../lib/api";
-import type { HoldingLots } from "../../../shared/types/api";
+import type { HoldingLots, PortfolioSummary } from "../../../shared/types/api";
 
 interface Tag {
   id: number;
@@ -56,19 +56,7 @@ interface Transaction {
   date: string;
 }
 
-interface Summary {
-  total_investment: number;
-  total_market_value: number;
-  unrealized_pnl: number;
-  realized_pnl: number;
-  dividend_income: number;
-  total_pnl: number;
-  return_rate: number;
-  cumulative_buy_fees: number;
-  cumulative_sell_fees: number;
-  cumulative_withholding_tax: number;
-  cumulative_total_fees: number;
-}
+type Summary = PortfolioSummary;
 
 interface Snapshot {
   id: number;
@@ -167,9 +155,11 @@ function SummaryCard({ id }: { id: string }) {
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
           <MetricBox label="Total Investment" value={s.total_investment} />
-          <MetricBox label="Market Value" value={s.total_market_value} />
+          <MetricBox label="Securities Value" value={s.securities_value} />
+          <MetricBox label="Cash Balance" value={s.cash_balance} />
+          <MetricBox label="Portfolio Value" value={s.portfolio_value} />
           <MetricBox label="Total P&L" value={s.total_pnl} highlight />
           <MetricBox label="Return Rate" value={`${s.return_rate}%`} />
         </div>
@@ -1159,7 +1149,7 @@ function ReturnCurveTab({ id }: { id: string }) {
         : 0;
     points.push({
       date: today,
-      marketValue: Math.round(currentSummary.total_market_value * 100) / 100,
+      marketValue: Math.round(currentSummary.securities_value * 100) / 100,
       investment: currentSummary.total_investment,
       returnRate: Math.round(rate * 100) / 100,
     });
@@ -1244,7 +1234,9 @@ function SummaryTab({ id }: { id: string }) {
       </div>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
         <Metric label="Total Investment" value={s.total_investment} />
-        <Metric label="Market Value" value={s.total_market_value} />
+        <Metric label="Securities Value" value={s.securities_value} />
+        <Metric label="Cash Balance" value={s.cash_balance} />
+        <Metric label="Portfolio Value" value={s.portfolio_value} />
         <Metric label="Unrealized P&L" value={s.unrealized_pnl} />
         <Metric label="Realized P&L" value={s.realized_pnl} />
         <Metric label="Dividend Income" value={s.dividend_income} />

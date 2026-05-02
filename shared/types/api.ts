@@ -134,6 +134,22 @@ export interface HoldingLots {
   lots: LotDetail[];
 }
 
+export interface PortfolioSummary {
+  total_investment: number;
+  securities_value: number;
+  cash_balance: number;
+  portfolio_value: number;
+  unrealized_pnl: number;
+  realized_pnl: number;
+  dividend_income: number;
+  total_pnl: number;
+  return_rate: number;
+  cumulative_buy_fees: number;
+  cumulative_sell_fees: number;
+  cumulative_withholding_tax: number;
+  cumulative_total_fees: number;
+}
+
 export interface CreateTagRequest {
   name: string;
 }
