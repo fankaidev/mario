@@ -1742,7 +1742,7 @@ function Metric({
   highlight?: boolean;
 }) {
   return (
-    <Card>
+    <Card className="transition-all hover:shadow-md">
       <CardContent className="p-3">
         <p className="text-xs text-muted-foreground">{label}</p>
         <p
