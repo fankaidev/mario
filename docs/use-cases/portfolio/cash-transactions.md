@@ -34,7 +34,7 @@
 | UC-PORTFOLIO-006-S10 | P1 | ✅ | Given portfolio with cash_balance=1000, When buying AAPL 10 shares @ 150 (cost=1500), Then cash_balance becomes -500 (margin allowed) | R4 |
 | UC-PORTFOLIO-006-S11 | P1 | ✅ | Given deposit with fee=50, When depositing 10000 USD, Then cash_balance becomes 9950 | R1 |
 | UC-PORTFOLIO-006-S12 | P1 | ✅ | Given withdrawal with fee=25, When withdrawing 1000 from balance=5000, Then cash_balance becomes 3975 | R2 |
-| UC-PORTFOLIO-006-S13 | P1 | ❌ | Given portfolio with deposits, withdrawals, buys, sells, and dividends, When recalculating cash, Then cash_balance equals net of all transfers and transactions | R9 |
+| UC-PORTFOLIO-006-S13 | P1 | ✅ | Given portfolio with deposits, withdrawals, buys, sells, and dividends, When recalculating cash, Then cash_balance equals net of all transfers and transactions | R9 |
 
 ### ai-e2e
 
