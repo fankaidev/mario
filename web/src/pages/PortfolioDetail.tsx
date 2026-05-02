@@ -24,12 +24,14 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/table";
+import { Switch } from "../components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { get, post, del } from "../lib/api";
 import type {
   HoldingLots,
   PortfolioSummary,
   PriceHistoryResponse,
+  Transaction,
 } from "../../../shared/types/api";
 
 interface Tag {
@@ -47,17 +49,6 @@ interface Holding {
   market_value: number | null;
   unrealized_pnl: number | null;
   unrealized_pnl_rate: number | null;
-}
-
-interface Transaction {
-  id: number;
-  symbol: string;
-  name: string;
-  type: string;
-  quantity: number;
-  price: number;
-  fee: number;
-  date: string;
 }
 
 type Summary = PortfolioSummary;
@@ -112,7 +103,7 @@ export function PortfolioDetail() {
         <Button asChild variant="link" className="h-auto p-0">
           <Link to="/">Back to Portfolios</Link>
         </Button>
-        <h1 className="mt-2 mb-6 text-xl font-semibold tracking-normal md:text-2xl">
+        <h1 className="mb-4 text-xl font-semibold md:text-2xl">
           {portfolio ? `${portfolio.name} (${portfolio.currency})` : "Loading..."}
         </h1>
 
@@ -123,7 +114,7 @@ export function PortfolioDetail() {
             {(
               [
                 ["holdings", "Holdings"],
-                ["transactions", "Trans."],
+                ["transactions", "Transactions"],
                 ["transfers", "Transfers"],
                 ["snapshots", "Snapshots"],
                 ["return", "Return"],
@@ -233,17 +224,11 @@ function HoldingsTab({
 }) {
   const [sort, setSort] = useState<SortState>({ field: "unrealizedPnlRate", direction: "desc" });
   const [tagFilter, setTagFilter] = useState<number | null>(null);
-  const [expandedSymbol, setExpandedSymbol] = useState<string | null>(null);
+  const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(new Set());
 
   const { data, isLoading } = useQuery({
     queryKey: ["holdings", id],
     queryFn: () => get<{ data: Holding[] }>(`/portfolios/${id}/holdings`),
-  });
-
-  const { data: lotsData } = useQuery({
-    queryKey: ["holding-lots", id, expandedSymbol],
-    queryFn: () => get<{ data: HoldingLots }>(`/portfolios/${id}/holdings/${expandedSymbol}/lots`),
-    enabled: expandedSymbol !== null,
   });
 
   const { data: tagsData } = useQuery({
@@ -363,11 +348,21 @@ function HoldingsTab({
           <TableBody>
             {sortedHoldings.map((h) => (
               <LotDetailsRow
+                id={id}
                 key={h.symbol}
                 holding={h}
-                isExpanded={expandedSymbol === h.symbol}
-                onToggle={() => setExpandedSymbol(expandedSymbol === h.symbol ? null : h.symbol)}
-                lotsData={expandedSymbol === h.symbol ? lotsData?.data : undefined}
+                isExpanded={expandedSymbols.has(h.symbol)}
+                onToggle={() =>
+                  setExpandedSymbols((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(h.symbol)) {
+                      next.delete(h.symbol);
+                    } else {
+                      next.add(h.symbol);
+                    }
+                    return next;
+                  })
+                }
                 onSelectSymbol={onSelectSymbol}
                 symbolTags={symbolTags}
                 totalMarketValue={totalMarketValue}
@@ -380,11 +375,21 @@ function HoldingsTab({
       <div className="space-y-2 md:hidden">
         {sortedHoldings.map((h) => (
           <MobileLotDetailsCard
+            id={id}
             key={h.symbol}
             holding={h}
-            isExpanded={expandedSymbol === h.symbol}
-            onToggle={() => setExpandedSymbol(expandedSymbol === h.symbol ? null : h.symbol)}
-            lotsData={expandedSymbol === h.symbol ? lotsData?.data : undefined}
+            isExpanded={expandedSymbols.has(h.symbol)}
+            onToggle={() =>
+              setExpandedSymbols((prev) => {
+                const next = new Set(prev);
+                if (next.has(h.symbol)) {
+                  next.delete(h.symbol);
+                } else {
+                  next.add(h.symbol);
+                }
+                return next;
+              })
+            }
             onSelectSymbol={onSelectSymbol}
             symbolTags={symbolTags}
             totalMarketValue={totalMarketValue}
@@ -429,22 +434,27 @@ function Th({
 }
 
 function LotDetailsRow({
+  id,
   holding,
   isExpanded,
   onToggle,
-  lotsData,
   onSelectSymbol,
   symbolTags,
   totalMarketValue,
 }: {
+  id: string;
   holding: Holding;
   isExpanded: boolean;
   onToggle: () => void;
-  lotsData: HoldingLots | undefined;
   onSelectSymbol: (symbol: string) => void;
   symbolTags: Map<string, Array<{ id: number; name: string }>>;
   totalMarketValue: number;
 }) {
+  const { data: lotsData } = useQuery({
+    queryKey: ["holding-lots", id, holding.symbol],
+    queryFn: () => get<{ data: HoldingLots }>(`/portfolios/${id}/holdings/${holding.symbol}/lots`),
+    enabled: isExpanded,
+  });
   return (
     <>
       <TableRow className="cursor-pointer" onClick={onToggle}>
@@ -493,7 +503,7 @@ function LotDetailsRow({
             : "-"}
         </TableCell>
       </TableRow>
-      {isExpanded && lotsData && (
+      {isExpanded && lotsData?.data && (
         <TableRow>
           <TableCell colSpan={8} className="bg-muted/50 px-4 py-2">
             <Table className="text-xs">
@@ -510,7 +520,7 @@ function LotDetailsRow({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {lotsData.lots.map((lot) => (
+                {lotsData.data.lots.map((lot) => (
                   <TableRow
                     key={lot.id}
                     className={lot.status === "closed" ? "text-muted-foreground" : ""}
@@ -541,7 +551,7 @@ function LotDetailsRow({
                 ))}
               </TableBody>
             </Table>
-            <PriceHistorySection symbol={holding.symbol} isVisible={isExpanded} />
+            <PriceHistorySection id={id} symbol={holding.symbol} isVisible={isExpanded} />
           </TableCell>
         </TableRow>
       )}
@@ -550,22 +560,27 @@ function LotDetailsRow({
 }
 
 function MobileLotDetailsCard({
+  id,
   holding,
   isExpanded,
   onToggle,
-  lotsData,
   onSelectSymbol,
   symbolTags,
   totalMarketValue,
 }: {
+  id: string;
   holding: Holding;
   isExpanded: boolean;
   onToggle: () => void;
-  lotsData: HoldingLots | undefined;
   onSelectSymbol: (symbol: string) => void;
   symbolTags: Map<string, Array<{ id: number; name: string }>>;
   totalMarketValue: number;
 }) {
+  const { data: lotsData } = useQuery({
+    queryKey: ["holding-lots", id, holding.symbol],
+    queryFn: () => get<{ data: HoldingLots }>(`/portfolios/${id}/holdings/${holding.symbol}/lots`),
+    enabled: isExpanded,
+  });
   return (
     <Card>
       <CardContent className="cursor-pointer p-3" onClick={onToggle}>
@@ -621,9 +636,9 @@ function MobileLotDetailsCard({
           </span>
         </div>
       </CardContent>
-      {isExpanded && lotsData && (
+      {isExpanded && lotsData?.data && (
         <div className="space-y-1 border-t bg-muted/50 px-3 py-2">
-          {lotsData.lots.map((lot) => (
+          {lotsData.data.lots.map((lot) => (
             <div
               key={lot.id}
               className={`text-xs ${lot.status === "closed" ? "text-muted-foreground" : ""}`}
@@ -650,15 +665,24 @@ function MobileLotDetailsCard({
               </div>
             </div>
           ))}
-          <PriceHistorySection symbol={holding.symbol} isVisible={isExpanded} />
+          <PriceHistorySection id={id} symbol={holding.symbol} isVisible={isExpanded} />
         </div>
       )}
     </Card>
   );
 }
 
-function PriceHistorySection({ symbol, isVisible }: { symbol: string; isVisible: boolean }) {
-  const [range, setRange] = useState<"1M" | "3M" | "1Y" | "3Y" | "ALL">("1Y");
+function PriceHistorySection({
+  id,
+  symbol,
+  isVisible,
+}: {
+  id: string;
+  symbol: string;
+  isVisible: boolean;
+}) {
+  const [range, setRange] = useState<"1M" | "3M" | "1Y" | "3Y" | "YTD" | "ALL">("1Y");
+  const [yFromZero, setYFromZero] = useState(false);
 
   const { startDate } = useMemo(() => {
     const today = new Date();
@@ -675,6 +699,9 @@ function PriceHistorySection({ symbol, isVisible }: { symbol: string; isVisible:
         break;
       case "3Y":
         start = new Date(today.getFullYear() - 3, today.getMonth(), today.getDate());
+        break;
+      case "YTD":
+        start = new Date(today.getFullYear(), 0, 1);
         break;
       case "ALL":
         return { startDate: undefined };
@@ -695,22 +722,64 @@ function PriceHistorySection({ symbol, isVisible }: { symbol: string; isVisible:
 
   const prices = data?.data?.prices ?? [];
 
+  const { data: txData } = useQuery({
+    queryKey: ["transactions", id, symbol],
+    queryFn: () => get<{ data: Transaction[] }>(`/portfolios/${id}/transactions?symbol=${symbol}`),
+    enabled: isVisible,
+  });
+
+  const markers = useMemo(() => {
+    const txs = txData?.data ?? [];
+    const result: Array<{ index: number; label: string; color: string }> = [];
+    for (const tx of txs) {
+      if (tx.type !== "buy" && tx.type !== "sell" && tx.type !== "initial") continue;
+      if (!tx.date) continue;
+      // Find closest price date
+      let bestIdx = -1;
+      let bestDiff = Infinity;
+      const txTime = new Date(tx.date).getTime();
+      for (let i = 0; i < prices.length; i++) {
+        const p = prices[i];
+        if (!p) continue;
+        const diff = Math.abs(new Date(p.date).getTime() - txTime);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          bestIdx = i;
+        }
+      }
+      if (bestIdx >= 0) {
+        result.push({
+          index: bestIdx,
+          label: tx.type === "sell" ? "S" : "B",
+          color: tx.type === "sell" ? "#dc2626" : "#16a34a",
+        });
+      }
+    }
+    return result;
+  }, [txData, prices]);
+
   if (!isVisible) return null;
 
   return (
     <div className="mt-3">
-      <div className="mb-2 flex gap-1">
-        {(["1M", "3M", "1Y", "3Y", "ALL"] as const).map((r) => (
-          <Button
-            key={r}
-            size="sm"
-            variant={range === r ? "default" : "outline"}
-            className="h-6 px-2 text-xs"
-            onClick={() => setRange(r)}
-          >
-            {r}
-          </Button>
-        ))}
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          {(["1M", "3M", "1Y", "3Y", "YTD", "ALL"] as const).map((r) => (
+            <Button
+              key={r}
+              size="sm"
+              variant={range === r ? "default" : "outline"}
+              className="h-6 px-2 text-xs"
+              onClick={() => setRange(r)}
+            >
+              {r}
+            </Button>
+          ))}
+        </div>
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+          <Switch checked={yFromZero} onCheckedChange={setYFromZero} />
+          Include Zero
+        </label>
       </div>
       {isLoading ? (
         <p className="text-xs text-muted-foreground">Loading chart...</p>
@@ -725,6 +794,8 @@ function PriceHistorySection({ symbol, isVisible }: { symbol: string; isVisible:
             }))}
             height={180}
             formatValue={(v) => v.toFixed(2)}
+            minValue={yFromZero ? 0 : undefined}
+            markers={markers}
           />
           <div className="mt-1 text-xs text-muted-foreground">
             <span className="inline-block h-0.5 w-3 bg-blue-600" /> Close Price
