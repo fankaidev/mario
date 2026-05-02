@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
+import { useDebouncedValue } from "../lib/use-debounced-value";
 import { LineChart } from "../components/LineChart";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -751,6 +752,8 @@ function TransactionsTab({
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
 
+  const debouncedSymbol = useDebouncedValue(symbolFilter, 300);
+
   const presets: Record<string, string> = {
     "1M": "Past Month",
     "3M": "Past 3M",
@@ -787,13 +790,13 @@ function TransactionsTab({
   }
 
   const params = new URLSearchParams();
-  if (symbolFilter) params.set("symbol", symbolFilter);
+  if (debouncedSymbol) params.set("symbol", debouncedSymbol);
   if (startDate) params.set("startDate", startDate);
   if (endDate) params.set("endDate", endDate);
   const queryString = params.toString() ? `?${params.toString()}` : "";
 
   const { data, isLoading } = useQuery({
-    queryKey: ["transactions", id, symbolFilter, startDate, endDate],
+    queryKey: ["transactions", id, debouncedSymbol, startDate, endDate],
     queryFn: () => get<{ data: Transaction[] }>(`/portfolios/${id}/transactions${queryString}`),
   });
 
@@ -805,7 +808,7 @@ function TransactionsTab({
     },
   });
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
+  if (isLoading && !data) return <p className="text-sm text-muted-foreground">Loading...</p>;
 
   return (
     <div>
