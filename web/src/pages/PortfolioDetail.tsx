@@ -112,7 +112,7 @@ export function PortfolioDetail() {
         <Button asChild variant="link" className="h-auto p-0">
           <Link to="/">Back to Portfolios</Link>
         </Button>
-        <h1 className="mt-2 mb-4 text-xl font-semibold tracking-normal md:text-2xl">
+        <h1 className="mt-2 mb-6 text-xl font-semibold tracking-normal md:text-2xl">
           {portfolio ? `${portfolio.name} (${portfolio.currency})` : "Loading..."}
         </h1>
 

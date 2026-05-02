@@ -48,6 +48,13 @@ export function LineChart({ data, height = 200, formatValue }: LineChartProps) {
 
   const allKeys = [...new Set(data.flatMap((p) => p.values.map((v) => v.key)))];
 
+  // Show at most ~8 x-axis labels evenly spaced
+  const maxLabels = 8;
+  const labelStep = Math.max(1, Math.ceil(data.length / maxLabels));
+
+  // Only show dots when data is sparse
+  const showDots = data.length <= 30;
+
   if (data.length === 0) return null;
 
   return (
@@ -73,10 +80,11 @@ export function LineChart({ data, height = 200, formatValue }: LineChartProps) {
           </g>
         ))}
         {data.map((point, i) => {
+          if (i % labelStep !== 0 && i !== data.length - 1) return null;
           const x = scaleX(i);
           return (
             <text
-              key={`label-${point.label}`}
+              key={`label-${point.label}-${i}`}
               x={x}
               y={chartHeight - 2}
               textAnchor="middle"
@@ -98,15 +106,24 @@ export function LineChart({ data, height = 200, formatValue }: LineChartProps) {
           return (
             <g key={key}>
               <polyline points={polyline} fill="none" stroke={color} strokeWidth={2} />
-              {data.map((point, i) => {
-                const v = point.values.find((v2) => v2.key === key);
-                if (!v) return null;
-                return (
-                  <circle key={`dot-${i}`} cx={scaleX(i)} cy={scaleY(v.value)} r={2.5} fill={color}>
-                    <title>{`${point.label}: ${formatValue ? formatValue(v.value) : v.value}`}</title>
-                  </circle>
-                );
-              })}
+              {showDots &&
+                data.map((point, i) => {
+                  const v = point.values.find((v2) => v2.key === key);
+                  if (!v) return null;
+                  return (
+                    <circle
+                      key={`dot-${i}`}
+                      cx={scaleX(i)}
+                      cy={scaleY(v.value)}
+                      r={2.5}
+                      fill={color}
+                    >
+                      <title>
+                        {`${point.label}: ${formatValue ? formatValue(v.value) : v.value}`}
+                      </title>
+                    </circle>
+                  );
+                })}
             </g>
           );
         })}
