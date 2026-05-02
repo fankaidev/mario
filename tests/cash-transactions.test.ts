@@ -238,4 +238,60 @@ describe("Cash Transactions", () => {
 
     expect(await getCashBalance()).toBe(3975);
   });
+
+  it("[UC-PORTFOLIO-006-S13] recalculate cash from all transfers and transactions", async () => {
+    await db
+      .prepare("UPDATE portfolios SET cash_balance = 200000 WHERE id = ?")
+      .bind(portfolioId)
+      .run();
+
+    await createTransfer("deposit", 100000, 0);
+    await createTransfer("withdrawal", 10000, 0);
+
+    const buyTx = await db
+      .prepare(
+        "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, 'AAPL', 'buy', 100, 150, 10, '2024-01-01') RETURNING id",
+      )
+      .bind(portfolioId)
+      .first<{ id: number }>();
+    await db
+      .prepare(
+        "INSERT INTO lots (transaction_id, portfolio_id, symbol, quantity, remaining_quantity, cost_basis) VALUES (?, ?, 'AAPL', 100, 50, 15010)",
+      )
+      .bind(buyTx!.id, portfolioId)
+      .run();
+
+    await db
+      .prepare(
+        "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, 'AAPL', 'sell', 50, 180, 5, '2024-02-01')",
+      )
+      .bind(portfolioId)
+      .run();
+
+    await db
+      .prepare(
+        "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, 'AAPL', 'dividend', 0, 100, 15, '2024-03-01')",
+      )
+      .bind(portfolioId)
+      .run();
+
+    const res = await worker.fetch(
+      `http://localhost/api/portfolios/${portfolioId}/recalculate-cash`,
+      {
+        method: "POST",
+        headers: authHeaders(),
+      },
+    );
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { data: { cash_balance: number } };
+
+    // Expected:
+    // deposits: +100000 (no fee) - withdrawals: -10000 = +90000 from transfers
+    // buy: -(100*150 + 10) = -15010
+    // sell: +(50*180 - 5) = +8995
+    // dividend: +(100 - 15) = +85
+    // Total: 90000 - 15010 + 8995 + 85 = 84070
+    expect(json.data.cash_balance).toBe(84070);
+    expect(await getCashBalance()).toBe(84070);
+  });
 });

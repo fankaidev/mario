@@ -201,6 +201,36 @@ portfolios.get("/:id/holdings/:symbol/lots", async (c) => {
   return c.json({ data: holdingLots });
 });
 
+portfolios.post("/:id/recalculate-cash", async (c) => {
+  const user = c.get("user");
+  const portfolioId = parseInt(c.req.param("id") ?? "", 10);
+  if (isNaN(portfolioId)) return c.json({ error: "Invalid portfolio ID" }, 400);
+
+  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+    .bind(portfolioId, user.id)
+    .first();
+  if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
+
+  await c.env.DB.prepare(
+    `UPDATE portfolios SET cash_balance = (
+      COALESCE((SELECT SUM(CASE WHEN type = 'deposit' THEN amount - fee WHEN type = 'withdrawal' THEN -(amount + fee) END) FROM transfers WHERE portfolio_id = ?), 0)
+      - COALESCE((SELECT SUM(quantity * price + fee) FROM transactions WHERE portfolio_id = ? AND type IN ('buy', 'initial')), 0)
+      + COALESCE((SELECT SUM(quantity * price - fee) FROM transactions WHERE portfolio_id = ? AND type = 'sell'), 0)
+      + COALESCE((SELECT SUM(price - fee) FROM transactions WHERE portfolio_id = ? AND type = 'dividend'), 0)
+    ) WHERE id = ?`,
+  )
+    .bind(portfolioId, portfolioId, portfolioId, portfolioId, portfolioId)
+    .run();
+
+  const updated = await c.env.DB.prepare("SELECT cash_balance FROM portfolios WHERE id = ?")
+    .bind(portfolioId)
+    .first<{ cash_balance: number }>();
+
+  return c.json({
+    data: { cash_balance: Math.round(updated!.cash_balance * 100) / 100 },
+  });
+});
+
 portfolios.get("/:id/summary", async (c) => {
   const user = c.get("user");
   const portfolioId = parseInt(c.req.param("id") ?? "", 10);
