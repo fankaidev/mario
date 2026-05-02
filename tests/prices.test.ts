@@ -148,10 +148,11 @@ describe("Price Update", () => {
 
     const finnhub = new FakePriceFetcher();
     const yahoo = new FakePriceFetcher();
+    const eastmoney = new FakePriceFetcher();
     yahoo.setPrice("0700.HK", 350.0);
     yahoo.setPrice("600519.SS", 1500.0);
 
-    const router = new FetcherRouter(finnhub, yahoo);
+    const router = new FetcherRouter(finnhub, yahoo, eastmoney);
     const updated = await updatePrices(db, router);
     expect(updated).toBe(2);
 
@@ -167,8 +168,9 @@ describe("Price Update", () => {
       .first<{ price: number }>();
     expect(ss!.price).toBe(1500.0);
 
-    // Finnhub should not have been called
+    // Finnhub and Eastmoney should not have been called
     expect(finnhub.getAccessedSymbols()).toEqual([]);
+    expect(eastmoney.getAccessedSymbols()).toEqual([]);
   });
 
   it("[UC-PORTFOLIO-005-S08] routes mixed portfolio to correct fetchers", async () => {
@@ -177,10 +179,11 @@ describe("Price Update", () => {
 
     const finnhub = new FakePriceFetcher();
     const yahoo = new FakePriceFetcher();
+    const eastmoney = new FakePriceFetcher();
     finnhub.setPrice("AAPL", 180.0);
     yahoo.setPrice("0700.HK", 350.0);
 
-    const router = new FetcherRouter(finnhub, yahoo);
+    const router = new FetcherRouter(finnhub, yahoo, eastmoney);
     const updated = await updatePrices(db, router);
     expect(updated).toBe(2);
 
@@ -199,5 +202,77 @@ describe("Price Update", () => {
     // Verify correct routing
     expect(finnhub.getAccessedSymbols()).toEqual(["AAPL"]);
     expect(yahoo.getAccessedSymbols()).toEqual(["0700.HK"]);
+    expect(eastmoney.getAccessedSymbols()).toEqual([]);
+  });
+
+  it("[UC-PORTFOLIO-005-S09] updates NAV for mutual funds via Eastmoney", async () => {
+    await seedLot("000979");
+    await seedLot("000217");
+
+    const finnhub = new FakePriceFetcher();
+    const yahoo = new FakePriceFetcher();
+    const eastmoney = new FakePriceFetcher();
+    eastmoney.setPrice("000979", 1.5);
+    eastmoney.setPrice("000217", 2.3);
+
+    const router = new FetcherRouter(finnhub, yahoo, eastmoney);
+    const updated = await updatePrices(db, router);
+    expect(updated).toBe(2);
+
+    const fund1 = await db
+      .prepare("SELECT price FROM prices WHERE symbol = ?")
+      .bind("000979")
+      .first<{ price: number }>();
+    expect(fund1!.price).toBe(1.5);
+
+    const fund2 = await db
+      .prepare("SELECT price FROM prices WHERE symbol = ?")
+      .bind("000217")
+      .first<{ price: number }>();
+    expect(fund2!.price).toBe(2.3);
+
+    // Finnhub and Yahoo should not have been called
+    expect(finnhub.getAccessedSymbols()).toEqual([]);
+    expect(yahoo.getAccessedSymbols()).toEqual([]);
+  });
+
+  it("[UC-PORTFOLIO-005-S10] routes all symbol types correctly", async () => {
+    await seedLot("AAPL");
+    await seedLot("0700.HK");
+    await seedLot("000979");
+
+    const finnhub = new FakePriceFetcher();
+    const yahoo = new FakePriceFetcher();
+    const eastmoney = new FakePriceFetcher();
+    finnhub.setPrice("AAPL", 180.0);
+    yahoo.setPrice("0700.HK", 350.0);
+    eastmoney.setPrice("000979", 1.5);
+
+    const router = new FetcherRouter(finnhub, yahoo, eastmoney);
+    const updated = await updatePrices(db, router);
+    expect(updated).toBe(3);
+
+    const aapl = await db
+      .prepare("SELECT price FROM prices WHERE symbol = ?")
+      .bind("AAPL")
+      .first<{ price: number }>();
+    expect(aapl!.price).toBe(180.0);
+
+    const hk = await db
+      .prepare("SELECT price FROM prices WHERE symbol = ?")
+      .bind("0700.HK")
+      .first<{ price: number }>();
+    expect(hk!.price).toBe(350.0);
+
+    const fund = await db
+      .prepare("SELECT price FROM prices WHERE symbol = ?")
+      .bind("000979")
+      .first<{ price: number }>();
+    expect(fund!.price).toBe(1.5);
+
+    // Verify correct routing
+    expect(finnhub.getAccessedSymbols()).toEqual(["AAPL"]);
+    expect(yahoo.getAccessedSymbols()).toEqual(["0700.HK"]);
+    expect(eastmoney.getAccessedSymbols()).toEqual(["000979"]);
   });
 });
