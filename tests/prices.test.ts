@@ -4,6 +4,7 @@ import type { UnstableDevWorker } from "wrangler";
 import { cleanDatabase } from "./helpers";
 import { FakePriceFetcher } from "./fake-price-fetcher";
 import { updatePrices } from "../src/routes/prices";
+import { FetcherRouter } from "../src/clients/fetcher-router";
 
 let worker: UnstableDevWorker;
 let db: D1Database;
@@ -139,5 +140,64 @@ describe("Price Update", () => {
       .bind("AAPL")
       .first<{ name: string }>();
     expect(row!.name).toBe("Apple Inc");
+  });
+
+  it("[UC-PORTFOLIO-005-S07] updates prices for HK/SS/SZ stocks via Yahoo Finance", async () => {
+    await seedLot("0700.HK");
+    await seedLot("600519.SS");
+
+    const finnhub = new FakePriceFetcher();
+    const yahoo = new FakePriceFetcher();
+    yahoo.setPrice("0700.HK", 350.0);
+    yahoo.setPrice("600519.SS", 1500.0);
+
+    const router = new FetcherRouter(finnhub, yahoo);
+    const updated = await updatePrices(db, router);
+    expect(updated).toBe(2);
+
+    const hk = await db
+      .prepare("SELECT price FROM prices WHERE symbol = ?")
+      .bind("0700.HK")
+      .first<{ price: number }>();
+    expect(hk!.price).toBe(350.0);
+
+    const ss = await db
+      .prepare("SELECT price FROM prices WHERE symbol = ?")
+      .bind("600519.SS")
+      .first<{ price: number }>();
+    expect(ss!.price).toBe(1500.0);
+
+    // Finnhub should not have been called
+    expect(finnhub.getAccessedSymbols()).toEqual([]);
+  });
+
+  it("[UC-PORTFOLIO-005-S08] routes mixed portfolio to correct fetchers", async () => {
+    await seedLot("AAPL");
+    await seedLot("0700.HK");
+
+    const finnhub = new FakePriceFetcher();
+    const yahoo = new FakePriceFetcher();
+    finnhub.setPrice("AAPL", 180.0);
+    yahoo.setPrice("0700.HK", 350.0);
+
+    const router = new FetcherRouter(finnhub, yahoo);
+    const updated = await updatePrices(db, router);
+    expect(updated).toBe(2);
+
+    const aapl = await db
+      .prepare("SELECT price FROM prices WHERE symbol = ?")
+      .bind("AAPL")
+      .first<{ price: number }>();
+    expect(aapl!.price).toBe(180.0);
+
+    const hk = await db
+      .prepare("SELECT price FROM prices WHERE symbol = ?")
+      .bind("0700.HK")
+      .first<{ price: number }>();
+    expect(hk!.price).toBe(350.0);
+
+    // Verify correct routing
+    expect(finnhub.getAccessedSymbols()).toEqual(["AAPL"]);
+    expect(yahoo.getAccessedSymbols()).toEqual(["0700.HK"]);
   });
 });

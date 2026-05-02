@@ -2,9 +2,10 @@ import type { PriceFetcher } from "./price-fetcher";
 import { YahooFinanceFetcher } from "./yahoo-finance";
 
 export class FetcherRouter implements PriceFetcher {
-  private yahoo = new YahooFinanceFetcher();
-
-  constructor(private finnhub: PriceFetcher) {}
+  constructor(
+    private finnhub: PriceFetcher,
+    private yahoo: PriceFetcher = new YahooFinanceFetcher(),
+  ) {}
 
   private isYahooSymbol(symbol: string): boolean {
     return symbol.endsWith(".HK") || symbol.endsWith(".SS") || symbol.endsWith(".SZ");
