@@ -16,7 +16,7 @@
 | R8 | Cumulative sell fees = sum of fees for all sell transactions |
 | R9 | Cumulative withholding tax = sum of fees for all dividend transactions |
 | R10 | Total cumulative fees = cumulative buy fees + cumulative sell fees + cumulative withholding tax |
-| R11 | Cash balance = current portfolio cash_balance |
+| R11 | Cash balance = available cash in portfolio |
 | R12 | Portfolio value = securities value + cash balance |
 | R13 | Price updated at = the oldest latest date among all held symbols' price history; null when no holdings or no price data |
 

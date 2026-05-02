@@ -6,15 +6,15 @@
 
 | ID | Rule |
 |----|------|
-| R1 | Deposit increases portfolio cash_balance by (amount - fee) |
-| R2 | Withdrawal decreases portfolio cash_balance by (amount + fee) |
-| R3 | Withdrawal cannot exceed current cash_balance |
-| R4 | Buy transaction decreases cash_balance by (price × quantity + fee); negative cash_balance allowed (margin/unsettled) |
-| R5 | Sell transaction increases cash_balance by (price × quantity - fee) |
-| R6 | Dividend transaction increases cash_balance by (price - fee) |
-| R7 | Deleting a transfer reverses its cash_balance effect; for deposit, deletion blocked if it would result in insufficient cash for subsequent withdrawals |
+| R1 | Deposit increases portfolio cash balance |
+| R2 | Withdrawal decreases portfolio cash balance |
+| R3 | Withdrawal cannot exceed current cash balance |
+| R4 | Buy transaction decreases cash balance; negative balance allowed (margin/unsettled) |
+| R5 | Sell transaction increases cash balance |
+| R6 | Dividend transaction increases cash balance |
+| R7 | Deleting a transfer reverses its cash balance effect; for deposit, deletion blocked if resulting balance would be negative |
 | R8 | Transfers (deposit/withdrawal) are stored in the `transfers` table with amount, fee, date, and optional note |
-| R9 | Recalculating cash_balance recomputes it from scratch using all transfers and transactions |
+| R9 | Cash balance reflects net result of all portfolio transfers and transactions |
 
 ## Scenarios
 
