@@ -402,7 +402,9 @@ function HoldingsTab({
       </div>
 
       {sortedHoldings.length === 0 && (
-        <p className="py-4 text-center text-sm text-muted-foreground">No holdings</p>
+        <div className="rounded-lg bg-muted py-6 text-center text-sm text-muted-foreground">
+          No holdings
+        </div>
       )}
     </div>
   );
@@ -719,7 +721,7 @@ function PriceHistorySection({
       ) : prices.length === 0 ? (
         <p className="text-xs text-muted-foreground">No price history available</p>
       ) : (
-        <div>
+        <div className="rounded-xl border bg-card p-3">
           <LineChart
             data={prices.map((p) => ({
               label: p.date,
@@ -1064,7 +1066,9 @@ function TransactionsTab({
           </div>
         ))}
         {data?.data.length === 0 && (
-          <p className="text-sm text-muted-foreground">No transactions yet.</p>
+          <div className="rounded-lg bg-muted py-6 text-center text-sm text-muted-foreground">
+            No transactions yet.
+          </div>
         )}
       </div>
 
@@ -1447,7 +1451,9 @@ function SnapshotsTab({ id }: { id: string }) {
       </div>
 
       {data?.data.length === 0 && (
-        <p className="text-sm text-muted-foreground">No snapshots yet.</p>
+        <div className="rounded-lg bg-muted py-6 text-center text-sm text-muted-foreground">
+          No snapshots yet.
+        </div>
       )}
 
       <div className="space-y-1">
@@ -1929,7 +1935,9 @@ function TagsTab({ id }: { id: string }) {
       )}
 
       {tags.length === 0 && !tagAggregates.length && (
-        <p className="text-sm text-muted-foreground">No tags yet.</p>
+        <div className="rounded-lg bg-muted py-6 text-center text-sm text-muted-foreground">
+          No tags yet.
+        </div>
       )}
 
       <div className="space-y-4">
