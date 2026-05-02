@@ -100,10 +100,14 @@ export function PortfolioDetail() {
   return (
     <div className="min-h-screen bg-muted/40">
       <div className="mx-auto max-w-5xl p-4 md:p-6">
-        <Button asChild variant="link" className="h-auto p-0">
-          <Link to="/">Back to Portfolios</Link>
+        <Button
+          asChild
+          variant="link"
+          className="h-auto p-0 text-muted-foreground hover:text-foreground"
+        >
+          <Link to="/">← Back to Portfolios</Link>
         </Button>
-        <h1 className="mb-4 text-xl font-semibold md:text-2xl">
+        <h1 className="mb-6 text-xl font-semibold md:text-2xl">
           {portfolio ? `${portfolio.name} (${portfolio.currency})` : "Loading..."}
         </h1>
 
@@ -168,7 +172,7 @@ function SummaryCard({ id }: { id: string }) {
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
           <MetricBox label="Total Investment" value={s.total_investment} />
           <MetricBox label="Securities Value" value={s.securities_value} />
           <MetricBox label="Cash Balance" value={s.cash_balance} />
