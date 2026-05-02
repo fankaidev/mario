@@ -5,13 +5,21 @@ interface DataPoint {
   values: { key: string; value: number; color: string }[];
 }
 
+interface ChartMarker {
+  index: number;
+  label: string;
+  color: string;
+}
+
 interface LineChartProps {
   data: DataPoint[];
   height?: number;
   formatValue?: (v: number) => string;
+  minValue?: number | undefined;
+  markers?: ChartMarker[];
 }
 
-export function LineChart({ data, height = 200, formatValue }: LineChartProps) {
+export function LineChart({ data, height = 200, formatValue, minValue, markers }: LineChartProps) {
   const { minVal, maxVal } = useMemo(() => {
     if (data.length === 0) return { minVal: 0, maxVal: 100, padding: 0.1 };
     let min = Infinity;
@@ -24,8 +32,12 @@ export function LineChart({ data, height = 200, formatValue }: LineChartProps) {
     }
     const range = max - min || 1;
     const pad = range * 0.1;
-    return { minVal: min - pad, maxVal: max + pad, padding: 0.1 };
-  }, [data]);
+    return {
+      minVal: minValue !== undefined ? Math.min(minValue, min) : min - pad,
+      maxVal: max + pad,
+      padding: 0.1,
+    };
+  }, [data, minValue]);
 
   const chartWidth = 600;
   const chartHeight = height;
@@ -124,6 +136,52 @@ export function LineChart({ data, height = 200, formatValue }: LineChartProps) {
                     </circle>
                   );
                 })}
+            </g>
+          );
+        })}
+        {markers?.map((m, i) => {
+          const x = scaleX(m.index);
+          if (x < leftPad || x > chartWidth - rightPad) return null;
+          const dataPoint = data[m.index];
+          const priceValue = dataPoint?.values[0]?.value;
+          const priceY = priceValue != null ? scaleY(priceValue) : null;
+          const segLen = 14;
+          const lineY1 = priceY != null ? Math.max(topPad, priceY - segLen) : topPad;
+          const lineY2 =
+            priceY != null
+              ? Math.min(chartHeight - bottomPad, priceY + segLen)
+              : chartHeight - bottomPad;
+          return (
+            <g key={`marker-${i}`}>
+              <line
+                x1={x}
+                y1={lineY1}
+                x2={x}
+                y2={lineY2}
+                stroke={m.color}
+                strokeWidth={1}
+                strokeDasharray="4 3"
+                opacity={0.6}
+              />
+              <rect
+                x={x - 6}
+                y={topPad + 2}
+                width={12}
+                height={10}
+                rx={2}
+                fill={m.color}
+                opacity={0.85}
+              />
+              <text
+                x={x}
+                y={topPad + 9}
+                textAnchor="middle"
+                fontSize={7}
+                fill="#fff"
+                fontWeight="bold"
+              >
+                {m.label}
+              </text>
             </g>
           );
         })}
