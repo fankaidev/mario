@@ -30,7 +30,7 @@ export interface IbkrFlexClient {
 }
 
 export class IbkrFlexHttpClient implements IbkrFlexClient {
-  private baseUrl = "https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService";
+  private baseUrl = "https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService";
   private maxRetries = 10;
   private retryDelay = 3000;
 
