@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { EmptyState } from "../components/EmptyState";
 import {
   Dialog,
   DialogContent,
@@ -35,7 +36,7 @@ export function PortfolioList() {
     },
   });
 
-  if (isLoading) return <p className="p-4 text-muted-foreground">Loading...</p>;
+  if (isLoading) return <p className="p-4 text-sm text-muted-foreground">Loading...</p>;
   if (error) return <p className="p-4 text-destructive">Failed to load portfolios</p>;
 
   return (
@@ -52,11 +53,7 @@ export function PortfolioList() {
       </div>
 
       {data?.data.length === 0 && (
-        <Card>
-          <CardContent className="p-6 text-sm text-muted-foreground">
-            No portfolios yet. Create one to get started.
-          </CardContent>
-        </Card>
+        <EmptyState message="No portfolios yet. Create one to get started." />
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -64,7 +61,7 @@ export function PortfolioList() {
           <Link key={p.id} to={`/portfolios/${p.id}`} className="block">
             <Card className="h-full transition-all hover:bg-accent hover:shadow-md">
               <CardHeader>
-                <CardTitle className="text-lg">{p.name}</CardTitle>
+                <CardTitle>{p.name}</CardTitle>
                 <CardDescription>{p.currency}</CardDescription>
               </CardHeader>
               <CardContent>
