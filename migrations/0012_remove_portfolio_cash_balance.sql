@@ -1,5 +1,8 @@
 -- Remove cash_balance column from portfolios table
 -- SQLite doesn't support DROP COLUMN, so we recreate the table
+-- Must disable foreign keys temporarily to allow table recreation
+
+PRAGMA foreign_keys = OFF;
 
 CREATE TABLE portfolios_new (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -16,3 +19,5 @@ DROP TABLE portfolios;
 ALTER TABLE portfolios_new RENAME TO portfolios;
 
 CREATE INDEX idx_portfolios_user_id ON portfolios(user_id);
+
+PRAGMA foreign_keys = ON;
