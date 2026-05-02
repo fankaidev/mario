@@ -1630,7 +1630,7 @@ function ReturnCurveTab({ id }: { id: string }) {
 
   if (points.length === 0)
     return (
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-muted-foreground">
         No data for return curve. Add snapshots to see the chart.
       </p>
     );
@@ -1656,7 +1656,7 @@ function ReturnCurveTab({ id }: { id: string }) {
               <span className="inline-block h-0.5 w-3 bg-blue-600" /> Market Value
             </span>
             <span className="flex items-center gap-1">
-              <span className="inline-block h-0.5 w-3 bg-gray-400" /> Investment
+              <span className="inline-block h-0.5 w-3 bg-[#9ca3af]" /> Investment
             </span>
           </div>
         </CardContent>
