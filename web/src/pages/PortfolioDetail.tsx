@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
-import { useDebouncedValue } from "../lib/use-debounced-value";
 import { LineChart } from "../components/LineChart";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -89,7 +88,7 @@ type TabName =
 export function PortfolioDetail() {
   const { id } = useParams<{ id: string }>();
   const [tab, setTab] = useState<TabName>("holdings");
-  const [symbolFilter, setSymbolFilter] = useState("");
+  const [selectedSymbols, setSelectedSymbols] = useState<Set<string>>(new Set());
 
   const { data: portfolioData } = useQuery({
     queryKey: ["portfolio", id],
@@ -129,12 +128,20 @@ export function PortfolioDetail() {
             ))}
           </TabsList>
 
-          {tab === "holdings" && <HoldingsTab id={id!} />}
+          {tab === "holdings" && (
+            <HoldingsTab
+              id={id!}
+              onSelectSymbol={(s) => {
+                setSelectedSymbols(new Set([s]));
+                setTab("transactions");
+              }}
+            />
+          )}
           {tab === "transactions" && (
             <TransactionsTab
               id={id!}
-              symbolFilter={symbolFilter}
-              onSymbolFilterChange={setSymbolFilter}
+              selectedSymbols={selectedSymbols}
+              onSelectedSymbolsChange={setSelectedSymbols}
             />
           )}
           {tab === "transfers" && <TransfersTab id={id!} />}
@@ -208,7 +215,13 @@ interface SortState {
   direction: SortDirection;
 }
 
-function HoldingsTab({ id }: { id: string }) {
+function HoldingsTab({
+  id,
+  onSelectSymbol,
+}: {
+  id: string;
+  onSelectSymbol?: ((symbol: string) => void) | undefined;
+}) {
   const [sort, setSort] = useState<SortState>({ field: "unrealizedPnlRate", direction: "desc" });
   const [tagFilter, setTagFilter] = useState<number | null>(null);
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(new Set());
@@ -352,6 +365,7 @@ function HoldingsTab({ id }: { id: string }) {
                 }
                 symbolTags={symbolTags}
                 totalMarketValue={totalMarketValue}
+                onSelectSymbol={onSelectSymbol}
               />
             ))}
           </TableBody>
@@ -378,6 +392,7 @@ function HoldingsTab({ id }: { id: string }) {
             }
             symbolTags={symbolTags}
             totalMarketValue={totalMarketValue}
+            onSelectSymbol={onSelectSymbol}
           />
         ))}
       </div>
@@ -425,6 +440,7 @@ function LotDetailsRow({
   onToggle,
   symbolTags,
   totalMarketValue,
+  onSelectSymbol,
 }: {
   id: string;
   holding: Holding;
@@ -432,6 +448,7 @@ function LotDetailsRow({
   onToggle: () => void;
   symbolTags: Map<string, Array<{ id: number; name: string }>>;
   totalMarketValue: number;
+  onSelectSymbol?: ((symbol: string) => void) | undefined;
 }) {
   return (
     <>
@@ -439,7 +456,20 @@ function LotDetailsRow({
         <TableCell>
           <div className="flex items-center gap-1">
             <span className="text-xs text-muted-foreground">{isExpanded ? "▼" : "▶"}</span>
-            <span className="font-medium">{holding.symbol}</span>
+            {onSelectSymbol ? (
+              <Button
+                variant="link"
+                className="h-auto p-0 font-medium"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectSymbol(holding.symbol);
+                }}
+              >
+                {holding.symbol}
+              </Button>
+            ) : (
+              <span className="font-medium">{holding.symbol}</span>
+            )}
           </div>
           <div className="text-xs text-muted-foreground">{holding.name}</div>
           {symbolTags.has(holding.symbol) && (
@@ -490,6 +520,7 @@ function MobileLotDetailsCard({
   onToggle,
   symbolTags,
   totalMarketValue,
+  onSelectSymbol,
 }: {
   id: string;
   holding: Holding;
@@ -497,6 +528,7 @@ function MobileLotDetailsCard({
   onToggle: () => void;
   symbolTags: Map<string, Array<{ id: number; name: string }>>;
   totalMarketValue: number;
+  onSelectSymbol?: ((symbol: string) => void) | undefined;
 }) {
   return (
     <Card>
@@ -504,7 +536,20 @@ function MobileLotDetailsCard({
         <div className="mb-2 flex items-center justify-between">
           <div>
             <span className="mr-1 text-xs text-muted-foreground">{isExpanded ? "▼" : "▶"}</span>
-            <span className="font-semibold">{holding.symbol}</span>
+            {onSelectSymbol ? (
+              <Button
+                variant="link"
+                className="h-auto p-0 font-semibold"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectSymbol(holding.symbol);
+                }}
+              >
+                {holding.symbol}
+              </Button>
+            ) : (
+              <span className="font-semibold">{holding.symbol}</span>
+            )}
             <div className="text-xs text-muted-foreground">{holding.name}</div>
             {symbolTags.has(holding.symbol) && (
               <div className="mt-0.5 flex flex-wrap gap-0.5">
@@ -794,65 +839,70 @@ function HoldingDetailPanel({ id, symbol }: { id: string; symbol: string }) {
 
 function TransactionsTab({
   id,
-  symbolFilter,
-  onSymbolFilterChange,
+  selectedSymbols,
+  onSelectedSymbolsChange,
 }: {
   id: string;
-  symbolFilter: string;
-  onSymbolFilterChange: (filter: string) => void;
+  selectedSymbols: Set<string>;
+  onSelectedSymbolsChange: (symbols: Set<string>) => void;
 }) {
   const queryClient = useQueryClient();
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [datePreset, setDatePreset] = useState("ALL");
+  const [datePreset, setDatePreset] = useState<
+    "1M" | "3M" | "6M" | "YTD" | "1Y" | "3Y" | "ALL" | "CUSTOM"
+  >("ALL");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
 
-  const debouncedSymbol = useDebouncedValue(symbolFilter, 300);
+  const { data: symbolsData } = useQuery({
+    queryKey: ["transaction-symbols", id],
+    queryFn: () => get<{ data: string[] }>(`/portfolios/${id}/transactions/symbols`),
+  });
+  const symbols = symbolsData?.data ?? [];
 
-  const presets: Record<string, string> = {
-    "1M": "Past Month",
-    "3M": "Past 3M",
-    "1Y": "Past Year",
-    YTD: "This Year",
-    ALL: "All Time",
-  };
+  const startDate = useMemo(() => {
+    const today = new Date();
+    let start: Date;
+    switch (datePreset) {
+      case "1M":
+        start = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+        break;
+      case "3M":
+        start = new Date(today.getFullYear(), today.getMonth() - 3, today.getDate());
+        break;
+      case "6M":
+        start = new Date(today.getFullYear(), today.getMonth() - 6, today.getDate());
+        break;
+      case "YTD":
+        start = new Date(today.getFullYear(), 0, 1);
+        break;
+      case "1Y":
+        start = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+        break;
+      case "3Y":
+        start = new Date(today.getFullYear() - 3, today.getMonth(), today.getDate());
+        break;
+      case "ALL":
+        return undefined;
+      case "CUSTOM":
+        return customStart || undefined;
+    }
+    return start.toISOString().split("T")[0];
+  }, [datePreset, customStart]);
 
-  const today = new Date().toISOString().split("T")[0]!;
-  let startDate: string | undefined;
-  let endDate: string | undefined;
+  const endDate = datePreset === "CUSTOM" ? customEnd || undefined : undefined;
 
-  if (datePreset === "1M") {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 1);
-    startDate = d.toISOString().split("T")[0]!;
-    endDate = today;
-  } else if (datePreset === "3M") {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 3);
-    startDate = d.toISOString().split("T")[0]!;
-    endDate = today;
-  } else if (datePreset === "1Y") {
-    const d = new Date();
-    d.setFullYear(d.getFullYear() - 1);
-    startDate = d.toISOString().split("T")[0]!;
-    endDate = today;
-  } else if (datePreset === "YTD") {
-    startDate = `${today.slice(0, 4)}-01-01`;
-    endDate = today;
-  } else if (datePreset === "CUSTOM") {
-    startDate = customStart || undefined;
-    endDate = customEnd || undefined;
-  }
+  const symbolParam = selectedSymbols.size > 0 ? [...selectedSymbols].join(",") : undefined;
 
   const params = new URLSearchParams();
-  if (debouncedSymbol) params.set("symbol", debouncedSymbol);
+  if (symbolParam) params.set("symbol", symbolParam);
   if (startDate) params.set("startDate", startDate);
   if (endDate) params.set("endDate", endDate);
   const queryString = params.toString() ? `?${params.toString()}` : "";
 
   const { data, isLoading } = useQuery({
-    queryKey: ["transactions", id, debouncedSymbol, startDate, endDate],
+    queryKey: ["transactions", id, symbolParam, startDate, endDate],
     queryFn: () => get<{ data: Transaction[] }>(`/portfolios/${id}/transactions${queryString}`),
   });
 
@@ -863,6 +913,16 @@ function TransactionsTab({
       setDeleteId(null);
     },
   });
+
+  function toggleSymbol(symbol: string) {
+    const next = new Set(selectedSymbols);
+    if (next.has(symbol)) {
+      next.delete(symbol);
+    } else {
+      next.add(symbol);
+    }
+    onSelectedSymbolsChange(next);
+  }
 
   if (isLoading && !data) return <p className="text-sm text-muted-foreground">Loading...</p>;
 
@@ -875,51 +935,68 @@ function TransactionsTab({
         </Button>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Input
-          type="text"
-          value={symbolFilter}
-          onChange={(e) => onSymbolFilterChange(e.target.value.toUpperCase())}
-          placeholder="Filter by symbol"
-          className="w-full max-w-xs"
-        />
-        <div className="flex flex-wrap gap-1">
-          {Object.entries(presets).map(([key, label]) => (
-            <Button
-              key={key}
-              size="sm"
-              variant={datePreset === key ? "default" : "secondary"}
-              onClick={() => setDatePreset(key)}
-            >
-              {label}
-            </Button>
-          ))}
+      <div className="mb-3 flex flex-wrap items-center gap-1">
+        {(["1M", "3M", "6M", "YTD", "1Y", "3Y", "ALL"] as const).map((r) => (
           <Button
+            key={r}
             size="sm"
-            variant={datePreset === "CUSTOM" ? "default" : "secondary"}
-            onClick={() => setDatePreset("CUSTOM")}
+            variant={datePreset === r ? "default" : "outline"}
+            className="h-6 px-2 text-xs"
+            onClick={() => setDatePreset(r)}
           >
-            Custom
+            {r}
           </Button>
-        </div>
+        ))}
+        <Button
+          size="sm"
+          variant={datePreset === "CUSTOM" ? "default" : "outline"}
+          className="h-6 px-2 text-xs"
+          onClick={() => setDatePreset("CUSTOM")}
+        >
+          Custom
+        </Button>
         {datePreset === "CUSTOM" && (
           <div className="flex items-center gap-2">
             <Input
               type="date"
               value={customStart}
               onChange={(e) => setCustomStart(e.target.value)}
-              className="h-8 w-auto text-xs"
+              className="h-6 w-auto text-xs"
             />
             <span className="text-xs text-muted-foreground">to</span>
             <Input
               type="date"
               value={customEnd}
               onChange={(e) => setCustomEnd(e.target.value)}
-              className="h-8 w-auto text-xs"
+              className="h-6 w-auto text-xs"
             />
           </div>
         )}
       </div>
+
+      {symbols.length > 1 && (
+        <div className="mb-4 flex flex-wrap gap-1">
+          <Button
+            size="sm"
+            variant={selectedSymbols.size === 0 ? "default" : "outline"}
+            className="h-6 px-2 text-xs"
+            onClick={() => onSelectedSymbolsChange(new Set())}
+          >
+            All
+          </Button>
+          {symbols.map((symbol) => (
+            <Button
+              key={symbol}
+              size="sm"
+              variant={selectedSymbols.has(symbol) ? "default" : "outline"}
+              className="h-6 px-2 text-xs"
+              onClick={() => toggleSymbol(symbol)}
+            >
+              {symbol}
+            </Button>
+          ))}
+        </div>
+      )}
 
       <div className="space-y-1">
         {data?.data.map((tx) => (

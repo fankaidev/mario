@@ -557,4 +557,40 @@ describe("Transaction History", () => {
     expect(body.data).toHaveLength(1);
     expect(body.data[0].date).toBe("2024-01-15");
   });
+
+  it("filters transactions by multiple comma-separated symbols", async () => {
+    await makeBuy("AAPL", 10, 150, "2024-01-15");
+    await makeBuy("TSLA", 5, 200, "2024-02-01");
+    await makeBuy("NVDA", 8, 100, "2024-03-01");
+
+    const body = await getTransactionsWithParams("?symbol=AAPL,TSLA");
+    expect(body.data).toHaveLength(2);
+    const symbols = body.data.map((tx) => (tx as { symbol: string }).symbol);
+    expect(symbols).toContain("AAPL");
+    expect(symbols).toContain("TSLA");
+  });
+
+  it("GET /symbols returns distinct symbols for a portfolio", async () => {
+    await makeBuy("AAPL", 10, 150, "2024-01-15");
+    await makeBuy("TSLA", 5, 200, "2024-02-01");
+    await makeBuy("AAPL", 20, 160, "2024-03-01");
+
+    const res = await worker.fetch(
+      `http://localhost/api/portfolios/${portfolioId}/transactions/symbols`,
+      { headers: authHeaders() },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: string[] };
+    expect(body.data).toEqual(["AAPL", "TSLA"]);
+  });
+
+  it("GET /symbols returns empty array when no transactions", async () => {
+    const res = await worker.fetch(
+      `http://localhost/api/portfolios/${portfolioId}/transactions/symbols`,
+      { headers: authHeaders() },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: string[] };
+    expect(body.data).toEqual([]);
+  });
 });
