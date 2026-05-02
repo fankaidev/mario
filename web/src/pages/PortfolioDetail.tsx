@@ -854,6 +854,9 @@ function TransactionsTab({
   >("ALL");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
+
+  const transactionTypes = ["buy", "sell", "dividend", "initial"] as const;
 
   const { data: symbolsData } = useQuery({
     queryKey: ["transaction-symbols", id],
@@ -894,15 +897,17 @@ function TransactionsTab({
   const endDate = datePreset === "CUSTOM" ? customEnd || undefined : undefined;
 
   const symbolParam = selectedSymbols.size > 0 ? [...selectedSymbols].join(",") : undefined;
+  const typeParam = selectedTypes.size > 0 ? [...selectedTypes].join(",") : undefined;
 
   const params = new URLSearchParams();
   if (symbolParam) params.set("symbol", symbolParam);
+  if (typeParam) params.set("type", typeParam);
   if (startDate) params.set("startDate", startDate);
   if (endDate) params.set("endDate", endDate);
   const queryString = params.toString() ? `?${params.toString()}` : "";
 
   const { data, isLoading } = useQuery({
-    queryKey: ["transactions", id, symbolParam, startDate, endDate],
+    queryKey: ["transactions", id, symbolParam, typeParam, startDate, endDate],
     queryFn: () => get<{ data: Transaction[] }>(`/portfolios/${id}/transactions${queryString}`),
   });
 
@@ -922,6 +927,16 @@ function TransactionsTab({
       next.add(symbol);
     }
     onSelectedSymbolsChange(next);
+  }
+
+  function toggleType(type: string) {
+    const next = new Set(selectedTypes);
+    if (next.has(type)) {
+      next.delete(type);
+    } else {
+      next.add(type);
+    }
+    setSelectedTypes(next);
   }
 
   if (isLoading && !data) return <p className="text-sm text-muted-foreground">Loading...</p>;
@@ -975,7 +990,7 @@ function TransactionsTab({
       </div>
 
       {symbols.length > 1 && (
-        <div className="mb-4 flex flex-wrap gap-1">
+        <div className="mb-3 flex flex-wrap gap-1">
           <Button
             size="sm"
             variant={selectedSymbols.size === 0 ? "default" : "outline"}
@@ -997,6 +1012,28 @@ function TransactionsTab({
           ))}
         </div>
       )}
+
+      <div className="mb-4 flex flex-wrap gap-1">
+        <Button
+          size="sm"
+          variant={selectedTypes.size === 0 ? "default" : "outline"}
+          className="h-6 px-2 text-xs"
+          onClick={() => setSelectedTypes(new Set())}
+        >
+          All
+        </Button>
+        {transactionTypes.map((type) => (
+          <Button
+            key={type}
+            size="sm"
+            variant={selectedTypes.has(type) ? "default" : "outline"}
+            className="h-6 px-2 text-xs capitalize"
+            onClick={() => toggleType(type)}
+          >
+            {type}
+          </Button>
+        ))}
+      </div>
 
       <div className="space-y-1">
         {data?.data.map((tx) => (

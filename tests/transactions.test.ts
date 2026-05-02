@@ -593,4 +593,70 @@ describe("Transaction History", () => {
     const body = (await res.json()) as { data: string[] };
     expect(body.data).toEqual([]);
   });
+
+  it("filters transactions by single type", async () => {
+    await makeBuy("AAPL", 10, 150, "2024-01-15");
+    await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        symbol: "AAPL",
+        type: "sell",
+        quantity: 5,
+        price: 170,
+        fee: 0,
+        date: "2024-02-01",
+      }),
+    });
+    await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        symbol: "AAPL",
+        type: "dividend",
+        quantity: 0,
+        price: 50,
+        fee: 10,
+        date: "2024-03-01",
+      }),
+    });
+
+    const body = await getTransactionsWithParams("?type=buy");
+    expect(body.data).toHaveLength(1);
+    expect((body.data[0] as { type: string }).type).toBe("buy");
+  });
+
+  it("filters transactions by multiple comma-separated types", async () => {
+    await makeBuy("AAPL", 10, 150, "2024-01-15");
+    await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        symbol: "AAPL",
+        type: "sell",
+        quantity: 5,
+        price: 170,
+        fee: 0,
+        date: "2024-02-01",
+      }),
+    });
+    await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        symbol: "AAPL",
+        type: "dividend",
+        quantity: 0,
+        price: 50,
+        fee: 10,
+        date: "2024-03-01",
+      }),
+    });
+
+    const body = await getTransactionsWithParams("?type=buy,sell");
+    expect(body.data).toHaveLength(2);
+    const types = body.data.map((tx) => (tx as { type: string }).type);
+    expect(types).toContain("buy");
+    expect(types).toContain("sell");
+  });
 });
