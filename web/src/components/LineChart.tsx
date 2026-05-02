@@ -145,19 +145,20 @@ export function LineChart({ data, height = 200, formatValue, minValue, markers }
           const dataPoint = data[m.index];
           const priceValue = dataPoint?.values[0]?.value;
           const priceY = priceValue != null ? scaleY(priceValue) : null;
-          const segLen = 14;
-          const lineY1 = priceY != null ? Math.max(topPad, priceY - segLen) : topPad;
-          const lineY2 =
-            priceY != null
-              ? Math.min(chartHeight - bottomPad, priceY + segLen)
-              : chartHeight - bottomPad;
+          if (priceY == null) return null;
+          const badgeH = 10;
+          const gap = 2;
+          const lineLen = 18;
+          const startY = Math.max(topPad, priceY - badgeH - gap - lineLen);
+          const badgeY = startY;
+          const lineTop = Math.min(startY + badgeH + gap, priceY - 2);
           return (
             <g key={`marker-${i}`}>
               <line
                 x1={x}
-                y1={lineY1}
+                y1={lineTop}
                 x2={x}
-                y2={lineY2}
+                y2={priceY}
                 stroke={m.color}
                 strokeWidth={1}
                 strokeDasharray="4 3"
@@ -165,16 +166,16 @@ export function LineChart({ data, height = 200, formatValue, minValue, markers }
               />
               <rect
                 x={x - 6}
-                y={topPad + 2}
+                y={badgeY}
                 width={12}
-                height={10}
+                height={badgeH}
                 rx={2}
                 fill={m.color}
                 opacity={0.85}
               />
               <text
                 x={x}
-                y={topPad + 9}
+                y={badgeY + 7}
                 textAnchor="middle"
                 fontSize={7}
                 fill="#fff"
