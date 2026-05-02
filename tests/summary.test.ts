@@ -122,7 +122,7 @@ describe("Portfolio Summary", () => {
     await seedBuy("TSLA", 50, 100, 3);
     await db
       .prepare(
-        "INSERT INTO prices (symbol, price, updated_at) VALUES ('AAPL', 180, '2024-03-01'), ('TSLA', 90, '2024-03-01')",
+        "INSERT INTO price_history (symbol, date, close) VALUES ('AAPL', '2024-03-01', 180), ('TSLA', '2024-03-01', 90)",
       )
       .run();
 
@@ -141,7 +141,7 @@ describe("Portfolio Summary", () => {
     const lotRow = await db.prepare("SELECT id FROM lots").first<{ id: number }>();
     await seedSell("MSFT", 50, 220, 5, lotRow!.id, 50);
     await db
-      .prepare("INSERT INTO prices (symbol, price, updated_at) VALUES ('MSFT', 220, '2024-03-01')")
+      .prepare("INSERT INTO price_history (symbol, date, close) VALUES ('MSFT', '2024-03-01', 220)")
       .run();
 
     const { data } = await getSummary();
@@ -186,7 +186,7 @@ describe("Portfolio Summary", () => {
     await seedBuy("TSLA", 50, 100, 3);
     await db
       .prepare(
-        "INSERT INTO prices (symbol, price, updated_at) VALUES ('AAPL', 180, '2024-03-01'), ('TSLA', 90, '2024-03-01')",
+        "INSERT INTO price_history (symbol, date, close) VALUES ('AAPL', '2024-03-01', 180), ('TSLA', '2024-03-01', 90)",
       )
       .run();
     await db
