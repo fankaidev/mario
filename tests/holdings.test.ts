@@ -95,7 +95,6 @@ describe("View Holdings", () => {
 
   it("[UC-PORTFOLIO-003-S02] returns empty when all lots closed", async () => {
     await seedLot("AAPL", 100, 15000, 0);
-    await db.prepare("UPDATE lots SET closed = 1 WHERE remaining_quantity = 0").run();
 
     const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/holdings`, {
       headers: authHeaders(),

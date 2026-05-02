@@ -69,7 +69,9 @@ export default {
     const fetcher = new FetcherRouter(finnhub);
 
     // Sync price history for all held symbols
-    const symbols = await env.DB.prepare("SELECT DISTINCT symbol FROM lots WHERE closed = 0").all<{
+    const symbols = await env.DB.prepare(
+      "SELECT DISTINCT symbol FROM lots WHERE remaining_quantity > 0",
+    ).all<{
       symbol: string;
     }>();
 

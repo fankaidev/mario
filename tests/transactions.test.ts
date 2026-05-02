@@ -189,15 +189,11 @@ describe("Sell Transaction", () => {
     expect(res.status).toBe(201);
 
     const lots = await db
-      .prepare(
-        "SELECT remaining_quantity, closed FROM lots WHERE symbol = ? ORDER BY created_at ASC",
-      )
+      .prepare("SELECT remaining_quantity FROM lots WHERE symbol = ? ORDER BY created_at ASC")
       .bind("AAPL")
-      .all<{ remaining_quantity: number; closed: number }>();
+      .all<{ remaining_quantity: number }>();
     expect(lots.results[0].remaining_quantity).toBe(20);
-    expect(lots.results[0].closed).toBe(0);
     expect(lots.results[1].remaining_quantity).toBe(50);
-    expect(lots.results[1].closed).toBe(0);
 
     const pnl = await db
       .prepare("SELECT quantity, pnl FROM realized_pnl")
@@ -232,11 +228,10 @@ describe("Sell Transaction", () => {
 
     const lots = await db
       .prepare(
-        "SELECT id, remaining_quantity, closed FROM lots WHERE symbol = 'AAPL' ORDER BY created_at ASC",
+        "SELECT id, remaining_quantity FROM lots WHERE symbol = 'AAPL' ORDER BY created_at ASC",
       )
-      .all<{ id: number; remaining_quantity: number; closed: number }>();
+      .all<{ id: number; remaining_quantity: number }>();
     expect(lots.results[0].remaining_quantity).toBe(80);
-    expect(lots.results[0].closed).toBe(0);
 
     const pnl = await db
       .prepare("SELECT quantity, proceeds, cost, pnl FROM realized_pnl")

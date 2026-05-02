@@ -109,7 +109,9 @@ prices.post("/sync", async (c) => {
   const symbols = body.symbol
     ? [body.symbol]
     : (
-        await c.env.DB.prepare("SELECT DISTINCT symbol FROM lots WHERE closed = 0").all<{
+        await c.env.DB.prepare(
+          "SELECT DISTINCT symbol FROM lots WHERE remaining_quantity > 0",
+        ).all<{
           symbol: string;
         }>()
       ).results.map((r) => r.symbol);

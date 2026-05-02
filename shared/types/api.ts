@@ -88,7 +88,6 @@ export interface Lot {
   quantity: number;
   remaining_quantity: number;
   cost_basis: number;
-  closed: number;
   created_at: string;
 }
 

@@ -90,7 +90,7 @@ export async function importIbkrStatement(
         // Sell: consume lots in FIFO order
         const lots = await db
           .prepare(
-            "SELECT id, quantity, remaining_quantity, cost_basis FROM lots WHERE portfolio_id = ? AND symbol = ? AND closed = 0 ORDER BY created_at ASC",
+            "SELECT id, quantity, remaining_quantity, cost_basis FROM lots WHERE portfolio_id = ? AND symbol = ? AND remaining_quantity > 0 ORDER BY created_at ASC",
           )
           .bind(portfolioId, symbol)
           .all<{ id: number; quantity: number; remaining_quantity: number; cost_basis: number }>();
@@ -115,12 +115,10 @@ export async function importIbkrStatement(
           if (remainingToSell <= 0) break;
           const consumed = Math.min(lot.remaining_quantity, remainingToSell);
           const newRemaining = lot.remaining_quantity - consumed;
-          const closed = newRemaining === 0 ? 1 : 0;
-
           statements.push(
             db
-              .prepare("UPDATE lots SET remaining_quantity = ?, closed = ? WHERE id = ?")
-              .bind(newRemaining, closed, lot.id),
+              .prepare("UPDATE lots SET remaining_quantity = ? WHERE id = ?")
+              .bind(newRemaining, lot.id),
           );
 
           const lotProceeds =
