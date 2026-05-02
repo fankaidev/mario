@@ -199,4 +199,25 @@ describe("Portfolio Summary", () => {
     expect(data.cash_balance).toBe(198000);
     expect(data.portfolio_value).toBe(220500);
   });
+
+  it("[UC-PORTFOLIO-006-S10] returns price_updated_at as oldest latest date among held symbols", async () => {
+    await seedDeposit(20000);
+    await seedBuy("AAPL", 100, 150, 5);
+    await seedBuy("TSLA", 50, 100, 3);
+    await db
+      .prepare(
+        "INSERT INTO price_history (symbol, date, close) VALUES ('AAPL', '2024-03-01', 180), ('TSLA', '2024-03-02', 90)",
+      )
+      .run();
+
+    const { data } = await getSummary();
+    expect(data.price_updated_at).toBe("2024-03-01");
+  });
+
+  it("[UC-PORTFOLIO-006-S10b] returns null price_updated_at when no holdings", async () => {
+    await seedDeposit(20000);
+
+    const { data } = await getSummary();
+    expect(data.price_updated_at).toBeNull();
+  });
 });
