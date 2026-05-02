@@ -165,7 +165,7 @@ describe("Cash Transactions", () => {
   it("[UC-PORTFOLIO-006-S06] dividend increases cash_balance", async () => {
     // Portfolio starts with 0 cash by default, no setup needed
 
-    const result = await createTransaction("dividend", 25, 2.5, "AAPL", 0);
+    const result = await createTransaction("dividend", 0.25, 2.5, "AAPL", 100);
     expect(result.status).toBe(201);
 
     expect(await getCashBalance()).toBe(22.5);
@@ -263,7 +263,7 @@ describe("Cash Transactions", () => {
 
     await db
       .prepare(
-        "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, 'AAPL', 'dividend', 0, 100, 15, '2024-03-01')",
+        "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, 'AAPL', 'dividend', 400, 0.25, 15, '2024-03-01')",
       )
       .bind(portfolioId)
       .run();
@@ -282,7 +282,7 @@ describe("Cash Transactions", () => {
     // deposits: +100000 (no fee) - withdrawals: -10000 = +90000 from transfers
     // buy: -(100*150 + 10) = -15010
     // sell: +(50*180 - 5) = +8995
-    // dividend: +(100 - 15) = +85
+    // dividend: +(400 * 0.25 - 15) = +85
     // Total: 90000 - 15010 + 8995 + 85 = 84070
     expect(json.data.cash_balance).toBe(84070);
     expect(await getCashBalance()).toBe(84070);

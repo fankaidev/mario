@@ -50,19 +50,17 @@ function parseBody(body: unknown): CreateTransactionRequest {
     throw { status: 400, message: "Symbol is required" };
   }
 
-  if (txType === "dividend") {
-    if (typeof price !== "number" || price < 0) {
-      throw { status: 400, message: "Price must be 0 or greater" };
-    }
-    return { symbol: symbol.trim(), type: txType, quantity: 0, price, fee: parsedFee, date };
-  }
-
-  if (typeof quantity !== "number" || quantity <= 0) {
-    throw { status: 400, message: "Quantity must be greater than 0" };
+  if (typeof quantity !== "number" || quantity < 0) {
+    throw { status: 400, message: "Quantity must be 0 or greater" };
   }
 
   if (typeof price !== "number" || price < 0) {
     throw { status: 400, message: "Price must be 0 or greater" };
+  }
+
+  // For dividend, quantity can be 0 (but other types require quantity > 0)
+  if (txType !== "dividend" && quantity <= 0) {
+    throw { status: 400, message: "Quantity must be greater than 0" };
   }
 
   return { symbol: symbol.trim(), type: txType, quantity, price, fee: parsedFee, date };

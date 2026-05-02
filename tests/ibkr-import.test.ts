@@ -197,7 +197,7 @@ describe("IBKR Import", () => {
           amount: 82,
           currency: "USD",
           symbol: "AAPL",
-          description: "DIVIDEND",
+          description: "AAPL(US0378331005) CASH DIVIDEND USD 0.205 PER SHARE (Ordinary Dividend)",
         },
         {
           type: "Withholding Tax",
@@ -205,7 +205,7 @@ describe("IBKR Import", () => {
           amount: -12.3,
           currency: "USD",
           symbol: "AAPL",
-          description: "TAX",
+          description: "AAPL(US0378331005) CASH DIVIDEND USD 0.205 PER SHARE - US TAX",
         },
       ],
     });
@@ -216,12 +216,13 @@ describe("IBKR Import", () => {
 
     const txRow = await db
       .prepare(
-        "SELECT symbol, type, price, fee FROM transactions WHERE portfolio_id = ? AND type = 'dividend'",
+        "SELECT symbol, type, quantity, price, fee FROM transactions WHERE portfolio_id = ? AND type = 'dividend'",
       )
       .bind(portfolioId)
-      .first<{ symbol: string; type: string; price: number; fee: number }>();
+      .first<{ symbol: string; type: string; quantity: number; price: number; fee: number }>();
     expect(txRow!.symbol).toBe("AAPL");
-    expect(txRow!.price).toBe(82);
+    expect(txRow!.quantity).toBe(400); // 82 / 0.205 = 400
+    expect(txRow!.price).toBe(0.205);
     expect(txRow!.fee).toBe(12.3);
   });
 

@@ -158,19 +158,31 @@ export async function importIbkrStatement(
   }
 
   // Group cash transactions: merge withholding tax with dividends of same symbol/date
-  const dividendMap = new Map<string, { amount: number; tax: number }>();
+  const dividendMap = new Map<
+    string,
+    { amount: number; tax: number; perShare: number; quantity: number }
+  >();
   const transfers: { date: string; type: "deposit" | "withdrawal"; amount: number; fee: number }[] =
     [];
 
   for (const ct of statement.cashTransactions) {
     if (ct.type === "Dividends" || ct.type === "Payment In Lieu Of Dividends") {
       const key = `${ct.dateTime}|${ct.symbol}`;
-      const existing = dividendMap.get(key) ?? { amount: 0, tax: 0 };
+      const existing = dividendMap.get(key) ?? { amount: 0, tax: 0, perShare: 0, quantity: 0 };
       existing.amount += ct.amount;
+
+      // Extract per-share dividend from description
+      // Format: "SYMBOL(...) CASH DIVIDEND USD X.XXXXX PER SHARE (...)"
+      const match = ct.description.match(/DIVIDEND USD ([\d.]+) PER SHARE/);
+      if (match) {
+        existing.perShare = parseFloat(match[1]!);
+        existing.quantity = Math.round((ct.amount / existing.perShare) * 100) / 100;
+      }
+
       dividendMap.set(key, existing);
     } else if (ct.type === "Withholding Tax") {
       const key = `${ct.dateTime}|${ct.symbol}`;
-      const existing = dividendMap.get(key) ?? { amount: 0, tax: 0 };
+      const existing = dividendMap.get(key) ?? { amount: 0, tax: 0, perShare: 0, quantity: 0 };
       existing.tax += Math.abs(ct.amount);
       dividendMap.set(key, existing);
     } else if (ct.type === "Deposits & Withdrawals") {
@@ -192,12 +204,18 @@ export async function importIbkrStatement(
     const [date, symbol] = key.split("|")!;
     if (!symbol) continue;
 
-    // Deduplicate
+    // Skip if we couldn't parse per-share amount
+    if (div.perShare === 0 || div.quantity === 0) {
+      result.errors.push(`Dividend ${symbol} on ${date}: could not parse per-share amount`);
+      continue;
+    }
+
+    // Deduplicate: match by symbol, date, per-share price, and quantity
     const existing = await db
       .prepare(
-        "SELECT id FROM transactions WHERE portfolio_id = ? AND symbol = ? AND type = 'dividend' AND price = ? AND date = ?",
+        "SELECT id FROM transactions WHERE portfolio_id = ? AND symbol = ? AND type = 'dividend' AND price = ? AND quantity = ? AND date = ?",
       )
-      .bind(portfolioId, symbol, div.amount, date)
+      .bind(portfolioId, symbol, div.perShare, div.quantity, date)
       .first();
     if (existing) {
       result.skipped++;
@@ -206,9 +224,9 @@ export async function importIbkrStatement(
 
     await db
       .prepare(
-        "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, ?, 'dividend', 0, ?, ?, ?)",
+        "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, ?, 'dividend', ?, ?, ?, ?)",
       )
-      .bind(portfolioId, symbol, div.amount, div.tax, date)
+      .bind(portfolioId, symbol, div.quantity, div.perShare, div.tax, date)
       .run();
 
     result.dividends_imported++;

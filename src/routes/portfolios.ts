@@ -20,7 +20,7 @@ export async function calculateCashBalance(db: D1Database, portfolioId: number):
       (SELECT COALESCE(SUM(CASE
         WHEN type IN ('buy', 'initial') THEN -(quantity * price + fee)
         WHEN type = 'sell' THEN quantity * price - fee
-        WHEN type = 'dividend' THEN price - fee
+        WHEN type = 'dividend' THEN quantity * price - fee
       END), 0) FROM transactions WHERE portfolio_id = ?) as tx_cash
     FROM transfers WHERE portfolio_id = ?
   `,
@@ -279,7 +279,7 @@ portfolios.get("/:id/summary", async (c) => {
     .first<{ total: number | null }>();
 
   const dividendRow = await c.env.DB.prepare(
-    "SELECT SUM(price - fee) AS total FROM transactions WHERE portfolio_id = ? AND type = 'dividend'",
+    "SELECT SUM(quantity * price - fee) AS total FROM transactions WHERE portfolio_id = ? AND type = 'dividend'",
   )
     .bind(portfolioId)
     .first<{ total: number | null }>();

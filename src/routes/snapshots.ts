@@ -33,7 +33,7 @@ export async function calculateSnapshot(
 
   const txCashRow = await db
     .prepare(
-      "SELECT COALESCE(SUM(CASE WHEN type IN ('buy', 'initial') THEN -(quantity * price + fee) WHEN type = 'sell' THEN quantity * price - fee WHEN type = 'dividend' THEN price - fee END), 0) AS total FROM transactions WHERE portfolio_id = ? AND date <= ?",
+      "SELECT COALESCE(SUM(CASE WHEN type IN ('buy', 'initial') THEN -(quantity * price + fee) WHEN type = 'sell' THEN quantity * price - fee WHEN type = 'dividend' THEN quantity * price - fee END), 0) AS total FROM transactions WHERE portfolio_id = ? AND date <= ?",
     )
     .bind(portfolioId, date)
     .first<{ total: number }>();
