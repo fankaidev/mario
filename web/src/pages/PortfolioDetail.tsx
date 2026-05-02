@@ -210,9 +210,11 @@ type SortField =
   | "symbol"
   | "quantity"
   | "cost"
+  | "price"
   | "marketValue"
   | "unrealizedPnl"
-  | "unrealizedPnlRate";
+  | "unrealizedPnlRate"
+  | "weight";
 type SortDirection = "asc" | "desc";
 interface SortState {
   field: SortField;
@@ -278,10 +280,18 @@ function HoldingsTab({
           bVal = b.quantity;
           break;
         case "cost":
-          aVal = a.cost;
-          bVal = b.cost;
+          aVal = a.quantity > 0 ? a.cost / a.quantity : null;
+          bVal = b.quantity > 0 ? b.cost / b.quantity : null;
+          break;
+        case "price":
+          aVal = a.price;
+          bVal = b.price;
           break;
         case "marketValue":
+          aVal = a.market_value;
+          bVal = b.market_value;
+          break;
+        case "weight":
           aVal = a.market_value;
           bVal = b.market_value;
           break;
@@ -342,11 +352,11 @@ function HoldingsTab({
               <Th label="Symbol" field="symbol" sort={sort} onSort={setSort} />
               <Th label="Qty" field="quantity" sort={sort} onSort={setSort} />
               <Th label="Avg Cost" field="cost" sort={sort} onSort={setSort} />
-              <Th label="Price" field="marketValue" sort={sort} onSort={setSort} />
+              <Th label="Price" field="price" sort={sort} onSort={setSort} />
               <Th label="Mkt Value" field="marketValue" sort={sort} onSort={setSort} />
               <Th label="P&L" field="unrealizedPnl" sort={sort} onSort={setSort} />
               <Th label="P&L%" field="unrealizedPnlRate" sort={sort} onSort={setSort} />
-              <Th label="Weight%" field="marketValue" sort={sort} onSort={setSort} />
+              <Th label="Weight%" field="weight" sort={sort} onSort={setSort} />
             </TableRow>
           </TableHeader>
           <TableBody>
