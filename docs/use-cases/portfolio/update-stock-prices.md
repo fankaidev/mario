@@ -12,6 +12,7 @@
 | R4 | API failure logs error, does not interrupt the flow |
 | R5 | Manual update and auto update share the same update logic |
 | R6 | Price update also fetches and stores company name in stocks table |
+| R7 | Symbols ending in `.HK`, `.SS`, `.SZ` use Yahoo Finance; all others use Finnhub |
 
 ## Scenarios
 
@@ -25,6 +26,8 @@
 | UC-PORTFOLIO-005-S04 | P1 | ✅ | Given portfolio has no holdings, When manually triggering update, Then return 0 stocks updated | R1 |
 | UC-PORTFOLIO-005-S05 | P1 | ✅ | Given user is not logged in, When manually triggering update, Then return 401 unauthorized |
 | UC-PORTFOLIO-005-S06 | P1 | ✅ | Given portfolio holds AAPL, and API returns AAPL name "Apple Inc", When price update completes, Then stocks table shows AAPL name as "Apple Inc" | R6 |
+| UC-PORTFOLIO-005-S07 | P0 | ✅ | Given portfolio holds 0700.HK and 600519.SS, When manually triggering price update, Then Yahoo Finance API is called for both, prices are written to prices table | R1, R7 |
+| UC-PORTFOLIO-005-S08 | P0 | ✅ | Given portfolio holds AAPL and 0700.HK, When manually triggering price update, Then Finnhub is called for AAPL, Yahoo Finance is called for 0700.HK, both prices are updated | R7 |
 
 ### ai-e2e
 (none)

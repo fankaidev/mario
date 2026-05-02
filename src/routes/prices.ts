@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { AuthVariables } from "../middleware/auth";
 import type { Bindings } from "../types";
 import type { PriceFetcher } from "../clients/price-fetcher";
+import { FetcherRouter } from "../clients/fetcher-router";
 
 export async function updatePrices(db: D1Database, fetcher: PriceFetcher): Promise<number> {
   const symbols = await db
@@ -62,7 +63,7 @@ prices.post("/update", async (c) => {
     return c.json({ error: "FINNHUB_API_KEY not configured" }, 500);
   }
 
-  const fetcher: PriceFetcher = {
+  const finnhub: PriceFetcher = {
     async fetchPrice(symbol: string) {
       const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}`, {
         headers: { "X-Finnhub-Token": apiKey },
@@ -85,6 +86,7 @@ prices.post("/update", async (c) => {
     },
   };
 
+  const fetcher = new FetcherRouter(finnhub);
   const updated = await updatePrices(c.env.DB, fetcher);
   return c.json({ data: { updated } });
 });

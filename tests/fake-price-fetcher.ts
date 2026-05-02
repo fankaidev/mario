@@ -4,6 +4,7 @@ export class FakePriceFetcher implements PriceFetcher {
   private prices: Map<string, number | null> = new Map();
   private failures: Set<string> = new Set();
   private names: Map<string, string> = new Map();
+  private accessedSymbols: string[] = [];
 
   setPrice(symbol: string, price: number | null) {
     this.prices.set(symbol, price);
@@ -18,6 +19,7 @@ export class FakePriceFetcher implements PriceFetcher {
   }
 
   async fetchPrice(symbol: string): Promise<number | null> {
+    this.accessedSymbols.push(symbol);
     if (this.failures.has(symbol)) {
       throw new Error(`Fetch failed for ${symbol}`);
     }
@@ -30,5 +32,9 @@ export class FakePriceFetcher implements PriceFetcher {
       throw new Error(`Fetch failed for ${symbol}`);
     }
     return this.names.get(symbol) ?? null;
+  }
+
+  getAccessedSymbols(): string[] {
+    return this.accessedSymbols;
   }
 }
