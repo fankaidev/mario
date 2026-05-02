@@ -245,15 +245,21 @@ describe("Sell Transaction", () => {
 });
 
 describe("Dividend Transaction", () => {
-  function divPayload(symbol: string, amount: number, withholdingTax: number, date: string) {
-    return { symbol, type: "dividend", quantity: 0, price: amount, fee: withholdingTax, date };
+  function divPayload(
+    symbol: string,
+    perShare: number,
+    quantity: number,
+    withholdingTax: number,
+    date: string,
+  ) {
+    return { symbol, type: "dividend", quantity, price: perShare, fee: withholdingTax, date };
   }
 
   it("[UC-PORTFOLIO-002-S06] creates dividend transaction without affecting lots", async () => {
     const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify(divPayload("AAPL", 100, 30, "2024-04-01")),
+      body: JSON.stringify(divPayload("AAPL", 0.25, 400, 10, "2024-04-01")),
     });
     expect(res.status).toBe(201);
     const body = (await res.json()) as {
@@ -261,9 +267,9 @@ describe("Dividend Transaction", () => {
     };
     expect(body.data.symbol).toBe("AAPL");
     expect(body.data.type).toBe("dividend");
-    expect(body.data.price).toBe(100);
-    expect(body.data.fee).toBe(30);
-    expect(body.data.quantity).toBe(0);
+    expect(body.data.price).toBe(0.25);
+    expect(body.data.quantity).toBe(400);
+    expect(body.data.fee).toBe(10);
 
     const lots = await db.prepare("SELECT id FROM lots").all();
     expect(lots.results).toHaveLength(0);

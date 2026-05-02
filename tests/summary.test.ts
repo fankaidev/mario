@@ -152,7 +152,7 @@ describe("Portfolio Summary", () => {
   it("[UC-PORTFOLIO-006-S03] includes dividend income", async () => {
     await db
       .prepare(
-        "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, 'AAPL', 'dividend', 0, 100, 30, '2024-04-01')",
+        "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, 'AAPL', 'dividend', 400, 0.25, 30, '2024-04-01')",
       )
       .bind(portfolioId)
       .run();
