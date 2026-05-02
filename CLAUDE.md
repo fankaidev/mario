@@ -74,6 +74,11 @@ This ensures all work is traceable, specified, tested, and documented.
 
 **Exception for trivial changes:** Typos, dependency updates, and config tweaks can skip the full workflow — commit directly to main with a clear commit message.
 
+### Git Commit Rules
+
+- **Never use `git commit --amend` or `git rebase` to rewrite published history.** Always create new commits for fixes and follow-up changes, even on PR branches. Rewriting history breaks review tracking, CI references, and collaborative context.
+- **Never force-push (`git push --force`) unless explicitly instructed.** Force-push orphans previous review comments and makes PR threads unrecoverable.
+
 ### Commit Convention
 
 Use [Conventional Commits](https://www.conventionalcommits.org/) format for all commits and PR titles:
