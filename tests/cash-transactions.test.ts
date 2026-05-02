@@ -39,16 +39,9 @@ function authHeaders(): Record<string, string> {
 }
 
 async function getCashBalance(): Promise<number> {
-  const response = await worker.fetch(
-    `http://localhost/api/portfolios/${portfolioId}/recalculate-cash`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...authHeaders(),
-      },
-    },
-  );
+  const response = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/summary`, {
+    headers: authHeaders(),
+  });
   const json = (await response.json()) as { data: { cash_balance: number } };
   return json.data.cash_balance;
 }
@@ -268,15 +261,7 @@ describe("Cash Transactions", () => {
       .bind(portfolioId)
       .run();
 
-    const res = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/recalculate-cash`,
-      {
-        method: "POST",
-        headers: authHeaders(),
-      },
-    );
-    expect(res.status).toBe(200);
-    const json = (await res.json()) as { data: { cash_balance: number } };
+    const cashBalance = await getCashBalance();
 
     // Expected:
     // deposits: +100000 (no fee) - withdrawals: -10000 = +90000 from transfers
@@ -284,7 +269,6 @@ describe("Cash Transactions", () => {
     // sell: +(50*180 - 5) = +8995
     // dividend: +(400 * 0.25 - 15) = +85
     // Total: 90000 - 15010 + 8995 + 85 = 84070
-    expect(json.data.cash_balance).toBe(84070);
-    expect(await getCashBalance()).toBe(84070);
+    expect(cashBalance).toBe(84070);
   });
 });

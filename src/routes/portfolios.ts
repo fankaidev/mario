@@ -223,23 +223,6 @@ portfolios.get("/:id/holdings/:symbol/lots", async (c) => {
   return c.json({ data: holdingLots });
 });
 
-portfolios.post("/:id/recalculate-cash", async (c) => {
-  const user = c.get("user");
-  const portfolioId = parseInt(c.req.param("id") ?? "", 10);
-  if (isNaN(portfolioId)) return c.json({ error: "Invalid portfolio ID" }, 400);
-
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
-    .bind(portfolioId, user.id)
-    .first();
-  if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
-
-  const cashBalance = await calculateCashBalance(c.env.DB, portfolioId);
-
-  return c.json({
-    data: { cash_balance: Math.round(cashBalance * 100) / 100 },
-  });
-});
-
 portfolios.get("/:id/summary", async (c) => {
   const user = c.get("user");
   const portfolioId = parseInt(c.req.param("id") ?? "", 10);

@@ -5,6 +5,7 @@ import { LineChart } from "../components/LineChart";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
+import { EmptyState } from "../components/EmptyState";
 import {
   Dialog,
   DialogContent,
@@ -411,11 +412,7 @@ function HoldingsTab({
         ))}
       </div>
 
-      {sortedHoldings.length === 0 && (
-        <div className="rounded-lg bg-muted py-6 text-center text-sm text-muted-foreground">
-          No holdings
-        </div>
-      )}
+      {sortedHoldings.length === 0 && <EmptyState message="No holdings" />}
     </div>
   );
 }
@@ -547,8 +544,8 @@ function MobileLotDetailsCard({
   onSelectSymbol?: ((symbol: string) => void) | undefined;
 }) {
   return (
-    <Card>
-      <CardContent className="cursor-pointer p-3" onClick={onToggle}>
+    <Card className="transition-all hover:shadow-md">
+      <CardContent className="cursor-pointer p-4" onClick={onToggle}>
         <div className="mb-2 flex items-center justify-between">
           <div>
             <span className="mr-1 text-xs text-muted-foreground">{isExpanded ? "▼" : "▶"}</span>
@@ -731,7 +728,7 @@ function PriceHistorySection({
       ) : prices.length === 0 ? (
         <p className="text-xs text-muted-foreground">No price history available</p>
       ) : (
-        <div className="rounded-xl border bg-card p-3">
+        <div className="rounded-xl border bg-card shadow-sm p-3">
           <LineChart
             data={prices.map((p) => ({
               label: p.date,
@@ -1075,11 +1072,7 @@ function TransactionsTab({
             </div>
           </div>
         ))}
-        {data?.data.length === 0 && (
-          <div className="rounded-lg bg-muted py-6 text-center text-sm text-muted-foreground">
-            No transactions yet.
-          </div>
-        )}
+        {data?.data.length === 0 && <EmptyState message="No transactions yet." />}
       </div>
 
       {showAdd && (
@@ -1267,9 +1260,7 @@ function TransfersTab({ id }: { id: string }) {
         </Button>
       </div>
 
-      {data?.data.length === 0 && (
-        <p className="text-sm text-muted-foreground">No transfers yet.</p>
-      )}
+      {data?.data.length === 0 && <EmptyState message="No transfers yet." />}
 
       <div className="space-y-1">
         {data?.data.map((t) => {
@@ -1460,11 +1451,7 @@ function SnapshotsTab({ id }: { id: string }) {
         </Button>
       </div>
 
-      {data?.data.length === 0 && (
-        <div className="rounded-lg bg-muted py-6 text-center text-sm text-muted-foreground">
-          No snapshots yet.
-        </div>
-      )}
+      {data?.data.length === 0 && <EmptyState message="No snapshots yet." />}
 
       <div className="space-y-1">
         {data?.data.map((s) => {
@@ -1649,11 +1636,7 @@ function ReturnCurveTab({ id }: { id: string }) {
   }
 
   if (points.length === 0)
-    return (
-      <p className="text-sm text-muted-foreground">
-        No data for return curve. Add snapshots to see the chart.
-      </p>
-    );
+    return <EmptyState message="No data for return curve. Add snapshots to see the chart." />;
 
   return (
     <div>
@@ -1944,11 +1927,7 @@ function TagsTab({ id }: { id: string }) {
         </div>
       )}
 
-      {tags.length === 0 && !tagAggregates.length && (
-        <div className="rounded-lg bg-muted py-6 text-center text-sm text-muted-foreground">
-          No tags yet.
-        </div>
-      )}
+      {tags.length === 0 && !tagAggregates.length && <EmptyState message="No tags yet." />}
 
       <div className="space-y-4">
         {tags.map((tag) => (

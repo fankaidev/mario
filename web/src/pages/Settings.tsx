@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, KeyRound, Plus, Trash2 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
+import { EmptyState } from "../components/EmptyState";
 import {
   Dialog,
   DialogContent,
@@ -40,7 +41,7 @@ export function Settings() {
     },
   });
 
-  if (isLoading) return <p className="p-4 text-muted-foreground">Loading...</p>;
+  if (isLoading) return <p className="p-4 text-sm text-muted-foreground">Loading...</p>;
   if (error) return <p className="p-4 text-destructive">Failed to load tokens</p>;
 
   return (
@@ -59,13 +60,7 @@ export function Settings() {
           </Button>
         </div>
 
-        {data?.data.length === 0 && (
-          <Card>
-            <CardContent className="p-6 text-sm text-muted-foreground">
-              No tokens created yet.
-            </CardContent>
-          </Card>
-        )}
+        {data?.data.length === 0 && <EmptyState message="No tokens created yet." />}
 
         <div className="space-y-2">
           {data?.data.map((t) => (
