@@ -75,3 +75,114 @@ Sell 120 AAPL @ $170  →  Consumes:
 | Portfolio → Transaction | 1:N |
 | Buy Transaction → Lot | 1:1 |
 | Lot → Sell Transaction | N:N (via realized_pnl) |
+
+## API Usage
+
+The Mario API can be accessed programmatically for automation, scripting, and integration with other tools.
+
+### Authentication
+
+Mario supports two authentication methods:
+
+1. **Cloudflare Access JWT** (for web UI)
+   - Automatically provided via `CF_Authorization` cookie or `Cf-Access-Jwt-Assertion` header
+   - Used when accessing the app through the browser
+
+2. **API Tokens** (for programmatic access)
+   - Generate tokens in the app UI (Settings → API Tokens)
+   - Use in `Authorization: Bearer <token>` header
+   - Suitable for scripts, CLI tools, and external services
+
+### Common Operations
+
+#### Sync Price History
+
+Fetch historical daily close prices for held stocks:
+
+```bash
+curl -X POST https://your-app.workers.dev/api/prices/sync \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "start_date": "2024-01-01"
+  }'
+```
+
+**Response:**
+```json
+{
+  "data": {
+    "total_records": 150,
+    "results": [
+      { "symbol": "AAPL", "records": 50 },
+      { "symbol": "TSLA", "records": 50 },
+      { "symbol": "0700.HK", "records": 50 }
+    ]
+  }
+}
+```
+
+**Options:**
+- `start_date` (optional): Start date for historical sync (default: `2026-01-01`)
+- `symbol` (optional): Sync specific symbol only (default: all held symbols)
+
+The sync endpoint automatically:
+- Fetches only missing dates (from last known date + 1)
+- Returns 0 records if already up-to-date
+- Uses appropriate data source per symbol (Yahoo Finance for HK/CN/US, Eastmoney for CN mutual funds)
+
+#### List Portfolios
+
+```bash
+curl https://your-app.workers.dev/api/portfolios \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+#### Get Portfolio Summary
+
+```bash
+curl https://your-app.workers.dev/api/portfolios/{id}/summary \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+#### Add Transaction
+
+```bash
+curl -X POST https://your-app.workers.dev/api/portfolios/{id}/transactions \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "symbol": "AAPL",
+    "type": "buy",
+    "quantity": 100,
+    "price": 150.50,
+    "fee": 1.00,
+    "date": "2024-01-15"
+  }'
+```
+
+### Response Format
+
+All API responses follow a consistent envelope:
+
+**Success:**
+```json
+{
+  "data": { ... }
+}
+```
+
+**Error:**
+```json
+{
+  "error": "Error message"
+}
+```
+
+### Base URL
+
+All endpoints are prefixed with `/api`:
+- Health check: `GET /api/health`
+- Portfolios: `GET /api/portfolios`
+- Transactions: `POST /api/portfolios/:id/transactions`
+- Price sync: `POST /api/prices/sync`
