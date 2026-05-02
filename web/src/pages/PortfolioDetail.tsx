@@ -1238,51 +1238,52 @@ function TransfersTab({ id }: { id: string }) {
     },
   });
 
-  if (isLoading) return <p className="text-sm text-gray-500">Loading...</p>;
+  if (isLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
 
   return (
     <div>
-      <div className="flex justify-between mb-4">
+      <div className="mb-4 flex justify-between">
         <h3 className="font-semibold">Transfers</h3>
-        <button
-          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 cursor-pointer"
-          onClick={() => setShowAdd(true)}
-        >
+        <Button size="sm" onClick={() => setShowAdd(true)}>
           Add Transfer
-        </button>
+        </Button>
       </div>
 
-      {data?.data.length === 0 && <p className="text-sm text-gray-500">No transfers yet.</p>}
+      {data?.data.length === 0 && (
+        <p className="text-sm text-muted-foreground">No transfers yet.</p>
+      )}
 
       <div className="space-y-1">
         {data?.data.map((t) => {
           const netEffect = t.type === "deposit" ? t.amount - t.fee : -(t.amount + t.fee);
           return (
-            <div key={t.id} className="flex items-center justify-between py-2 border-b text-sm">
+            <div key={t.id} className="flex items-center justify-between border-b py-2 text-sm">
               <div>
                 <span className="font-medium">{t.date}</span>
-                <span
-                  className={`ml-2 px-1.5 py-0.5 rounded text-xs ${
+                <Badge
+                  variant="secondary"
+                  className={`ml-2 border-transparent ${
                     t.type === "deposit" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
                   }`}
                 >
                   {t.type}
-                </span>
-                {t.note && <span className="ml-2 text-gray-400">{t.note}</span>}
+                </Badge>
+                {t.note && <span className="ml-2 text-muted-foreground">{t.note}</span>}
               </div>
               <div className="flex items-center gap-3">
                 <span>{t.amount.toLocaleString()}</span>
-                {t.fee > 0 && <span className="text-gray-400">fee {t.fee}</span>}
+                {t.fee > 0 && <span className="text-muted-foreground">fee {t.fee}</span>}
                 <span className={netEffect >= 0 ? "text-green-600" : "text-red-600"}>
                   {netEffect >= 0 ? "+" : ""}
                   {netEffect.toLocaleString()}
                 </span>
-                <button
-                  className="text-red-500 text-xs hover:underline cursor-pointer"
+                <Button
+                  variant="link"
+                  className="h-auto p-0 text-xs text-destructive"
                   onClick={() => setDeleteId(t.id)}
                 >
                   Delete
-                </button>
+                </Button>
               </div>
             </div>
           );
@@ -1342,26 +1343,28 @@ function AddTransferModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl">
-        <h3 className="text-lg font-semibold mb-4">Add Transfer</h3>
-        {mutation.error && <p className="mb-3 text-red-500 text-sm">{mutation.error.message}</p>}
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add Transfer</DialogTitle>
+        </DialogHeader>
+        {mutation.error && <p className="text-sm text-destructive">{mutation.error.message}</p>}
         <div className="space-y-3">
           <div>
-            <label className="block text-sm mb-1">Type</label>
-            <select
-              className="w-full border rounded px-3 py-2"
+            <Label htmlFor="transfer-type">Type</Label>
+            <Select
+              id="transfer-type"
               value={type}
               onChange={(e) => setType(e.target.value as "deposit" | "withdrawal")}
             >
               <option value="deposit">Deposit</option>
               <option value="withdrawal">Withdrawal</option>
-            </select>
+            </Select>
           </div>
           <div>
-            <label className="block text-sm mb-1">Amount</label>
-            <input
-              className="w-full border rounded px-3 py-2"
+            <Label htmlFor="transfer-amount">Amount</Label>
+            <Input
+              id="transfer-amount"
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
@@ -1369,9 +1372,9 @@ function AddTransferModal({
             />
           </div>
           <div>
-            <label className="block text-sm mb-1">Fee</label>
-            <input
-              className="w-full border rounded px-3 py-2"
+            <Label htmlFor="transfer-fee">Fee</Label>
+            <Input
+              id="transfer-fee"
               type="number"
               value={fee}
               onChange={(e) => setFee(e.target.value)}
@@ -1379,41 +1382,37 @@ function AddTransferModal({
             />
           </div>
           <div>
-            <label className="block text-sm mb-1">Date</label>
-            <input
-              className="w-full border rounded px-3 py-2"
+            <Label htmlFor="transfer-date">Date</Label>
+            <Input
+              id="transfer-date"
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
             />
           </div>
           <div>
-            <label className="block text-sm mb-1">Note (optional)</label>
-            <input
-              className="w-full border rounded px-3 py-2"
+            <Label htmlFor="transfer-note">Note (optional)</Label>
+            <Input
+              id="transfer-note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Initial funding"
             />
           </div>
         </div>
-        <div className="flex justify-end gap-3 mt-4">
-          <button
-            className="px-4 py-2 text-gray-600 rounded hover:bg-gray-100 cursor-pointer"
-            onClick={onClose}
-          >
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer"
+          </Button>
+          <Button
             disabled={!amount || parseFloat(amount) <= 0 || mutation.isPending}
             onClick={handleSubmit}
           >
             Add
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
