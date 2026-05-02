@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { AuthVariables } from "../middleware/auth";
 import type { Bindings } from "../types";
 import type { Holding, HoldingLots, LotDetail, Portfolio } from "../../shared/types/api";
+import { getLatestPrice } from "./prices";
 
 const portfolios = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
@@ -93,13 +94,10 @@ portfolios.get("/:id/holdings", async (c) => {
 
   const holdings: Holding[] = [];
   for (const lot of lots.results) {
-    const priceRow = await c.env.DB.prepare("SELECT price FROM prices WHERE symbol = ?")
-      .bind(lot.symbol)
-      .first<{ price: number | null }>();
+    const price = await getLatestPrice(c.env.DB, lot.symbol);
     const nameRow = await c.env.DB.prepare("SELECT name FROM stocks WHERE symbol = ?")
       .bind(lot.symbol)
       .first<{ name: string }>();
-    const price = priceRow?.price ?? null;
     const marketValue = price !== null ? lot.quantity * price : null;
     const unrealizedPnl = marketValue !== null ? marketValue - lot.cost : null;
     const unrealizedPnlRate = unrealizedPnl !== null ? (unrealizedPnl / lot.cost) * 100 : null;
@@ -143,10 +141,7 @@ portfolios.get("/:id/holdings/:symbol/lots", async (c) => {
     .bind(symbol)
     .first<{ name: string }>();
 
-  const priceRow = await c.env.DB.prepare("SELECT price FROM prices WHERE symbol = ?")
-    .bind(symbol)
-    .first<{ price: number | null }>();
-  const currentPrice = priceRow?.price ?? null;
+  const currentPrice = await getLatestPrice(c.env.DB, symbol);
 
   const lots = await c.env.DB.prepare(
     "SELECT l.id, l.quantity, l.remaining_quantity, l.cost_basis, l.closed, l.created_at, t.date, t.price AS buy_price FROM lots l JOIN transactions t ON l.transaction_id = t.id WHERE l.portfolio_id = ? AND l.symbol = ? ORDER BY l.created_at ASC",
@@ -258,11 +253,9 @@ portfolios.get("/:id/summary", async (c) => {
   let totalMarketValue = 0;
   let totalCost = 0;
   for (const row of lots.results) {
-    const priceRow = await c.env.DB.prepare("SELECT price FROM prices WHERE symbol = ?")
-      .bind(row.symbol)
-      .first<{ price: number | null }>();
-    if (priceRow?.price != null) {
-      totalMarketValue += row.qty * priceRow.price;
+    const price = await getLatestPrice(c.env.DB, row.symbol);
+    if (price !== null) {
+      totalMarketValue += row.qty * price;
     }
     totalCost += row.cost;
   }

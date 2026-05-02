@@ -4,7 +4,7 @@ import type { Bindings } from "./types";
 import portfolios from "./routes/portfolios";
 import transactions from "./routes/transactions";
 import transfers from "./routes/transfers";
-import prices, { updatePrices } from "./routes/prices";
+import prices, { getLatestPrice, syncPriceHistory } from "./routes/prices";
 import tokens from "./routes/tokens";
 import tags from "./routes/tags";
 import corporateActions from "./routes/corporate-actions";
@@ -65,8 +65,17 @@ export default {
     };
 
     const fetcher = new FetcherRouter(finnhub);
-    const updated = await updatePrices(env.DB, fetcher);
-    console.log(`Scheduled price update: ${updated} stocks updated`);
+
+    // Sync price history for all held symbols
+    const symbols = await env.DB.prepare("SELECT DISTINCT symbol FROM lots WHERE closed = 0").all<{
+      symbol: string;
+    }>();
+
+    let totalRecords = 0;
+    for (const { symbol } of symbols.results) {
+      totalRecords += await syncPriceHistory(env.DB, fetcher, symbol);
+    }
+    console.log(`Scheduled price sync: ${totalRecords} records updated`);
 
     const portfolios = await env.DB.prepare(
       "SELECT id, cash_balance FROM portfolios WHERE archived = 0",
@@ -98,11 +107,9 @@ export default {
 
       let marketValue = 0;
       for (const lot of lots.results) {
-        const priceRow = await env.DB.prepare("SELECT price FROM prices WHERE symbol = ?")
-          .bind(lot.symbol)
-          .first<{ price: number }>();
-        if (priceRow?.price) {
-          marketValue += lot.remaining_quantity * priceRow.price;
+        const price = await getLatestPrice(env.DB, lot.symbol);
+        if (price !== null) {
+          marketValue += lot.remaining_quantity * price;
         }
       }
 

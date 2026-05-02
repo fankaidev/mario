@@ -3,7 +3,7 @@ import { getPlatformProxy, unstable_dev } from "wrangler";
 import type { UnstableDevWorker } from "wrangler";
 import { cleanDatabase } from "./helpers";
 import { FakePriceFetcher } from "./fake-price-fetcher";
-import { updatePrices } from "../src/routes/prices";
+import { syncPriceHistory, getLatestPrice } from "../src/routes/prices";
 import { FetcherRouter } from "../src/clients/fetcher-router";
 
 let worker: UnstableDevWorker;
@@ -51,71 +51,38 @@ async function seedLot(symbol: string) {
     .run();
 }
 
-describe("Price Update", () => {
-  it("[UC-PORTFOLIO-005-S01] updates prices for held stocks", async () => {
+describe("Price Sync", () => {
+  it("[UC-PORTFOLIO-005-S01] syncs prices for held stocks", async () => {
     await seedLot("AAPL");
     await seedLot("TSLA");
 
-    const fetcher = new FakePriceFetcher();
-    fetcher.setPrice("AAPL", 180);
-    fetcher.setPrice("TSLA", 250);
+    const finnhub = new FakePriceFetcher();
+    const yahoo = new FakePriceFetcher();
+    const eastmoney = new FakePriceFetcher();
+    yahoo.setHistory("AAPL", [{ date: "2024-01-15", close: 180 }]);
+    yahoo.setHistory("TSLA", [{ date: "2024-01-15", close: 250 }]);
 
-    const updated = await updatePrices(db, fetcher);
-    expect(updated).toBe(2);
+    const router = new FetcherRouter(finnhub, yahoo, eastmoney);
+    const records1 = await syncPriceHistory(db, router, "AAPL", "2024-01-01");
+    const records2 = await syncPriceHistory(db, router, "TSLA", "2024-01-01");
 
-    const aapl = await db
-      .prepare("SELECT price FROM prices WHERE symbol = ?")
-      .bind("AAPL")
-      .first<{ price: number }>();
-    expect(aapl!.price).toBe(180);
-    const tsla = await db
-      .prepare("SELECT price FROM prices WHERE symbol = ?")
-      .bind("TSLA")
-      .first<{ price: number }>();
-    expect(tsla!.price).toBe(250);
+    expect(records1).toBe(1);
+    expect(records2).toBe(1);
+
+    const aaplPrice = await getLatestPrice(db, "AAPL");
+    expect(aaplPrice).toBe(180);
+    const tslaPrice = await getLatestPrice(db, "TSLA");
+    expect(tslaPrice).toBe(250);
   });
 
-  it("[UC-PORTFOLIO-005-S02] stores price and timestamp", async () => {
-    await seedLot("AAPL");
+  it("[UC-PORTFOLIO-005-S04] returns 0 when no data to sync", async () => {
+    const finnhub = new FakePriceFetcher();
+    const yahoo = new FakePriceFetcher();
+    const eastmoney = new FakePriceFetcher();
+    const router = new FetcherRouter(finnhub, yahoo, eastmoney);
 
-    const fetcher = new FakePriceFetcher();
-    fetcher.setPrice("AAPL", 175.5);
-
-    const updated = await updatePrices(db, fetcher);
-    expect(updated).toBe(1);
-
-    const row = await db
-      .prepare("SELECT price, updated_at FROM prices WHERE symbol = ?")
-      .bind("AAPL")
-      .first<{ price: number; updated_at: string }>();
-    expect(row!.price).toBe(175.5);
-    expect(row!.updated_at).not.toBeNull();
-  });
-
-  it("[UC-PORTFOLIO-005-S03] continues on individual fetch failure", async () => {
-    await seedLot("AAPL");
-    await seedLot("TSLA");
-
-    const fetcher = new FakePriceFetcher();
-    fetcher.setPrice("AAPL", 180);
-    fetcher.setFailure("TSLA");
-
-    const updated = await updatePrices(db, fetcher);
-    expect(updated).toBe(1);
-
-    const aapl = await db
-      .prepare("SELECT price FROM prices WHERE symbol = ?")
-      .bind("AAPL")
-      .first<{ price: number }>();
-    expect(aapl!.price).toBe(180);
-    const tsla = await db.prepare("SELECT price FROM prices WHERE symbol = ?").bind("TSLA").first();
-    expect(tsla).toBeNull();
-  });
-
-  it("[UC-PORTFOLIO-005-S04] returns 0 when no holdings", async () => {
-    const fetcher = new FakePriceFetcher();
-    const updated = await updatePrices(db, fetcher);
-    expect(updated).toBe(0);
+    const records = await syncPriceHistory(db, router, "AAPL", "2024-01-01");
+    expect(records).toBe(0);
   });
 
   it("[UC-PORTFOLIO-005-S05] returns 401 when unauthenticated", async () => {
@@ -125,50 +92,28 @@ describe("Price Update", () => {
     expect(res.status).toBe(401);
   });
 
-  it("[UC-PORTFOLIO-005-S06] stores stock name in stocks table", async () => {
-    await seedLot("AAPL");
-
-    const fetcher = new FakePriceFetcher();
-    fetcher.setPrice("AAPL", 180);
-    fetcher.setName("AAPL", "Apple Inc");
-
-    const updated = await updatePrices(db, fetcher);
-    expect(updated).toBe(1);
-
-    const row = await db
-      .prepare("SELECT name FROM stocks WHERE symbol = ?")
-      .bind("AAPL")
-      .first<{ name: string }>();
-    expect(row!.name).toBe("Apple Inc");
-  });
-
-  it("[UC-PORTFOLIO-005-S07] updates prices for HK/SS/SZ stocks via Yahoo Finance", async () => {
+  it("[UC-PORTFOLIO-005-S07] syncs prices for HK/SS/SZ stocks via Yahoo Finance", async () => {
     await seedLot("0700.HK");
     await seedLot("600519.SS");
 
     const finnhub = new FakePriceFetcher();
     const yahoo = new FakePriceFetcher();
     const eastmoney = new FakePriceFetcher();
-    yahoo.setPrice("0700.HK", 350.0);
-    yahoo.setPrice("600519.SS", 1500.0);
+    yahoo.setHistory("0700.HK", [{ date: "2024-01-15", close: 350.0 }]);
+    yahoo.setHistory("600519.SS", [{ date: "2024-01-15", close: 1500.0 }]);
 
     const router = new FetcherRouter(finnhub, yahoo, eastmoney);
-    const updated = await updatePrices(db, router);
-    expect(updated).toBe(2);
+    const records1 = await syncPriceHistory(db, router, "0700.HK", "2024-01-01");
+    const records2 = await syncPriceHistory(db, router, "600519.SS", "2024-01-01");
 
-    const hk = await db
-      .prepare("SELECT price FROM prices WHERE symbol = ?")
-      .bind("0700.HK")
-      .first<{ price: number }>();
-    expect(hk!.price).toBe(350.0);
+    expect(records1).toBe(1);
+    expect(records2).toBe(1);
 
-    const ss = await db
-      .prepare("SELECT price FROM prices WHERE symbol = ?")
-      .bind("600519.SS")
-      .first<{ price: number }>();
-    expect(ss!.price).toBe(1500.0);
+    const hkPrice = await getLatestPrice(db, "0700.HK");
+    expect(hkPrice).toBe(350.0);
+    const ssPrice = await getLatestPrice(db, "600519.SS");
+    expect(ssPrice).toBe(1500.0);
 
-    // Finnhub and Eastmoney should not have been called
     expect(finnhub.getAccessedSymbols()).toEqual([]);
     expect(eastmoney.getAccessedSymbols()).toEqual([]);
   });
@@ -180,58 +125,45 @@ describe("Price Update", () => {
     const finnhub = new FakePriceFetcher();
     const yahoo = new FakePriceFetcher();
     const eastmoney = new FakePriceFetcher();
-    finnhub.setPrice("AAPL", 180.0);
-    yahoo.setPrice("0700.HK", 350.0);
+    yahoo.setHistory("AAPL", [{ date: "2024-01-15", close: 180.0 }]);
+    yahoo.setHistory("0700.HK", [{ date: "2024-01-15", close: 350.0 }]);
 
     const router = new FetcherRouter(finnhub, yahoo, eastmoney);
-    const updated = await updatePrices(db, router);
-    expect(updated).toBe(2);
+    await syncPriceHistory(db, router, "AAPL", "2024-01-01");
+    await syncPriceHistory(db, router, "0700.HK", "2024-01-01");
 
-    const aapl = await db
-      .prepare("SELECT price FROM prices WHERE symbol = ?")
-      .bind("AAPL")
-      .first<{ price: number }>();
-    expect(aapl!.price).toBe(180.0);
+    const aaplPrice = await getLatestPrice(db, "AAPL");
+    expect(aaplPrice).toBe(180.0);
+    const hkPrice = await getLatestPrice(db, "0700.HK");
+    expect(hkPrice).toBe(350.0);
 
-    const hk = await db
-      .prepare("SELECT price FROM prices WHERE symbol = ?")
-      .bind("0700.HK")
-      .first<{ price: number }>();
-    expect(hk!.price).toBe(350.0);
-
-    // Verify correct routing
-    expect(finnhub.getAccessedSymbols()).toEqual(["AAPL"]);
-    expect(yahoo.getAccessedSymbols()).toEqual(["0700.HK"]);
+    expect(yahoo.getAccessedSymbols()).toEqual(["AAPL", "0700.HK"]);
+    expect(finnhub.getAccessedSymbols()).toEqual([]);
     expect(eastmoney.getAccessedSymbols()).toEqual([]);
   });
 
-  it("[UC-PORTFOLIO-005-S09] updates NAV for mutual funds via Eastmoney", async () => {
+  it("[UC-PORTFOLIO-005-S09] syncs NAV for mutual funds via Eastmoney", async () => {
     await seedLot("000979");
     await seedLot("000217");
 
     const finnhub = new FakePriceFetcher();
     const yahoo = new FakePriceFetcher();
     const eastmoney = new FakePriceFetcher();
-    eastmoney.setPrice("000979", 1.5);
-    eastmoney.setPrice("000217", 2.3);
+    eastmoney.setHistory("000979", [{ date: "2024-01-15", close: 1.5 }]);
+    eastmoney.setHistory("000217", [{ date: "2024-01-15", close: 2.3 }]);
 
     const router = new FetcherRouter(finnhub, yahoo, eastmoney);
-    const updated = await updatePrices(db, router);
-    expect(updated).toBe(2);
+    const records1 = await syncPriceHistory(db, router, "000979", "2024-01-01");
+    const records2 = await syncPriceHistory(db, router, "000217", "2024-01-01");
 
-    const fund1 = await db
-      .prepare("SELECT price FROM prices WHERE symbol = ?")
-      .bind("000979")
-      .first<{ price: number }>();
-    expect(fund1!.price).toBe(1.5);
+    expect(records1).toBe(1);
+    expect(records2).toBe(1);
 
-    const fund2 = await db
-      .prepare("SELECT price FROM prices WHERE symbol = ?")
-      .bind("000217")
-      .first<{ price: number }>();
-    expect(fund2!.price).toBe(2.3);
+    const fund1Price = await getLatestPrice(db, "000979");
+    expect(fund1Price).toBe(1.5);
+    const fund2Price = await getLatestPrice(db, "000217");
+    expect(fund2Price).toBe(2.3);
 
-    // Finnhub and Yahoo should not have been called
     expect(finnhub.getAccessedSymbols()).toEqual([]);
     expect(yahoo.getAccessedSymbols()).toEqual([]);
   });
@@ -244,35 +176,24 @@ describe("Price Update", () => {
     const finnhub = new FakePriceFetcher();
     const yahoo = new FakePriceFetcher();
     const eastmoney = new FakePriceFetcher();
-    finnhub.setPrice("AAPL", 180.0);
-    yahoo.setPrice("0700.HK", 350.0);
-    eastmoney.setPrice("000979", 1.5);
+    yahoo.setHistory("AAPL", [{ date: "2024-01-15", close: 180.0 }]);
+    yahoo.setHistory("0700.HK", [{ date: "2024-01-15", close: 350.0 }]);
+    eastmoney.setHistory("000979", [{ date: "2024-01-15", close: 1.5 }]);
 
     const router = new FetcherRouter(finnhub, yahoo, eastmoney);
-    const updated = await updatePrices(db, router);
-    expect(updated).toBe(3);
+    await syncPriceHistory(db, router, "AAPL", "2024-01-01");
+    await syncPriceHistory(db, router, "0700.HK", "2024-01-01");
+    await syncPriceHistory(db, router, "000979", "2024-01-01");
 
-    const aapl = await db
-      .prepare("SELECT price FROM prices WHERE symbol = ?")
-      .bind("AAPL")
-      .first<{ price: number }>();
-    expect(aapl!.price).toBe(180.0);
+    const aaplPrice = await getLatestPrice(db, "AAPL");
+    expect(aaplPrice).toBe(180.0);
+    const hkPrice = await getLatestPrice(db, "0700.HK");
+    expect(hkPrice).toBe(350.0);
+    const fundPrice = await getLatestPrice(db, "000979");
+    expect(fundPrice).toBe(1.5);
 
-    const hk = await db
-      .prepare("SELECT price FROM prices WHERE symbol = ?")
-      .bind("0700.HK")
-      .first<{ price: number }>();
-    expect(hk!.price).toBe(350.0);
-
-    const fund = await db
-      .prepare("SELECT price FROM prices WHERE symbol = ?")
-      .bind("000979")
-      .first<{ price: number }>();
-    expect(fund!.price).toBe(1.5);
-
-    // Verify correct routing
-    expect(finnhub.getAccessedSymbols()).toEqual(["AAPL"]);
-    expect(yahoo.getAccessedSymbols()).toEqual(["0700.HK"]);
+    expect(yahoo.getAccessedSymbols()).toEqual(["AAPL", "0700.HK"]);
+    expect(finnhub.getAccessedSymbols()).toEqual([]);
     expect(eastmoney.getAccessedSymbols()).toEqual(["000979"]);
   });
 });

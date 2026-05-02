@@ -14,7 +14,6 @@ export class FetcherRouter implements PriceFetcher {
   }
 
   private isEastmoneySymbol(symbol: string): boolean {
-    // 6-digit codes without suffix (China mutual funds)
     return /^\d{6}$/.test(symbol);
   }
 
@@ -36,5 +35,17 @@ export class FetcherRouter implements PriceFetcher {
       return this.yahoo.fetchName(symbol);
     }
     return this.finnhub.fetchName(symbol);
+  }
+
+  async fetchHistory(
+    symbol: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<Array<{ date: string; close: number }>> {
+    if (this.isEastmoneySymbol(symbol)) {
+      return this.eastmoney.fetchHistory?.(symbol, startDate, endDate) ?? [];
+    }
+    // Yahoo Finance for US stocks and HK/SS/SZ
+    return this.yahoo.fetchHistory?.(symbol, startDate, endDate) ?? [];
   }
 }

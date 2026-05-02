@@ -66,8 +66,8 @@ describe("View Holdings", () => {
     await seedLot("AAPL", 100, 15000, 20);
     await seedLot("AAPL", 50, 8000, 50);
     await db
-      .prepare("INSERT INTO prices (symbol, price, updated_at) VALUES (?, ?, ?)")
-      .bind("AAPL", 180, "2024-03-01")
+      .prepare("INSERT INTO price_history (symbol, date, close) VALUES (?, ?, ?)")
+      .bind("AAPL", "2024-03-01", 180)
       .run();
 
     const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/holdings`, {

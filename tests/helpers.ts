@@ -24,7 +24,7 @@ export async function cleanDatabase(db: D1Database) {
   await db.exec("DELETE FROM transactions");
   await db.exec("DELETE FROM transfers");
   await db.exec("DELETE FROM portfolio_snapshots");
-  await db.exec("DELETE FROM prices");
+  await db.exec("DELETE FROM price_history");
   await db.exec("DELETE FROM corporate_actions");
   await db.exec("DELETE FROM stocks");
   await db.exec("DELETE FROM tags");
