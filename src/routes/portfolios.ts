@@ -245,11 +245,9 @@ portfolios.get("/:id/summary", async (c) => {
   const portfolioId = parseInt(c.req.param("id") ?? "", 10);
   if (isNaN(portfolioId)) return c.json({ error: "Invalid portfolio ID" }, 400);
 
-  const portfolio = await c.env.DB.prepare(
-    "SELECT id, cash_balance FROM portfolios WHERE id = ? AND user_id = ?",
-  )
+  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
     .bind(portfolioId, user.id)
-    .first<{ id: number; cash_balance: number }>();
+    .first<{ id: number }>();
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
 
   const investmentRow = await c.env.DB.prepare(
