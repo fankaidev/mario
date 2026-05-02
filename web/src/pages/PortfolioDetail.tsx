@@ -681,7 +681,7 @@ function PriceHistorySection({
   symbol: string;
   isVisible: boolean;
 }) {
-  const [range, setRange] = useState<"1M" | "3M" | "1Y" | "3Y" | "YTD" | "ALL">("1Y");
+  const [range, setRange] = useState<"1M" | "3M" | "6M" | "YTD" | "1Y" | "3Y" | "ALL">("1Y");
   const [yFromZero, setYFromZero] = useState(false);
 
   const { startDate } = useMemo(() => {
@@ -694,14 +694,17 @@ function PriceHistorySection({
       case "3M":
         start = new Date(today.getFullYear(), today.getMonth() - 3, today.getDate());
         break;
+      case "6M":
+        start = new Date(today.getFullYear(), today.getMonth() - 6, today.getDate());
+        break;
+      case "YTD":
+        start = new Date(today.getFullYear(), 0, 1);
+        break;
       case "1Y":
         start = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
         break;
       case "3Y":
         start = new Date(today.getFullYear() - 3, today.getMonth(), today.getDate());
-        break;
-      case "YTD":
-        start = new Date(today.getFullYear(), 0, 1);
         break;
       case "ALL":
         return { startDate: undefined };
@@ -764,7 +767,7 @@ function PriceHistorySection({
     <div className="mt-3">
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-1">
-          {(["1M", "3M", "1Y", "3Y", "YTD", "ALL"] as const).map((r) => (
+          {(["1M", "3M", "6M", "YTD", "1Y", "3Y", "ALL"] as const).map((r) => (
             <Button
               key={r}
               size="sm"
