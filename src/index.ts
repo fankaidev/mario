@@ -10,6 +10,7 @@ import tags from "./routes/tags";
 import corporateActions from "./routes/corporate-actions";
 import snapshots from "./routes/snapshots";
 import type { PriceFetcher } from "./clients/price-fetcher";
+import { FetcherRouter } from "./clients/fetcher-router";
 
 const app = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
@@ -40,7 +41,7 @@ export default {
       return;
     }
 
-    const fetcher: PriceFetcher = {
+    const finnhub: PriceFetcher = {
       async fetchPrice(symbol: string) {
         const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}`, {
           headers: { "X-Finnhub-Token": apiKey },
@@ -63,6 +64,7 @@ export default {
       },
     };
 
+    const fetcher = new FetcherRouter(finnhub);
     const updated = await updatePrices(env.DB, fetcher);
     console.log(`Scheduled price update: ${updated} stocks updated`);
 
