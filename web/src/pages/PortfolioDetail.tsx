@@ -129,15 +129,7 @@ export function PortfolioDetail() {
             ))}
           </TabsList>
 
-          {tab === "holdings" && (
-            <HoldingsTab
-              id={id!}
-              onSelectSymbol={(s) => {
-                setSymbolFilter(s);
-                setTab("transactions");
-              }}
-            />
-          )}
+          {tab === "holdings" && <HoldingsTab id={id!} />}
           {tab === "transactions" && (
             <TransactionsTab
               id={id!}
@@ -216,13 +208,7 @@ interface SortState {
   direction: SortDirection;
 }
 
-function HoldingsTab({
-  id,
-  onSelectSymbol,
-}: {
-  id: string;
-  onSelectSymbol: (symbol: string) => void;
-}) {
+function HoldingsTab({ id }: { id: string }) {
   const [sort, setSort] = useState<SortState>({ field: "unrealizedPnlRate", direction: "desc" });
   const [tagFilter, setTagFilter] = useState<number | null>(null);
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(new Set());
@@ -364,7 +350,6 @@ function HoldingsTab({
                     return next;
                   })
                 }
-                onSelectSymbol={onSelectSymbol}
                 symbolTags={symbolTags}
                 totalMarketValue={totalMarketValue}
               />
@@ -391,7 +376,6 @@ function HoldingsTab({
                 return next;
               })
             }
-            onSelectSymbol={onSelectSymbol}
             symbolTags={symbolTags}
             totalMarketValue={totalMarketValue}
           />
@@ -439,7 +423,6 @@ function LotDetailsRow({
   holding,
   isExpanded,
   onToggle,
-  onSelectSymbol,
   symbolTags,
   totalMarketValue,
 }: {
@@ -447,31 +430,16 @@ function LotDetailsRow({
   holding: Holding;
   isExpanded: boolean;
   onToggle: () => void;
-  onSelectSymbol: (symbol: string) => void;
   symbolTags: Map<string, Array<{ id: number; name: string }>>;
   totalMarketValue: number;
 }) {
-  const { data: lotsData } = useQuery({
-    queryKey: ["holding-lots", id, holding.symbol],
-    queryFn: () => get<{ data: HoldingLots }>(`/portfolios/${id}/holdings/${holding.symbol}/lots`),
-    enabled: isExpanded,
-  });
   return (
     <>
       <TableRow className="cursor-pointer" onClick={onToggle}>
         <TableCell>
           <div className="flex items-center gap-1">
             <span className="text-xs text-muted-foreground">{isExpanded ? "▼" : "▶"}</span>
-            <Button
-              variant="link"
-              className="h-auto p-0 font-medium"
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelectSymbol(holding.symbol);
-              }}
-            >
-              {holding.symbol}
-            </Button>
+            <span className="font-medium">{holding.symbol}</span>
           </div>
           <div className="text-xs text-muted-foreground">{holding.name}</div>
           {symbolTags.has(holding.symbol) && (
@@ -504,55 +472,10 @@ function LotDetailsRow({
             : "-"}
         </TableCell>
       </TableRow>
-      {isExpanded && lotsData?.data && (
+      {isExpanded && (
         <TableRow>
           <TableCell colSpan={8} className="bg-muted/50 px-4 py-2">
-            <Table className="text-xs">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="h-8">Date</TableHead>
-                  <TableHead className="h-8">Buy Price</TableHead>
-                  <TableHead className="h-8">Qty</TableHead>
-                  <TableHead className="h-8">Rem</TableHead>
-                  <TableHead className="h-8">Cost</TableHead>
-                  <TableHead className="h-8">Value</TableHead>
-                  <TableHead className="h-8">P&L</TableHead>
-                  <TableHead className="h-8">P&L%</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lotsData.data.lots.map((lot) => (
-                  <TableRow
-                    key={lot.id}
-                    className={lot.status === "closed" ? "text-muted-foreground" : ""}
-                  >
-                    <TableCell>{lot.date}</TableCell>
-                    <TableCell>{lot.buy_price}</TableCell>
-                    <TableCell>{lot.quantity}</TableCell>
-                    <TableCell>{lot.remaining_quantity}</TableCell>
-                    <TableCell>{lot.cost_basis.toLocaleString()}</TableCell>
-                    <TableCell>{lot.current_value?.toLocaleString() ?? "-"}</TableCell>
-                    <TableCell
-                      className={(lot.unrealized_pnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"}
-                    >
-                      {lot.unrealized_pnl != null
-                        ? `${lot.unrealized_pnl >= 0 ? "+" : ""}${lot.unrealized_pnl.toLocaleString()}`
-                        : "-"}
-                    </TableCell>
-                    <TableCell
-                      className={
-                        (lot.unrealized_pnl_rate ?? 0) >= 0 ? "text-green-600" : "text-red-600"
-                      }
-                    >
-                      {lot.unrealized_pnl_rate != null
-                        ? `${lot.unrealized_pnl_rate >= 0 ? "+" : ""}${lot.unrealized_pnl_rate}%`
-                        : "-"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <PriceHistorySection id={id} symbol={holding.symbol} isVisible={isExpanded} />
+            <HoldingDetailPanel id={id} symbol={holding.symbol} />
           </TableCell>
         </TableRow>
       )}
@@ -565,7 +488,6 @@ function MobileLotDetailsCard({
   holding,
   isExpanded,
   onToggle,
-  onSelectSymbol,
   symbolTags,
   totalMarketValue,
 }: {
@@ -573,31 +495,16 @@ function MobileLotDetailsCard({
   holding: Holding;
   isExpanded: boolean;
   onToggle: () => void;
-  onSelectSymbol: (symbol: string) => void;
   symbolTags: Map<string, Array<{ id: number; name: string }>>;
   totalMarketValue: number;
 }) {
-  const { data: lotsData } = useQuery({
-    queryKey: ["holding-lots", id, holding.symbol],
-    queryFn: () => get<{ data: HoldingLots }>(`/portfolios/${id}/holdings/${holding.symbol}/lots`),
-    enabled: isExpanded,
-  });
   return (
     <Card>
       <CardContent className="cursor-pointer p-3" onClick={onToggle}>
         <div className="mb-2 flex items-center justify-between">
           <div>
             <span className="mr-1 text-xs text-muted-foreground">{isExpanded ? "▼" : "▶"}</span>
-            <Button
-              variant="link"
-              className="h-auto p-0 font-semibold"
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelectSymbol(holding.symbol);
-              }}
-            >
-              {holding.symbol}
-            </Button>
+            <span className="font-semibold">{holding.symbol}</span>
             <div className="text-xs text-muted-foreground">{holding.name}</div>
             {symbolTags.has(holding.symbol) && (
               <div className="mt-0.5 flex flex-wrap gap-0.5">
@@ -637,36 +544,9 @@ function MobileLotDetailsCard({
           </span>
         </div>
       </CardContent>
-      {isExpanded && lotsData?.data && (
-        <div className="space-y-1 border-t bg-muted/50 px-3 py-2">
-          {lotsData.data.lots.map((lot) => (
-            <div
-              key={lot.id}
-              className={`text-xs ${lot.status === "closed" ? "text-muted-foreground" : ""}`}
-            >
-              <div className="flex justify-between">
-                <span>
-                  {lot.date} | {lot.buy_price} × {lot.quantity} (rem {lot.remaining_quantity})
-                </span>
-                <span>{lot.status === "open" ? "Open" : "Closed"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Cost: {lot.cost_basis.toLocaleString()}</span>
-                <span
-                  className={
-                    lot.unrealized_pnl != null && lot.unrealized_pnl >= 0
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }
-                >
-                  {lot.unrealized_pnl != null
-                    ? `${lot.unrealized_pnl >= 0 ? "+" : ""}${lot.unrealized_pnl.toLocaleString()} (${lot.unrealized_pnl_rate ?? "-"}%)`
-                    : "-"}
-                </span>
-              </div>
-            </div>
-          ))}
-          <PriceHistorySection id={id} symbol={holding.symbol} isVisible={isExpanded} />
+      {isExpanded && (
+        <div className="border-t bg-muted/50 px-3 py-2">
+          <HoldingDetailPanel id={id} symbol={holding.symbol} />
         </div>
       )}
     </Card>
@@ -806,6 +686,108 @@ function PriceHistorySection({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function HoldingDetailPanel({ id, symbol }: { id: string; symbol: string }) {
+  const [activeTab, setActiveTab] = useState<"chart" | "transactions" | "lots">("chart");
+
+  const { data: lotsData } = useQuery({
+    queryKey: ["holding-lots", id, symbol],
+    queryFn: () => get<{ data: HoldingLots }>(`/portfolios/${id}/holdings/${symbol}/lots`),
+  });
+
+  const { data: txData } = useQuery({
+    queryKey: ["transactions", id, symbol],
+    queryFn: () => get<{ data: Transaction[] }>(`/portfolios/${id}/transactions?symbol=${symbol}`),
+  });
+
+  return (
+    <div>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+        <TabsList className="mb-2 h-7">
+          <TabsTrigger value="chart" className="px-2 text-xs">
+            Chart
+          </TabsTrigger>
+          <TabsTrigger value="transactions" className="px-2 text-xs">
+            Transactions
+          </TabsTrigger>
+          <TabsTrigger value="lots" className="px-2 text-xs">
+            Lots
+          </TabsTrigger>
+        </TabsList>
+
+        {activeTab === "chart" && <PriceHistorySection id={id} symbol={symbol} isVisible={true} />}
+
+        {activeTab === "transactions" && (
+          <div className="space-y-1">
+            {txData?.data.map((tx) => (
+              <div key={tx.id} className="flex items-center justify-between border-b py-1 text-xs">
+                <div>
+                  <span className="font-medium">{tx.date}</span>
+                  <TransactionTypeBadge type={tx.type} />
+                  <span className="ml-1 text-muted-foreground">
+                    {tx.quantity} × {tx.price}
+                  </span>
+                </div>
+                {tx.fee > 0 && <span className="text-muted-foreground">fee {tx.fee}</span>}
+              </div>
+            ))}
+            {(!txData?.data || txData.data.length === 0) && (
+              <p className="text-xs text-muted-foreground">No transactions</p>
+            )}
+          </div>
+        )}
+
+        {activeTab === "lots" && lotsData?.data && (
+          <Table className="text-xs">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="h-8">Date</TableHead>
+                <TableHead className="h-8">Buy Price</TableHead>
+                <TableHead className="h-8">Qty</TableHead>
+                <TableHead className="h-8">Rem</TableHead>
+                <TableHead className="h-8">Cost</TableHead>
+                <TableHead className="h-8">Value</TableHead>
+                <TableHead className="h-8">P&L</TableHead>
+                <TableHead className="h-8">P&L%</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {lotsData.data.lots.map((lot) => (
+                <TableRow
+                  key={lot.id}
+                  className={lot.status === "closed" ? "text-muted-foreground" : ""}
+                >
+                  <TableCell>{lot.date}</TableCell>
+                  <TableCell>{lot.buy_price}</TableCell>
+                  <TableCell>{lot.quantity}</TableCell>
+                  <TableCell>{lot.remaining_quantity}</TableCell>
+                  <TableCell>{lot.cost_basis.toLocaleString()}</TableCell>
+                  <TableCell>{lot.current_value?.toLocaleString() ?? "-"}</TableCell>
+                  <TableCell
+                    className={(lot.unrealized_pnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"}
+                  >
+                    {lot.unrealized_pnl != null
+                      ? `${lot.unrealized_pnl >= 0 ? "+" : ""}${lot.unrealized_pnl.toLocaleString()}`
+                      : "-"}
+                  </TableCell>
+                  <TableCell
+                    className={
+                      (lot.unrealized_pnl_rate ?? 0) >= 0 ? "text-green-600" : "text-red-600"
+                    }
+                  >
+                    {lot.unrealized_pnl_rate != null
+                      ? `${lot.unrealized_pnl_rate >= 0 ? "+" : ""}${lot.unrealized_pnl_rate}%`
+                      : "-"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Tabs>
     </div>
   );
 }
