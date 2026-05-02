@@ -62,7 +62,7 @@ export function PortfolioList() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {data?.data.map((p) => (
           <Link key={p.id} to={`/portfolios/${p.id}`} className="block">
-            <Card className="h-full transition-colors hover:bg-accent">
+            <Card className="h-full transition-all hover:bg-accent hover:shadow-md">
               <CardHeader>
                 <CardTitle className="text-lg">{p.name}</CardTitle>
                 <CardDescription>{p.currency}</CardDescription>
