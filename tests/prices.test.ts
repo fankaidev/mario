@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getPlatformProxy, unstable_dev } from "wrangler";
 import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase } from "./helpers";
+import { cleanDatabase, createApiTokenForUser } from "./helpers";
 import { FakePriceFetcher } from "./fake-price-fetcher";
 import { syncPriceHistory, getLatestPrice } from "../src/routes/prices";
 import { FetcherRouter } from "../src/clients/fetcher-router";
@@ -9,6 +9,7 @@ import { FetcherRouter } from "../src/clients/fetcher-router";
 let worker: UnstableDevWorker;
 let db: D1Database;
 let portfolioId: number;
+let authToken: string;
 
 beforeAll(async () => {
   const { env } = await getPlatformProxy<{ DB: D1Database }>();
@@ -29,12 +30,17 @@ beforeEach(async () => {
     .prepare("INSERT INTO users (email) VALUES (?) RETURNING id")
     .bind("test@example.com")
     .first<{ id: number }>();
+  authToken = await createApiTokenForUser(db, userResult!.id);
   const portfolioResult = await db
     .prepare("INSERT INTO portfolios (user_id, name, currency) VALUES (?, ?, ?) RETURNING id")
     .bind(userResult!.id, "US Stocks", "USD")
     .first<{ id: number }>();
   portfolioId = portfolioResult!.id;
 });
+
+function authHeaders(): Record<string, string> {
+  return { Authorization: `Bearer ${authToken}` };
+}
 
 async function seedLot(symbol: string) {
   const txResult = await db
@@ -195,5 +201,64 @@ describe("Price Sync", () => {
     expect(yahoo.getAccessedSymbols()).toEqual(["AAPL", "0700.HK"]);
     expect(finnhub.getAccessedSymbols()).toEqual([]);
     expect(eastmoney.getAccessedSymbols()).toEqual(["000979"]);
+  });
+});
+
+describe("Price History", () => {
+  it("[UC-PORTFOLIO-003-S13] returns price history for symbol within date range", async () => {
+    await db
+      .prepare(
+        "INSERT INTO price_history (symbol, date, close) VALUES ('AAPL', '2024-01-15', 150), ('AAPL', '2024-02-15', 160), ('AAPL', '2024-03-15', 170)",
+      )
+      .run();
+
+    const res = await worker.fetch(
+      "http://localhost/api/prices/history/AAPL?start_date=2024-02-01&end_date=2024-02-28",
+      { headers: authHeaders() },
+    );
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as {
+      data: { symbol: string; prices: Array<{ date: string; close: number }> };
+    };
+    expect(json.data.symbol).toBe("AAPL");
+    expect(json.data.prices).toHaveLength(1);
+    expect(json.data.prices[0]).toEqual({ date: "2024-02-15", close: 160 });
+  });
+
+  it("[UC-PORTFOLIO-003-S13b] returns all price history when no date range specified", async () => {
+    await db
+      .prepare(
+        "INSERT INTO price_history (symbol, date, close) VALUES ('TSLA', '2024-01-10', 200), ('TSLA', '2024-02-10', 220)",
+      )
+      .run();
+
+    const res = await worker.fetch("http://localhost/api/prices/history/TSLA", {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as {
+      data: { symbol: string; prices: Array<{ date: string; close: number }> };
+    };
+    expect(json.data.symbol).toBe("TSLA");
+    expect(json.data.prices).toHaveLength(2);
+    expect(json.data.prices[0]).toEqual({ date: "2024-01-10", close: 200 });
+    expect(json.data.prices[1]).toEqual({ date: "2024-02-10", close: 220 });
+  });
+
+  it("[UC-PORTFOLIO-003-S14] returns 401 when unauthenticated", async () => {
+    const res = await worker.fetch("http://localhost/api/prices/history/AAPL");
+    expect(res.status).toBe(401);
+  });
+
+  it("returns empty prices array when no price history exists", async () => {
+    const res = await worker.fetch("http://localhost/api/prices/history/NVDA", {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as {
+      data: { symbol: string; prices: Array<{ date: string; close: number }> };
+    };
+    expect(json.data.symbol).toBe("NVDA");
+    expect(json.data.prices).toHaveLength(0);
   });
 });

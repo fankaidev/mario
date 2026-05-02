@@ -114,4 +114,38 @@ prices.post("/sync", async (c) => {
   return c.json({ data: { total_records: totalRecords, results } });
 });
 
+prices.get("/history/:symbol", async (c) => {
+  const user = c.get("user");
+  if (!user) return c.json({ error: "Unauthorized" }, 401);
+
+  const symbol = c.req.param("symbol")?.toUpperCase();
+  if (!symbol) return c.json({ error: "Symbol is required" }, 400);
+
+  const { start_date, end_date } = c.req.query();
+
+  let sql = "SELECT date, close FROM price_history WHERE symbol = ?";
+  const params: (string | number)[] = [symbol];
+
+  if (start_date) {
+    sql += " AND date >= ?";
+    params.push(start_date);
+  }
+  if (end_date) {
+    sql += " AND date <= ?";
+    params.push(end_date);
+  }
+  sql += " ORDER BY date ASC";
+
+  const rows = await c.env.DB.prepare(sql)
+    .bind(...params)
+    .all<{ date: string; close: number }>();
+
+  return c.json({
+    data: {
+      symbol,
+      prices: rows.results,
+    },
+  });
+});
+
 export default prices;

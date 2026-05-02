@@ -17,6 +17,8 @@
 | R9 | Clicking a sortable column header toggles between ascending and descending order |
 | R10 | Clicking a different column resets to ascending order |
 | R11 | Each holding includes stock name from stocks table, fallback to symbol if not yet populated |
+| R12 | Clicking a holding row expands to show lot details and price history chart |
+| R13 | Price history chart shows daily close prices for the selected date range (1M, 3M, 1Y, 3Y, All) |
 
 ## Scenarios
 
@@ -30,6 +32,9 @@
 | UC-PORTFOLIO-003-S04 | P1 | ✅ | Given user is not logged in, When viewing holdings, Then return 401 unauthorized | |
 | UC-PORTFOLIO-003-S08 | P0 | ✅ | Given portfolio holds AAPL and stocks table has AAPL name "Apple Inc", When viewing holdings, Then AAPL holding returns name "Apple Inc" | R11 |
 | UC-PORTFOLIO-003-S09 | P1 | ✅ | Given portfolio holds AAPL but stocks table has no entry for AAPL, When viewing holdings, Then AAPL holding returns name "AAPL" (symbol fallback) | R11 |
+| UC-PORTFOLIO-003-S12 | P0 | ❌ | Given portfolio holds AAPL with price history from 2024-01-01 to 2024-03-01, When viewing holdings and clicking AAPL row, Then price history chart shows AAPL daily close prices | R12, R13 |
+| UC-PORTFOLIO-003-S13 | P1 | ❌ | Given user requests price history for AAPL with start_date=2024-02-01 and end_date=2024-02-28, When calling GET /api/prices/history/AAPL, Then returns only prices within that date range | R13 |
+| UC-PORTFOLIO-003-S14 | P1 | ❌ | Given user is not logged in, When calling GET /api/prices/history/AAPL, Then return 401 unauthorized | |
 
 ### ai-e2e
 

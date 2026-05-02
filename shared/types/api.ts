@@ -151,6 +151,16 @@ export interface PortfolioSummary {
   price_updated_at: string | null;
 }
 
+export interface PriceHistoryItem {
+  date: string;
+  close: number;
+}
+
+export interface PriceHistoryResponse {
+  symbol: string;
+  prices: PriceHistoryItem[];
+}
+
 export interface CreateTagRequest {
   name: string;
 }

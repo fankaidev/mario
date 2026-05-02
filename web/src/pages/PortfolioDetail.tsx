@@ -26,7 +26,11 @@ import {
 } from "../components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { get, post, del } from "../lib/api";
-import type { HoldingLots, PortfolioSummary } from "../../../shared/types/api";
+import type {
+  HoldingLots,
+  PortfolioSummary,
+  PriceHistoryResponse,
+} from "../../../shared/types/api";
 
 interface Tag {
   id: number;
@@ -537,6 +541,7 @@ function LotDetailsRow({
                 ))}
               </TableBody>
             </Table>
+            <PriceHistorySection symbol={holding.symbol} isVisible={isExpanded} />
           </TableCell>
         </TableRow>
       )}
@@ -645,9 +650,89 @@ function MobileLotDetailsCard({
               </div>
             </div>
           ))}
+          <PriceHistorySection symbol={holding.symbol} isVisible={isExpanded} />
         </div>
       )}
     </Card>
+  );
+}
+
+function PriceHistorySection({ symbol, isVisible }: { symbol: string; isVisible: boolean }) {
+  const [range, setRange] = useState<"1M" | "3M" | "1Y" | "3Y" | "ALL">("1Y");
+
+  const { startDate } = useMemo(() => {
+    const today = new Date();
+    let start: Date;
+    switch (range) {
+      case "1M":
+        start = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+        break;
+      case "3M":
+        start = new Date(today.getFullYear(), today.getMonth() - 3, today.getDate());
+        break;
+      case "1Y":
+        start = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+        break;
+      case "3Y":
+        start = new Date(today.getFullYear() - 3, today.getMonth(), today.getDate());
+        break;
+      case "ALL":
+        start = new Date(2000, 0, 1);
+        break;
+    }
+    return {
+      startDate: range === "ALL" ? undefined : start.toISOString().split("T")[0],
+    };
+  }, [range]);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["price-history", symbol, startDate],
+    queryFn: () =>
+      get<{ data: PriceHistoryResponse }>(
+        `/prices/history/${symbol}${startDate ? `?start_date=${startDate}` : ""}`,
+      ),
+    enabled: isVisible,
+  });
+
+  const prices = data?.data?.prices ?? [];
+
+  if (!isVisible) return null;
+
+  return (
+    <div className="mt-3">
+      <div className="mb-2 flex gap-1">
+        {(["1M", "3M", "1Y", "3Y", "ALL"] as const).map((r) => (
+          <Button
+            key={r}
+            size="sm"
+            variant={range === r ? "default" : "outline"}
+            className="h-6 px-2 text-xs"
+            onClick={() => setRange(r)}
+          >
+            {r}
+          </Button>
+        ))}
+      </div>
+      {isLoading ? (
+        <p className="text-xs text-muted-foreground">Loading chart...</p>
+      ) : prices.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No price history available</p>
+      ) : (
+        <div>
+          <LineChart
+            data={prices.map((p) => ({
+              label: p.date,
+              values: [{ key: "close", value: p.close, color: "#2563eb" }],
+            }))}
+            height={180}
+            formatValue={(v) => v.toFixed(2)}
+          />
+          <div className="mt-1 text-xs text-muted-foreground">
+            <span className="inline-block h-0.5 w-3 bg-blue-600" /> Close Price
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
