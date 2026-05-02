@@ -36,7 +36,7 @@ corporateActions.post("/", async (c) => {
     .run();
 
   await c.env.DB.prepare(
-    "UPDATE lots SET quantity = quantity * ?, remaining_quantity = remaining_quantity * ? WHERE portfolio_id = ? AND symbol = ? AND closed = 0",
+    "UPDATE lots SET quantity = quantity * ?, remaining_quantity = remaining_quantity * ? WHERE portfolio_id = ? AND symbol = ? AND remaining_quantity > 0",
   )
     .bind(body.ratio, body.ratio, portfolioId, body.symbol.trim())
     .run();

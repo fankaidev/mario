@@ -87,7 +87,7 @@ portfolios.get("/:id/holdings", async (c) => {
   }
 
   const lots = await c.env.DB.prepare(
-    "SELECT symbol, SUM(remaining_quantity) AS quantity, SUM(remaining_quantity * cost_basis / quantity) AS cost FROM lots WHERE portfolio_id = ? AND closed = 0 GROUP BY symbol",
+    "SELECT symbol, SUM(remaining_quantity) AS quantity, SUM(remaining_quantity * cost_basis / quantity) AS cost FROM lots WHERE portfolio_id = ? AND remaining_quantity > 0 GROUP BY symbol",
   )
     .bind(portfolioId)
     .all<{ symbol: string; quantity: number; cost: number }>();
@@ -144,7 +144,7 @@ portfolios.get("/:id/holdings/:symbol/lots", async (c) => {
   const currentPrice = await getLatestPrice(c.env.DB, symbol);
 
   const lots = await c.env.DB.prepare(
-    "SELECT l.id, l.quantity, l.remaining_quantity, l.cost_basis, l.closed, l.created_at, t.date, t.price AS buy_price FROM lots l JOIN transactions t ON l.transaction_id = t.id WHERE l.portfolio_id = ? AND l.symbol = ? ORDER BY l.created_at ASC",
+    "SELECT l.id, l.quantity, l.remaining_quantity, l.cost_basis, l.created_at, t.date, t.price AS buy_price FROM lots l JOIN transactions t ON l.transaction_id = t.id WHERE l.portfolio_id = ? AND l.symbol = ? ORDER BY l.created_at ASC",
   )
     .bind(portfolioId, symbol)
     .all<{
@@ -152,14 +152,13 @@ portfolios.get("/:id/holdings/:symbol/lots", async (c) => {
       quantity: number;
       remaining_quantity: number;
       cost_basis: number;
-      closed: number;
       created_at: string;
       date: string;
       buy_price: number;
     }>();
 
   const totalQuantity = lots.results
-    .filter((l) => l.closed === 0)
+    .filter((l) => l.remaining_quantity > 0)
     .reduce((sum, l) => sum + l.remaining_quantity, 0);
 
   const lotDetails: LotDetail[] = lots.results.map((l) => {
@@ -182,7 +181,7 @@ portfolios.get("/:id/holdings/:symbol/lots", async (c) => {
       unrealized_pnl: unrealizedPnl !== null ? Math.round(unrealizedPnl * 100) / 100 : null,
       unrealized_pnl_rate:
         unrealizedPnlRate !== null ? Math.round(unrealizedPnlRate * 100) / 100 : null,
-      status: l.closed === 0 ? ("open" as const) : ("closed" as const),
+      status: l.remaining_quantity > 0 ? ("open" as const) : ("closed" as const),
     };
   });
 
@@ -245,7 +244,7 @@ portfolios.get("/:id/summary", async (c) => {
     .first<{ total: number | null }>();
 
   const lots = await c.env.DB.prepare(
-    "SELECT symbol, SUM(remaining_quantity) AS qty, SUM(remaining_quantity * cost_basis / quantity) AS cost FROM lots WHERE portfolio_id = ? AND closed = 0 GROUP BY symbol",
+    "SELECT symbol, SUM(remaining_quantity) AS qty, SUM(remaining_quantity * cost_basis / quantity) AS cost FROM lots WHERE portfolio_id = ? AND remaining_quantity > 0 GROUP BY symbol",
   )
     .bind(portfolioId)
     .all<{ symbol: string; qty: number; cost: number }>();
@@ -294,7 +293,7 @@ portfolios.get("/:id/summary", async (c) => {
   const priceUpdatedAtRow =
     lots.results.length > 0
       ? await c.env.DB.prepare(
-          "SELECT MIN(latest_date) as price_updated_at FROM (SELECT symbol, MAX(date) as latest_date FROM price_history WHERE symbol IN (SELECT DISTINCT symbol FROM lots WHERE portfolio_id = ? AND closed = 0) GROUP BY symbol)",
+          "SELECT MIN(latest_date) as price_updated_at FROM (SELECT symbol, MAX(date) as latest_date FROM price_history WHERE symbol IN (SELECT DISTINCT symbol FROM lots WHERE portfolio_id = ? AND remaining_quantity > 0) GROUP BY symbol)",
         )
           .bind(portfolioId)
           .first<{ price_updated_at: string | null }>()

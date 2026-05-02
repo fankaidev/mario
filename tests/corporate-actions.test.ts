@@ -81,7 +81,7 @@ describe("Corporate Actions", () => {
       .run();
     await db
       .prepare(
-        "INSERT INTO lots (transaction_id, portfolio_id, symbol, quantity, remaining_quantity, cost_basis, closed) VALUES (?, ?, 'AAPL', 100, 0, 15005, 1)",
+        "INSERT INTO lots (transaction_id, portfolio_id, symbol, quantity, remaining_quantity, cost_basis) VALUES (?, ?, 'AAPL', 100, 0, 15005)",
       )
       .bind(txRes.meta.last_row_id, portfolioId)
       .run();

@@ -254,7 +254,7 @@ transactions.delete("/:txId", async (c) => {
     for (const row of pnlRows.results) {
       statements.push(
         c.env.DB.prepare(
-          "UPDATE lots SET remaining_quantity = remaining_quantity + ?, closed = 0 WHERE id = ?",
+          "UPDATE lots SET remaining_quantity = remaining_quantity + ? WHERE id = ?",
         ).bind(row.quantity, row.lot_id),
       );
     }
@@ -325,7 +325,7 @@ async function handleSell(
   body: CreateTransactionRequest,
 ) {
   const lots = await c.env.DB.prepare(
-    "SELECT id, quantity, remaining_quantity, cost_basis FROM lots WHERE portfolio_id = ? AND symbol = ? AND closed = 0 ORDER BY created_at ASC",
+    "SELECT id, quantity, remaining_quantity, cost_basis FROM lots WHERE portfolio_id = ? AND symbol = ? AND remaining_quantity > 0 ORDER BY created_at ASC",
   )
     .bind(portfolioId, body.symbol)
     .all<{ id: number; quantity: number; remaining_quantity: number; cost_basis: number }>();
@@ -352,12 +352,10 @@ async function handleSell(
 
     const consumed = Math.min(lot.remaining_quantity, remainingToSell);
     const newRemaining = lot.remaining_quantity - consumed;
-    const closed = newRemaining === 0 ? 1 : 0;
 
     statements.push(
-      c.env.DB.prepare("UPDATE lots SET remaining_quantity = ?, closed = ? WHERE id = ?").bind(
+      c.env.DB.prepare("UPDATE lots SET remaining_quantity = ? WHERE id = ?").bind(
         newRemaining,
-        closed,
         lot.id,
       ),
     );

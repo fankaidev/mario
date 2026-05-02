@@ -127,9 +127,7 @@ describe("View Lot Details", () => {
 
   it("[UC-PORTFOLIO-012-S02] shows closed status for fully sold lots", async () => {
     await seedBuyTx("AAPL", 100, 150, 0, "2024-01-01");
-    await db
-      .prepare("UPDATE lots SET remaining_quantity = 0, closed = 1 WHERE symbol = 'AAPL'")
-      .run();
+    await db.prepare("UPDATE lots SET remaining_quantity = 0 WHERE symbol = 'AAPL'").run();
 
     const res = await worker.fetch(
       `http://localhost/api/portfolios/${portfolioId}/holdings/AAPL/lots`,
