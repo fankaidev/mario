@@ -36,7 +36,7 @@ export class IbkrFlexHttpClient implements IbkrFlexClient {
 
   async fetchStatement(token: string, queryId: string): Promise<IbkrFlexStatement> {
     // Step 1: Send request
-    const sendUrl = `${this.baseUrl}/SendRequest?t=${encodeURIComponent(token)}&q=${encodeURIComponent(queryId)}&v=3`;
+    const sendUrl = `${this.baseUrl}.SendRequest?t=${encodeURIComponent(token)}&q=${encodeURIComponent(queryId)}&v=3`;
     const sendRes = await fetch(sendUrl);
     if (!sendRes.ok) throw new Error(`IBKR SendRequest failed: ${sendRes.status}`);
 
@@ -52,7 +52,7 @@ export class IbkrFlexHttpClient implements IbkrFlexClient {
     if (!referenceCode) throw new Error("IBKR SendRequest: no ReferenceCode returned");
 
     // Step 2: Poll for statement
-    const getUrl = `${this.baseUrl}/GetStatement?t=${encodeURIComponent(token)}&q=${encodeURIComponent(referenceCode)}&v=3`;
+    const getUrl = `${this.baseUrl}.GetStatement?t=${encodeURIComponent(token)}&q=${encodeURIComponent(referenceCode)}&v=3`;
 
     for (let i = 0; i < this.maxRetries; i++) {
       await this.sleep(this.retryDelay);
