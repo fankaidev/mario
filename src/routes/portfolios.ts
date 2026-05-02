@@ -127,7 +127,8 @@ portfolios.get("/:id/holdings", async (c) => {
       .first<{ name: string }>();
     const marketValue = price !== null ? lot.quantity * price : null;
     const unrealizedPnl = marketValue !== null ? marketValue - lot.cost : null;
-    const unrealizedPnlRate = unrealizedPnl !== null ? (unrealizedPnl / lot.cost) * 100 : null;
+    const unrealizedPnlRate =
+      unrealizedPnl !== null && lot.cost > 0 ? (unrealizedPnl / lot.cost) * 100 : null;
 
     holdings.push({
       symbol: lot.symbol,
