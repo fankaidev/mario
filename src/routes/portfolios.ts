@@ -4,6 +4,33 @@ import type { Bindings } from "../types";
 import type { Holding, HoldingLots, LotDetail, Portfolio } from "../../shared/types/api";
 import { getLatestPrice } from "./prices";
 
+/**
+ * Calculate cash balance dynamically from all transfers and transactions.
+ * This is the single source of truth for portfolio cash balance.
+ */
+export async function calculateCashBalance(db: D1Database, portfolioId: number): Promise<number> {
+  const result = await db
+    .prepare(
+      `
+    SELECT
+      COALESCE(SUM(CASE
+        WHEN type = 'deposit' THEN amount - fee
+        WHEN type = 'withdrawal' THEN -(amount + fee)
+      END), 0) as transfer_cash,
+      (SELECT COALESCE(SUM(CASE
+        WHEN type IN ('buy', 'initial') THEN -(quantity * price + fee)
+        WHEN type = 'sell' THEN quantity * price - fee
+        WHEN type = 'dividend' THEN price - fee
+      END), 0) FROM transactions WHERE portfolio_id = ?) as tx_cash
+    FROM transfers WHERE portfolio_id = ?
+  `,
+    )
+    .bind(portfolioId, portfolioId)
+    .first<{ transfer_cash: number; tx_cash: number }>();
+
+  return (result?.transfer_cash ?? 0) + (result?.tx_cash ?? 0);
+}
+
 const portfolios = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
 portfolios.post("/", async (c) => {
@@ -206,23 +233,10 @@ portfolios.post("/:id/recalculate-cash", async (c) => {
     .first();
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
 
-  await c.env.DB.prepare(
-    `UPDATE portfolios SET cash_balance = (
-      COALESCE((SELECT SUM(CASE WHEN type = 'deposit' THEN amount - fee WHEN type = 'withdrawal' THEN -(amount + fee) END) FROM transfers WHERE portfolio_id = ?), 0)
-      - COALESCE((SELECT SUM(quantity * price + fee) FROM transactions WHERE portfolio_id = ? AND type IN ('buy', 'initial')), 0)
-      + COALESCE((SELECT SUM(quantity * price - fee) FROM transactions WHERE portfolio_id = ? AND type = 'sell'), 0)
-      + COALESCE((SELECT SUM(price - fee) FROM transactions WHERE portfolio_id = ? AND type = 'dividend'), 0)
-    ) WHERE id = ?`,
-  )
-    .bind(portfolioId, portfolioId, portfolioId, portfolioId, portfolioId)
-    .run();
-
-  const updated = await c.env.DB.prepare("SELECT cash_balance FROM portfolios WHERE id = ?")
-    .bind(portfolioId)
-    .first<{ cash_balance: number }>();
+  const cashBalance = await calculateCashBalance(c.env.DB, portfolioId);
 
   return c.json({
-    data: { cash_balance: Math.round(updated!.cash_balance * 100) / 100 },
+    data: { cash_balance: Math.round(cashBalance * 100) / 100 },
   });
 });
 
@@ -231,11 +245,9 @@ portfolios.get("/:id/summary", async (c) => {
   const portfolioId = parseInt(c.req.param("id") ?? "", 10);
   if (isNaN(portfolioId)) return c.json({ error: "Invalid portfolio ID" }, 400);
 
-  const portfolio = await c.env.DB.prepare(
-    "SELECT id, cash_balance FROM portfolios WHERE id = ? AND user_id = ?",
-  )
+  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
     .bind(portfolioId, user.id)
-    .first<{ id: number; cash_balance: number }>();
+    .first<{ id: number }>();
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
 
   const investmentRow = await c.env.DB.prepare(
@@ -288,7 +300,7 @@ portfolios.get("/:id/summary", async (c) => {
   const buyFees = feeRow?.buy_fees ?? 0;
   const sellFees = feeRow?.sell_fees ?? 0;
   const withholdingTax = feeRow?.withholding_tax ?? 0;
-  const cashBalance = portfolio.cash_balance;
+  const cashBalance = await calculateCashBalance(c.env.DB, portfolioId);
   const portfolioValue = totalMarketValue + cashBalance;
 
   const priceUpdatedAtRow =

@@ -86,10 +86,6 @@ export async function importIbkrStatement(
             costBasis,
           )
           .run();
-        await db
-          .prepare("UPDATE portfolios SET cash_balance = cash_balance - ? WHERE id = ?")
-          .bind(costBasis, portfolioId)
-          .run();
       } else {
         // Sell: consume lots in FIFO order
         const lots = await db
@@ -112,7 +108,6 @@ export async function importIbkrStatement(
           continue;
         }
 
-        const proceeds = trade.quantity * trade.tradePrice - trade.ibCommission;
         const statements: D1PreparedStatement[] = [];
         let remainingToSell = trade.quantity;
 
@@ -152,12 +147,6 @@ export async function importIbkrStatement(
           );
           remainingToSell -= consumed;
         }
-
-        statements.push(
-          db
-            .prepare("UPDATE portfolios SET cash_balance = cash_balance + ? WHERE id = ?")
-            .bind(proceeds, portfolioId),
-        );
 
         await db.batch(statements);
       }
@@ -217,16 +206,11 @@ export async function importIbkrStatement(
       continue;
     }
 
-    const cashChange = div.amount - div.tax;
     await db
       .prepare(
         "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, ?, 'dividend', 0, ?, ?, ?)",
       )
       .bind(portfolioId, symbol, div.amount, div.tax, date)
-      .run();
-    await db
-      .prepare("UPDATE portfolios SET cash_balance = cash_balance + ? WHERE id = ?")
-      .bind(cashChange, portfolioId)
       .run();
 
     result.dividends_imported++;
@@ -251,15 +235,6 @@ export async function importIbkrStatement(
         "INSERT INTO transfers (portfolio_id, type, amount, fee, date) VALUES (?, ?, ?, ?, ?)",
       )
       .bind(portfolioId, transfer.type, transfer.amount, transfer.fee, transfer.date)
-      .run();
-
-    const cashDelta =
-      transfer.type === "deposit"
-        ? transfer.amount - transfer.fee
-        : -(transfer.amount + transfer.fee);
-    await db
-      .prepare("UPDATE portfolios SET cash_balance = cash_balance + ? WHERE id = ?")
-      .bind(cashDelta, portfolioId)
       .run();
 
     result.transfers_imported++;

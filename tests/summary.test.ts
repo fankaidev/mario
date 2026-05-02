@@ -182,16 +182,15 @@ describe("Portfolio Summary", () => {
   });
 
   it("[UC-PORTFOLIO-006-S09] includes cash balance in portfolio value", async () => {
+    // Deposit enough to have 198000 cash after buying AAPL (15005) and TSLA (5003)
+    // 198000 + 15005 + 5003 = 218008
+    await seedDeposit(218008);
     await seedBuy("AAPL", 100, 150, 5);
     await seedBuy("TSLA", 50, 100, 3);
     await db
       .prepare(
         "INSERT INTO price_history (symbol, date, close) VALUES ('AAPL', '2024-03-01', 180), ('TSLA', '2024-03-01', 90)",
       )
-      .run();
-    await db
-      .prepare("UPDATE portfolios SET cash_balance = ? WHERE id = ?")
-      .bind(198000, portfolioId)
       .run();
 
     const { data } = await getSummary();

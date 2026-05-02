@@ -39,11 +39,18 @@ function authHeaders(): Record<string, string> {
 }
 
 async function getCashBalance(): Promise<number> {
-  const portfolio = await db
-    .prepare("SELECT cash_balance FROM portfolios WHERE id = ?")
-    .bind(portfolioId)
-    .first<{ cash_balance: number }>();
-  return portfolio!.cash_balance;
+  const response = await worker.fetch(
+    `http://localhost/api/portfolios/${portfolioId}/recalculate-cash`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders(),
+      },
+    },
+  );
+  const json = (await response.json()) as { data: { cash_balance: number } };
+  return json.data.cash_balance;
 }
 
 async function createTransfer(
@@ -101,10 +108,8 @@ describe("Cash Transactions", () => {
   });
 
   it("[UC-PORTFOLIO-006-S02] withdrawal decreases cash_balance", async () => {
-    await db
-      .prepare("UPDATE portfolios SET cash_balance = 10000 WHERE id = ?")
-      .bind(portfolioId)
-      .run();
+    // Seed initial cash via deposit
+    await createTransfer("deposit", 10000, 0);
 
     const result = await createTransfer("withdrawal", 3000, 0);
     expect(result.status).toBe(201);
@@ -113,10 +118,8 @@ describe("Cash Transactions", () => {
   });
 
   it("[UC-PORTFOLIO-006-S03] withdrawal fails with insufficient balance", async () => {
-    await db
-      .prepare("UPDATE portfolios SET cash_balance = 1000 WHERE id = ?")
-      .bind(portfolioId)
-      .run();
+    // Seed initial cash via deposit
+    await createTransfer("deposit", 1000, 0);
 
     const result = await createTransfer("withdrawal", 2000, 0);
     expect(result.status).toBe(400);
@@ -125,10 +128,8 @@ describe("Cash Transactions", () => {
   });
 
   it("[UC-PORTFOLIO-006-S04] buy decreases cash_balance", async () => {
-    await db
-      .prepare("UPDATE portfolios SET cash_balance = 10000 WHERE id = ?")
-      .bind(portfolioId)
-      .run();
+    // Seed initial cash via deposit
+    await createTransfer("deposit", 10000, 0);
 
     const result = await createTransaction("buy", 150, 5, "AAPL", 10);
     expect(result.status).toBe(201);
@@ -137,7 +138,8 @@ describe("Cash Transactions", () => {
   });
 
   it("[UC-PORTFOLIO-006-S05] sell increases cash_balance", async () => {
-    await db.prepare("UPDATE portfolios SET cash_balance = 0 WHERE id = ?").bind(portfolioId).run();
+    // Deposit enough for the buy, then sell
+    await createTransfer("deposit", 1500, 0); // Cash = 1500
 
     const txResult = await db
       .prepare(
@@ -151,15 +153,17 @@ describe("Cash Transactions", () => {
       )
       .bind(txResult!.id, portfolioId)
       .run();
+    // After buy: 1500 - 1500 = 0
 
     const result = await createTransaction("sell", 180, 5, "AAPL", 5);
     expect(result.status).toBe(201);
 
+    // After sell: 0 + (5*180 - 5) = 895
     expect(await getCashBalance()).toBe(895);
   });
 
   it("[UC-PORTFOLIO-006-S06] dividend increases cash_balance", async () => {
-    await db.prepare("UPDATE portfolios SET cash_balance = 0 WHERE id = ?").bind(portfolioId).run();
+    // Portfolio starts with 0 cash by default, no setup needed
 
     const result = await createTransaction("dividend", 25, 2.5, "AAPL", 0);
     expect(result.status).toBe(201);
@@ -179,10 +183,8 @@ describe("Cash Transactions", () => {
   });
 
   it("[UC-PORTFOLIO-006-S08] deleting buy reverses cash_balance", async () => {
-    await db
-      .prepare("UPDATE portfolios SET cash_balance = 10000 WHERE id = ?")
-      .bind(portfolioId)
-      .run();
+    // Seed initial cash via deposit
+    await createTransfer("deposit", 10000, 0);
 
     const result = await createTransaction("buy", 150, 5, "AAPL", 10);
     expect(result.status).toBe(201);
@@ -209,10 +211,8 @@ describe("Cash Transactions", () => {
   });
 
   it("[UC-PORTFOLIO-006-S10] buy with insufficient cash allowed (negative balance)", async () => {
-    await db
-      .prepare("UPDATE portfolios SET cash_balance = 1000 WHERE id = ?")
-      .bind(portfolioId)
-      .run();
+    // Seed initial cash via deposit
+    await createTransfer("deposit", 1000, 0);
 
     const result = await createTransaction("buy", 150, 0, "AAPL", 10);
     expect(result.status).toBe(201);
@@ -228,10 +228,8 @@ describe("Cash Transactions", () => {
   });
 
   it("[UC-PORTFOLIO-006-S12] withdrawal with fee adds fee to deducted amount", async () => {
-    await db
-      .prepare("UPDATE portfolios SET cash_balance = 5000 WHERE id = ?")
-      .bind(portfolioId)
-      .run();
+    // Seed initial cash via deposit
+    await createTransfer("deposit", 5000, 0);
 
     const result = await createTransfer("withdrawal", 1000, 25);
     expect(result.status).toBe(201);
@@ -240,11 +238,6 @@ describe("Cash Transactions", () => {
   });
 
   it("[UC-PORTFOLIO-006-S13] recalculate cash from all transfers and transactions", async () => {
-    await db
-      .prepare("UPDATE portfolios SET cash_balance = 200000 WHERE id = ?")
-      .bind(portfolioId)
-      .run();
-
     await createTransfer("deposit", 100000, 0);
     await createTransfer("withdrawal", 10000, 0);
 

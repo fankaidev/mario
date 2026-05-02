@@ -85,11 +85,9 @@ transactions.post("/", async (c) => {
     return c.json({ error: err.message }, err.status as 400);
   }
 
-  const portfolio = await c.env.DB.prepare(
-    "SELECT id, cash_balance FROM portfolios WHERE id = ? AND user_id = ?",
-  )
+  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
     .bind(portfolioId, user.id)
-    .first<{ id: number; cash_balance: number }>();
+    .first<{ id: number }>();
   if (!portfolio) {
     return c.json({ error: "Portfolio not found" }, 404);
   }
@@ -213,11 +211,9 @@ transactions.delete("/:txId", async (c) => {
     return c.json({ error: "Invalid ID" }, 400);
   }
 
-  const portfolio = await c.env.DB.prepare(
-    "SELECT id, cash_balance FROM portfolios WHERE id = ? AND user_id = ?",
-  )
+  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
     .bind(portfolioId, user.id)
-    .first<{ id: number; cash_balance: number }>();
+    .first<{ id: number }>();
   if (!portfolio) {
     return c.json({ error: "Portfolio not found" }, 404);
   }
@@ -234,17 +230,8 @@ transactions.delete("/:txId", async (c) => {
   const statements: D1PreparedStatement[] = [];
 
   if (tx.type === "buy" || tx.type === "initial") {
-    const costBasis = tx.quantity! * tx.price + tx.fee;
-    statements.push(
-      c.env.DB.prepare("DELETE FROM lots WHERE transaction_id = ?").bind(txId),
-      c.env.DB.prepare("UPDATE portfolios SET cash_balance = cash_balance + ? WHERE id = ?").bind(
-        costBasis,
-        portfolioId,
-      ),
-    );
+    statements.push(c.env.DB.prepare("DELETE FROM lots WHERE transaction_id = ?").bind(txId));
   } else if (tx.type === "sell") {
-    const proceeds = tx.quantity! * tx.price - tx.fee;
-
     const pnlRows = await c.env.DB.prepare(
       "SELECT lot_id, quantity FROM realized_pnl WHERE sell_transaction_id = ?",
     )
@@ -260,18 +247,6 @@ transactions.delete("/:txId", async (c) => {
     }
     statements.push(
       c.env.DB.prepare("DELETE FROM realized_pnl WHERE sell_transaction_id = ?").bind(txId),
-      c.env.DB.prepare("UPDATE portfolios SET cash_balance = cash_balance - ? WHERE id = ?").bind(
-        proceeds,
-        portfolioId,
-      ),
-    );
-  } else if (tx.type === "dividend") {
-    const cashChange = tx.price - tx.fee;
-    statements.push(
-      c.env.DB.prepare("UPDATE portfolios SET cash_balance = cash_balance - ? WHERE id = ?").bind(
-        cashChange,
-        portfolioId,
-      ),
     );
   }
 
@@ -297,15 +272,11 @@ async function handleBuy(
 
   const txId = txResult.meta.last_row_id;
 
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      "INSERT INTO lots (transaction_id, portfolio_id, symbol, quantity, remaining_quantity, cost_basis) VALUES (?, ?, ?, ?, ?, ?)",
-    ).bind(txId, portfolioId, body.symbol, body.quantity, body.quantity, costBasis),
-    c.env.DB.prepare("UPDATE portfolios SET cash_balance = cash_balance - ? WHERE id = ?").bind(
-      costBasis,
-      portfolioId,
-    ),
-  ]);
+  await c.env.DB.prepare(
+    "INSERT INTO lots (transaction_id, portfolio_id, symbol, quantity, remaining_quantity, cost_basis) VALUES (?, ?, ?, ?, ?, ?)",
+  )
+    .bind(txId, portfolioId, body.symbol, body.quantity, body.quantity, costBasis)
+    .run();
 
   const transaction = await c.env.DB.prepare(
     "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE id = ?",
@@ -343,8 +314,6 @@ async function handleSell(
 
   const txId = txResult.meta.last_row_id;
 
-  const proceeds = body.quantity! * body.price - body.fee;
-
   const statements: D1PreparedStatement[] = [];
   let remainingToSell = body.quantity!;
   for (const lot of lots.results) {
@@ -376,13 +345,6 @@ async function handleSell(
     remainingToSell -= consumed;
   }
 
-  statements.push(
-    c.env.DB.prepare("UPDATE portfolios SET cash_balance = cash_balance + ? WHERE id = ?").bind(
-      proceeds,
-      portfolioId,
-    ),
-  );
-
   await c.env.DB.batch(statements);
 
   const transaction = await c.env.DB.prepare(
@@ -399,16 +361,10 @@ async function handleDividend(
   portfolioId: number,
   body: CreateTransactionRequest,
 ) {
-  const cashChange = body.price - body.fee;
-
   const txResult = await c.env.DB.prepare(
     "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, ?, ?, ?, ?, ?, ?)",
   )
     .bind(portfolioId, body.symbol, body.type, body.quantity, body.price, body.fee, body.date)
-    .run();
-
-  await c.env.DB.prepare("UPDATE portfolios SET cash_balance = cash_balance + ? WHERE id = ?")
-    .bind(cashChange, portfolioId)
     .run();
 
   const transaction = await c.env.DB.prepare(

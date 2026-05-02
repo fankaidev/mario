@@ -135,6 +135,37 @@ Example: `feat: add FIFO lot tracking for sell transactions`
 - Only fetches prices for stocks currently held in any portfolio.
 - Null price = stock not updated yet or fetch failed.
 
+### Single Source of Truth
+
+**Principle:** Derive data from authoritative sources rather than storing redundant copies. If data can be calculated from other data, calculate it dynamically instead of storing it.
+
+**Benefits:**
+- Always correct: if calculation logic is right, result is right
+- Simpler code: no need to update derived values in multiple places
+- Easier to fix bugs: change one calculation, everywhere updates instantly
+- No data inconsistency: stored redundant data can drift out of sync
+
+**Examples:**
+
+1. **Cash Balance** (implemented in issue #133)
+   - ❌ Before: Stored `cash_balance` in `portfolios` table, updated incrementally on every transaction/transfer
+   - ✅ After: Calculate dynamically from `transfers` and `transactions` tables
+   - Why: 10+ update locations led to bugs (dividend bug subtracting instead of adding); dynamic calculation is always correct
+
+2. **Holdings Summary**
+   - ❌ Don't store: Total quantity, market value, unrealized P&L in a separate table
+   - ✅ Instead: Calculate from `lots` table + current prices
+   - Why: Values change when prices update; calculating on-demand ensures freshness
+
+3. **Portfolio P&L**
+   - ❌ Don't store: Total P&L, return rate as static values
+   - ✅ Instead: Calculate from realized P&L records + current holdings value
+   - Why: Values depend on current prices and lot state; calculation reflects reality
+
+**When to store vs. calculate:**
+- Store: Historical snapshots (`portfolio_snapshots`), immutable events (`transactions`, `transfers`)
+- Calculate: Current state that can be derived (`cash_balance`, `holdings`, `summary`)
+
 ## Code Quality
 
 - **Formatter**: `oxfmt` — format all `.ts`, `.tsx`, `.json`, `.sql` files
