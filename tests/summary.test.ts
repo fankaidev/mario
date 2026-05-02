@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getPlatformProxy, unstable_dev } from "wrangler";
 import type { UnstableDevWorker } from "wrangler";
 import { cleanDatabase, createApiTokenForUser } from "./helpers";
+import type { PortfolioSummary } from "../shared/types/api";
 
 let worker: UnstableDevWorker;
 let db: D1Database;
@@ -110,19 +111,7 @@ async function getSummary() {
     headers: authHeaders(),
   });
   return (await res.json()) as {
-    data: {
-      total_investment: number;
-      total_market_value: number;
-      unrealized_pnl: number;
-      realized_pnl: number;
-      dividend_income: number;
-      total_pnl: number;
-      return_rate: number;
-      cumulative_buy_fees: number;
-      cumulative_sell_fees: number;
-      cumulative_withholding_tax: number;
-      cumulative_total_fees: number;
-    };
+    data: PortfolioSummary;
   };
 }
 
@@ -139,7 +128,7 @@ describe("Portfolio Summary", () => {
 
     const { data } = await getSummary();
     expect(data.total_investment).toBe(20000);
-    expect(data.total_market_value).toBe(18000 + 4500);
+    expect(data.securities_value).toBe(18000 + 4500);
     expect(data.unrealized_pnl).toBeCloseTo(2492, 0);
     expect(data.realized_pnl).toBe(0);
     expect(data.total_pnl).toBeCloseTo(2492, 0);
@@ -176,7 +165,7 @@ describe("Portfolio Summary", () => {
   it("[UC-PORTFOLIO-006-S05] returns zero metrics when empty", async () => {
     const { data } = await getSummary();
     expect(data.total_investment).toBe(0);
-    expect(data.total_market_value).toBe(0);
+    expect(data.securities_value).toBe(0);
     expect(data.unrealized_pnl).toBe(0);
     expect(data.realized_pnl).toBe(0);
     expect(data.dividend_income).toBe(0);
@@ -190,5 +179,24 @@ describe("Portfolio Summary", () => {
 
     const { data } = await getSummary();
     expect(data.total_investment).toBe(60000);
+  });
+
+  it("[UC-PORTFOLIO-006-S09] includes cash balance in portfolio value", async () => {
+    await seedBuy("AAPL", 100, 150, 5);
+    await seedBuy("TSLA", 50, 100, 3);
+    await db
+      .prepare(
+        "INSERT INTO prices (symbol, price, updated_at) VALUES ('AAPL', 180, '2024-03-01'), ('TSLA', 90, '2024-03-01')",
+      )
+      .run();
+    await db
+      .prepare("UPDATE portfolios SET cash_balance = ? WHERE id = ?")
+      .bind(198000, portfolioId)
+      .run();
+
+    const { data } = await getSummary();
+    expect(data.securities_value).toBe(22500);
+    expect(data.cash_balance).toBe(198000);
+    expect(data.portfolio_value).toBe(220500);
   });
 });

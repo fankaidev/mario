@@ -206,9 +206,11 @@ portfolios.get("/:id/summary", async (c) => {
   const portfolioId = parseInt(c.req.param("id") ?? "", 10);
   if (isNaN(portfolioId)) return c.json({ error: "Invalid portfolio ID" }, 400);
 
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id, cash_balance FROM portfolios WHERE id = ? AND user_id = ?",
+  )
     .bind(portfolioId, user.id)
-    .first();
+    .first<{ id: number; cash_balance: number }>();
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
 
   const investmentRow = await c.env.DB.prepare(
@@ -263,11 +265,15 @@ portfolios.get("/:id/summary", async (c) => {
   const buyFees = feeRow?.buy_fees ?? 0;
   const sellFees = feeRow?.sell_fees ?? 0;
   const withholdingTax = feeRow?.withholding_tax ?? 0;
+  const cashBalance = portfolio.cash_balance;
+  const portfolioValue = totalMarketValue + cashBalance;
 
   return c.json({
     data: {
       total_investment: Math.round(totalInvestment * 100) / 100,
-      total_market_value: Math.round(totalMarketValue * 100) / 100,
+      securities_value: Math.round(totalMarketValue * 100) / 100,
+      cash_balance: Math.round(cashBalance * 100) / 100,
+      portfolio_value: Math.round(portfolioValue * 100) / 100,
       unrealized_pnl: Math.round(unrealizedPnl * 100) / 100,
       realized_pnl: Math.round(realizedWithFee * 100) / 100,
       dividend_income: Math.round(dividendIncome * 100) / 100,
