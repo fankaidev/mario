@@ -78,7 +78,7 @@ This ensures all work is traceable, specified, tested, and documented.
 
 ## Autopilot Mode
 
-When instructed to enter **Autopilot**, keep calling `/next-issue` and processing each issue through the full Mario Workflow (design → implement → PR → review → merge → deploy) until no open issues remain without the `in-progress` label.
+When instructed to enter **Autopilot**, keep using the `next-issue` skill and processing each issue through the full Mario Workflow (design → implement → PR → review → merge → deploy) until no open issues remain without the `in-progress` label.
 
 ### Git Commit Rules
 
