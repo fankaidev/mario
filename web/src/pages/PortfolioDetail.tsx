@@ -77,14 +77,7 @@ interface Portfolio {
   currency: string;
 }
 
-type TabName =
-  | "holdings"
-  | "transactions"
-  | "transfers"
-  | "snapshots"
-  | "return"
-  | "summary"
-  | "tags";
+type TabName = "holdings" | "transactions" | "transfers" | "summary" | "tags";
 
 export function PortfolioDetail() {
   const { id } = useParams<{ id: string }>();
@@ -121,8 +114,6 @@ export function PortfolioDetail() {
                 ["holdings", "Holdings"],
                 ["transactions", "Transactions"],
                 ["transfers", "Transfers"],
-                ["snapshots", "Snapshots"],
-                ["return", "Return"],
                 ["tags", "Tags"],
                 ["summary", "Summary"],
               ] as [TabName, string][]
@@ -150,10 +141,8 @@ export function PortfolioDetail() {
             />
           )}
           {tab === "transfers" && <TransfersTab id={id!} />}
-          {tab === "snapshots" && <SnapshotsTab id={id!} />}
-          {tab === "return" && <ReturnCurveTab id={id!} />}
-          {tab === "summary" && <SummaryTab id={id!} />}
           {tab === "tags" && <TagsTab id={id!} />}
+          {tab === "summary" && <SummaryTab id={id!} />}
         </Tabs>
       </div>
     </div>
@@ -1449,78 +1438,6 @@ function AddTransferModal({
   );
 }
 
-function SnapshotsTab({ id }: { id: string }) {
-  const queryClient = useQueryClient();
-  const [showAdd, setShowAdd] = useState(false);
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["snapshots", id],
-    queryFn: () => get<{ data: Snapshot[] }>(`/portfolios/${id}/snapshots`),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (snapshotId: number) =>
-      del<{ data: null }>(`/portfolios/${id}/snapshots/${snapshotId}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["snapshots", id] }),
-  });
-
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
-
-  return (
-    <div>
-      <div className="mb-4 flex justify-between">
-        <h3 className="font-semibold">Snapshots</h3>
-        <Button size="sm" onClick={() => setShowAdd(true)}>
-          Add Snapshot
-        </Button>
-      </div>
-
-      {data?.data.length === 0 && <EmptyState message="No snapshots yet." />}
-
-      <div className="space-y-1">
-        {data?.data.map((s) => {
-          const pnl = s.market_value - s.total_investment;
-          const rate = s.total_investment > 0 ? (pnl / s.total_investment) * 100 : 0;
-          return (
-            <div key={s.id} className="flex items-center justify-between border-b py-2 text-sm">
-              <div>
-                <span className="font-medium">{s.date}</span>
-                {s.note && <span className="ml-2 text-muted-foreground">{s.note}</span>}
-              </div>
-              <div className="flex items-center gap-3">
-                <span>Inv: {s.total_investment.toLocaleString()}</span>
-                <span>Mkt: {s.market_value.toLocaleString()}</span>
-                <span className={pnl >= 0 ? "text-green-600" : "text-red-600"}>
-                  P&L: {pnl.toLocaleString()} ({rate >= 0 ? "+" : ""}
-                  {rate.toFixed(1)}%)
-                </span>
-                <Button
-                  variant="link"
-                  className="h-auto p-0 text-xs text-destructive"
-                  onClick={() => deleteMutation.mutate(s.id)}
-                >
-                  Delete
-                </Button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {showAdd && (
-        <AddSnapshotModal
-          portfolioId={id}
-          onClose={() => setShowAdd(false)}
-          onCreated={() => {
-            queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
-            setShowAdd(false);
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
 function AddSnapshotModal({
   portfolioId,
   onClose,
@@ -1609,22 +1526,29 @@ function AddSnapshotModal({
   );
 }
 
-function ReturnCurveTab({ id }: { id: string }) {
-  const { data, isLoading } = useQuery({
-    queryKey: ["snapshots", id],
-    queryFn: () => get<{ data: Snapshot[] }>(`/portfolios/${id}/snapshots`),
-  });
+function SummaryTab({ id }: { id: string }) {
+  const queryClient = useQueryClient();
+  const [showAddSnapshot, setShowAddSnapshot] = useState(false);
+  const [deleteSnapshotId, setDeleteSnapshotId] = useState<number | null>(null);
 
-  const summary = useQuery({
+  const { data: summaryData, isLoading: summaryLoading } = useQuery({
     queryKey: ["summary", id],
     queryFn: () => get<{ data: Summary }>(`/portfolios/${id}/summary`),
   });
 
-  if (isLoading || summary.isLoading)
+  const { data: snapshotsData, isLoading: snapshotsLoading } = useQuery({
+    queryKey: ["snapshots", id],
+    queryFn: () => get<{ data: Snapshot[] }>(`/portfolios/${id}/snapshots`),
+  });
+
+  if (summaryLoading || snapshotsLoading)
     return <p className="text-sm text-muted-foreground">Loading...</p>;
 
-  const snapshots = data?.data ?? [];
-  const currentSummary = summary.data?.data;
+  const s = summaryData?.data;
+  if (!s) return null;
+
+  const snapshots = snapshotsData?.data ?? [];
+  const currentSummary = s;
 
   interface ChartPoint {
     date: string;
@@ -1634,13 +1558,13 @@ function ReturnCurveTab({ id }: { id: string }) {
   }
 
   const points: ChartPoint[] = snapshots
-    .map((s) => ({
-      date: s.date,
-      marketValue: s.market_value,
-      investment: s.total_investment,
+    .map((snap) => ({
+      date: snap.date,
+      marketValue: snap.market_value,
+      investment: snap.total_investment,
       returnRate:
-        s.total_investment > 0
-          ? ((s.market_value - s.total_investment) / s.total_investment) * 100
+        snap.total_investment > 0
+          ? ((snap.market_value - snap.total_investment) / snap.total_investment) * 100
           : 0,
     }))
     .reverse();
@@ -1659,63 +1583,14 @@ function ReturnCurveTab({ id }: { id: string }) {
     });
   }
 
-  if (points.length === 0)
-    return <EmptyState message="No data for return curve. Add snapshots to see the chart." />;
-
-  return (
-    <div>
-      <h3 className="mb-4 font-semibold">Market Value Over Time</h3>
-      <Card className="mb-6">
-        <CardContent className="p-4">
-          <LineChart
-            data={points.map((p) => ({
-              label: p.date,
-              values: [
-                { key: "mv", value: p.marketValue, color: "#2563eb" },
-                { key: "inv", value: p.investment, color: "#9ca3af" },
-              ],
-            }))}
-            height={250}
-            formatValue={(v) => v.toLocaleString()}
-          />
-          <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <span className="inline-block h-0.5 w-3 bg-blue-600" /> Market Value
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="inline-block h-0.5 w-3 bg-[#9ca3af]" /> Investment
-            </span>
-          </div>
-        </CardContent>
-      </Card>
-
-      <h3 className="mb-4 font-semibold">Return Rate Over Time</h3>
-      <Card>
-        <CardContent className="p-4">
-          <LineChart
-            data={points.map((p) => ({
-              label: p.date,
-              values: [{ key: "rate", value: p.returnRate, color: "#059669" }],
-            }))}
-            height={250}
-            formatValue={(v) => `${v.toFixed(1)}%`}
-          />
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function SummaryTab({ id }: { id: string }) {
-  const { data, isLoading } = useQuery({
-    queryKey: ["summary", id],
-    queryFn: () => get<{ data: Summary }>(`/portfolios/${id}/summary`),
+  const deleteSnapshotMutation = useMutation({
+    mutationFn: (snapshotId: number) =>
+      del<{ data: null }>(`/portfolios/${id}/snapshots/${snapshotId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
+      setDeleteSnapshotId(null);
+    },
   });
-
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
-
-  const s = data?.data;
-  if (!s) return null;
 
   return (
     <div>
@@ -1755,6 +1630,104 @@ function SummaryTab({ id }: { id: string }) {
           <span>{s.cumulative_total_fees}</span>
         </div>
       </div>
+
+      {points.length > 0 && (
+        <>
+          <h3 className="mt-6 mb-4 font-semibold">Market Value Over Time</h3>
+          <Card className="mb-6">
+            <CardContent className="p-4">
+              <LineChart
+                data={points.map((p) => ({
+                  label: p.date,
+                  values: [
+                    { key: "mv", value: p.marketValue, color: "#2563eb" },
+                    { key: "inv", value: p.investment, color: "#9ca3af" },
+                  ],
+                }))}
+                height={250}
+                formatValue={(v) => v.toLocaleString()}
+              />
+              <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-0.5 w-3 bg-blue-600" /> Market Value
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-0.5 w-3 bg-[#9ca3af]" /> Investment
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <h3 className="mb-4 font-semibold">Return Rate Over Time</h3>
+          <Card className="mb-6">
+            <CardContent className="p-4">
+              <LineChart
+                data={points.map((p) => ({
+                  label: p.date,
+                  values: [{ key: "rate", value: p.returnRate, color: "#059669" }],
+                }))}
+                height={250}
+                formatValue={(v) => `${v.toFixed(1)}%`}
+              />
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      <div className="mb-4 mt-6 flex justify-between">
+        <h3 className="font-semibold">Snapshots</h3>
+        <Button size="sm" onClick={() => setShowAddSnapshot(true)}>
+          Add Snapshot
+        </Button>
+      </div>
+      {snapshots.length === 0 && <EmptyState message="No snapshots yet." />}
+      <div className="space-y-1">
+        {snapshots.map((snap) => {
+          const pnl = snap.market_value - snap.total_investment;
+          const rate = snap.total_investment > 0 ? (pnl / snap.total_investment) * 100 : 0;
+          return (
+            <div key={snap.id} className="flex items-center justify-between border-b py-2 text-sm">
+              <div>
+                <span className="font-medium">{snap.date}</span>
+                {snap.note && <span className="ml-2 text-muted-foreground">{snap.note}</span>}
+              </div>
+              <div className="flex items-center gap-3">
+                <span>Inv: {snap.total_investment.toLocaleString()}</span>
+                <span>Mkt: {snap.market_value.toLocaleString()}</span>
+                <span className={pnl >= 0 ? "text-green-600" : "text-red-600"}>
+                  P&L: {pnl.toLocaleString()} ({rate >= 0 ? "+" : ""}
+                  {rate.toFixed(1)}%)
+                </span>
+                <Button
+                  variant="link"
+                  className="h-auto p-0 text-xs text-destructive"
+                  onClick={() => setDeleteSnapshotId(snap.id)}
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {showAddSnapshot && (
+        <AddSnapshotModal
+          portfolioId={id}
+          onClose={() => setShowAddSnapshot(false)}
+          onCreated={() => {
+            queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
+            setShowAddSnapshot(false);
+          }}
+        />
+      )}
+      {deleteSnapshotId !== null && (
+        <ConfirmModal
+          message="Delete this snapshot?"
+          onConfirm={() => deleteSnapshotMutation.mutate(deleteSnapshotId)}
+          onCancel={() => setDeleteSnapshotId(null)}
+        />
+      )}
     </div>
   );
 }
