@@ -74,7 +74,11 @@ A personal portfolio tracker for US, HK, and China A-share markets. Deployed on 
 
 This ensures all work is traceable, specified, tested, and documented.
 
-**Exception for trivial changes:** Typos, dependency updates, and config tweaks can skip the full workflow — commit directly to main with a clear commit message.
+**Exception for trivial changes:** Typos, dependency updates, and config tweaks can skip the full BDD workflow, but must still go through a branch + PR. **Never commit directly to `main`.**
+
+## Autopilot Mode
+
+When instructed to enter **Autopilot**, keep calling `/next-issue` and processing each issue through the full Mario Workflow (design → implement → PR → review → merge → deploy) until no open issues remain without the `in-progress` label.
 
 ### Git Commit Rules
 
