@@ -145,13 +145,16 @@ export function TransfersTab({ id, currency }: { id: string; currency: string })
 
   const transfersWithRunningTotal = useMemo(() => {
     const transfers = data?.data ?? [];
+    // Sort ascending to calculate running total from oldest to newest
     const sorted = [...transfers].sort((a, b) => a.date.localeCompare(b.date));
     let runningTotal = 0;
-    return sorted.map((t) => {
+    const withRunningTotal = sorted.map((t) => {
       const netEffect = t.type === "deposit" ? t.amount - t.fee : -(t.amount + t.fee);
       runningTotal += netEffect;
       return { ...t, runningTotal };
     });
+    // Reverse to display newest first
+    return withRunningTotal.reverse();
   }, [data?.data]);
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
