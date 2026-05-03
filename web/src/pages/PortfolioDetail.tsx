@@ -81,7 +81,7 @@ export function PortfolioDetail() {
               onSelectedSymbolsChange={setSelectedSymbols}
             />
           )}
-          {tab === "transfers" && <TransfersTab id={id!} />}
+          {tab === "transfers" && <TransfersTab id={id!} currency={portfolio?.currency ?? ""} />}
           {tab === "tags" && <TagsTab id={id!} />}
           {tab === "summary" && <SummaryTab id={id!} />}
         </Tabs>

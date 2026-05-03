@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Trash2, Wrench, Check } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import {
@@ -121,10 +122,11 @@ function AddTransferModal({
   );
 }
 
-export function TransfersTab({ id }: { id: string }) {
+export function TransfersTab({ id, currency }: { id: string; currency: string }) {
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [manageMode, setManageMode] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["transfers", id],
@@ -147,45 +149,66 @@ export function TransfersTab({ id }: { id: string }) {
     <div>
       <div className="mb-4 flex justify-between">
         <h3 className="font-semibold">Transfers</h3>
-        <Button size="sm" onClick={() => setShowAdd(true)}>
-          Add Transfer
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setManageMode(!manageMode)}>
+            {manageMode ? <Check className="h-4 w-4" /> : <Wrench className="h-4 w-4" />}
+            {manageMode ? "Done" : "Manage"}
+          </Button>
+          <Button size="sm" onClick={() => setShowAdd(true)}>
+            Add Transfer
+          </Button>
+        </div>
       </div>
 
       {data?.data.length === 0 && <EmptyState message="No transfers yet." />}
 
       <div className="space-y-1">
+        <div
+          className={`grid items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground ${manageMode ? "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_32px]" : "grid-cols-[90px_90px_1fr_60px_100px_80px_100px]"}`}
+        >
+          <span>Date</span>
+          <span>Type</span>
+          <span>Note</span>
+          <span>Currency</span>
+          <span className="text-right">Amount</span>
+          <span className="text-right">Fee</span>
+          <span className="text-right">Net</span>
+          {manageMode && <span />}
+        </div>
         {data?.data.map((t) => {
           const netEffect = t.type === "deposit" ? t.amount - t.fee : -(t.amount + t.fee);
           return (
-            <div key={t.id} className="flex items-center justify-between border-b py-2 text-sm">
-              <div>
-                <span className="font-medium">{t.date}</span>
-                <Badge
-                  variant="secondary"
-                  className={`ml-2 border-transparent ${
-                    t.type === "deposit" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                  }`}
-                >
-                  {t.type}
-                </Badge>
-                {t.note && <span className="ml-2 text-muted-foreground">{t.note}</span>}
-              </div>
-              <div className="flex items-center gap-3">
-                <span>{t.amount.toLocaleString()}</span>
-                {t.fee > 0 && <span className="text-muted-foreground">fee {t.fee}</span>}
-                <span className={netEffect >= 0 ? "text-green-600" : "text-red-600"}>
-                  {netEffect >= 0 ? "+" : ""}
-                  {netEffect.toLocaleString()}
-                </span>
+            <div
+              key={t.id}
+              className={`grid items-center gap-2 border-b py-2 text-sm ${manageMode ? "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_32px]" : "grid-cols-[90px_90px_1fr_60px_100px_80px_100px]"}`}
+            >
+              <span className="text-muted-foreground">{t.date}</span>
+              <Badge
+                variant="secondary"
+                className={`w-fit border-transparent ${
+                  t.type === "deposit" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                }`}
+              >
+                {t.type}
+              </Badge>
+              <span className="truncate text-muted-foreground">{t.note || ""}</span>
+              <span>{currency}</span>
+              <span className="text-right">{t.amount.toLocaleString()}</span>
+              <span className="text-right text-muted-foreground">{t.fee > 0 ? t.fee : ""}</span>
+              <span className={`text-right ${netEffect >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {netEffect >= 0 ? "+" : ""}
+                {netEffect.toLocaleString()}
+              </span>
+              {manageMode && (
                 <Button
-                  variant="link"
-                  className="h-auto p-0 text-xs text-destructive"
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
                   onClick={() => setDeleteId(t.id)}
                 >
-                  Delete
+                  <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
-              </div>
+              )}
             </div>
           );
         })}

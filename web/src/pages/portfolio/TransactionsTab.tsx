@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, ChevronUp, Trash2, Wrench, Check } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import {
   Dialog,
@@ -151,6 +152,9 @@ export function TransactionsTab({
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
+  const [showTypeFilter, setShowTypeFilter] = useState(false);
+  const [showSymbolFilter, setShowSymbolFilter] = useState(false);
+  const [manageMode, setManageMode] = useState(false);
 
   const transactionTypes = ["buy", "sell", "dividend", "initial"] as const;
 
@@ -247,74 +251,127 @@ export function TransactionsTab({
     <div>
       <div className="mb-4 flex justify-between">
         <h3 className="font-semibold">Transactions</h3>
-        <Button size="sm" onClick={() => setShowAdd(true)}>
-          Add Transaction
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setManageMode(!manageMode)}>
+            {manageMode ? <Check className="h-4 w-4" /> : <Wrench className="h-4 w-4" />}
+            {manageMode ? "Done" : "Manage"}
+          </Button>
+          <Button size="sm" onClick={() => setShowAdd(true)}>
+            Add Transaction
+          </Button>
+        </div>
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center gap-1">
-        {(["1M", "3M", "6M", "YTD", "1Y", "3Y", "ALL"] as const).map((r) => (
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1">
+          {(["1M", "3M", "6M", "YTD", "1Y", "3Y", "ALL"] as const).map((r) => (
+            <Button
+              key={r}
+              size="sm"
+              variant={datePreset === r ? "default" : "outline"}
+              className="h-6 px-2 text-xs"
+              onClick={() => setDatePreset(r)}
+            >
+              {r}
+            </Button>
+          ))}
           <Button
-            key={r}
             size="sm"
-            variant={datePreset === r ? "default" : "outline"}
+            variant={datePreset === "CUSTOM" ? "default" : "outline"}
             className="h-6 px-2 text-xs"
-            onClick={() => setDatePreset(r)}
+            onClick={() => setDatePreset("CUSTOM")}
           >
-            {r}
+            Custom
           </Button>
-        ))}
-        <Button
-          size="sm"
-          variant={datePreset === "CUSTOM" ? "default" : "outline"}
-          className="h-6 px-2 text-xs"
-          onClick={() => setDatePreset("CUSTOM")}
-        >
-          Custom
-        </Button>
-        {datePreset === "CUSTOM" && (
-          <div className="flex items-center gap-2">
-            <Input
-              type="date"
-              value={customStart}
-              onChange={(e) => setCustomStart(e.target.value)}
-              className="h-6 w-auto text-xs"
-            />
-            <span className="text-xs text-muted-foreground">to</span>
-            <Input
-              type="date"
-              value={customEnd}
-              onChange={(e) => setCustomEnd(e.target.value)}
-              className="h-6 w-auto text-xs"
-            />
-          </div>
-        )}
-      </div>
+        </div>
 
-      <div className="mb-3 flex flex-wrap gap-1">
-        <Button
-          size="sm"
-          variant={selectedTypes.size === 0 ? "default" : "outline"}
-          className="h-6 px-2 text-xs"
-          onClick={() => setSelectedTypes(new Set())}
-        >
-          All
-        </Button>
-        {transactionTypes.map((type) => (
+        <div className="flex gap-2">
           <Button
-            key={type}
             size="sm"
-            variant={selectedTypes.has(type) ? "default" : "outline"}
-            className="h-6 px-2 text-xs capitalize"
-            onClick={() => toggleType(type)}
+            variant={showTypeFilter ? "default" : "outline"}
+            className="h-6 px-2 text-xs"
+            onClick={() => setShowTypeFilter(!showTypeFilter)}
           >
-            {type}
+            Type
+            {selectedTypes.size > 0 && (
+              <span className="ml-1 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">
+                {selectedTypes.size}
+              </span>
+            )}
+            {showTypeFilter ? (
+              <ChevronUp className="ml-1 h-3 w-3" />
+            ) : (
+              <ChevronDown className="ml-1 h-3 w-3" />
+            )}
           </Button>
-        ))}
+
+          {symbols.length > 1 && (
+            <Button
+              size="sm"
+              variant={showSymbolFilter ? "default" : "outline"}
+              className="h-6 px-2 text-xs"
+              onClick={() => setShowSymbolFilter(!showSymbolFilter)}
+            >
+              Symbol
+              {selectedSymbols.size > 0 && (
+                <span className="ml-1 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">
+                  {selectedSymbols.size}
+                </span>
+              )}
+              {showSymbolFilter ? (
+                <ChevronUp className="ml-1 h-3 w-3" />
+              ) : (
+                <ChevronDown className="ml-1 h-3 w-3" />
+              )}
+            </Button>
+          )}
+        </div>
       </div>
 
-      {symbols.length > 1 && (
-        <div className="mb-4 flex flex-wrap gap-1">
+      {datePreset === "CUSTOM" && (
+        <div className="mb-3 flex items-center justify-end gap-2">
+          <Input
+            type="date"
+            value={customStart}
+            onChange={(e) => setCustomStart(e.target.value)}
+            className="h-6 w-auto text-xs"
+          />
+          <span className="text-xs text-muted-foreground">to</span>
+          <Input
+            type="date"
+            value={customEnd}
+            onChange={(e) => setCustomEnd(e.target.value)}
+            className="h-6 w-auto text-xs"
+          />
+        </div>
+      )}
+
+      {showTypeFilter && (
+        <div className="mb-3 flex flex-wrap justify-end gap-1">
+          <Button
+            size="sm"
+            variant={selectedTypes.size === 0 ? "default" : "outline"}
+            className="h-6 px-2 text-xs"
+            onClick={() => setSelectedTypes(new Set())}
+          >
+            All
+          </Button>
+          {transactionTypes.map((type) => (
+            <Button
+              key={type}
+              size="sm"
+              variant={selectedTypes.has(type) ? "default" : "outline"}
+              className="h-6 px-2 text-xs capitalize"
+              onClick={() => toggleType(type)}
+            >
+              {type}
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {showSymbolFilter && symbols.length > 1 && (
+        <div className="mb-3 flex flex-wrap justify-end gap-1">
           <Button
             size="sm"
             variant={selectedSymbols.size === 0 ? "default" : "outline"}
@@ -338,27 +395,41 @@ export function TransactionsTab({
       )}
 
       <div className="space-y-1">
+        <div
+          className={`grid items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground ${manageMode ? "grid-cols-[90px_1fr_70px_80px_80px_80px_32px]" : "grid-cols-[90px_1fr_70px_80px_80px_80px]"}`}
+        >
+          <span>Date</span>
+          <span>Symbol</span>
+          <span>Type</span>
+          <span className="text-right">Qty</span>
+          <span className="text-right">Price</span>
+          <span className="text-right">Fee</span>
+          {manageMode && <span />}
+        </div>
         {filteredTransactions.map((tx) => (
-          <div key={tx.id} className="flex items-center justify-between border-b py-2 text-sm">
-            <div>
-              <span className="font-medium">{tx.symbol}</span>
-              <span className="ml-2 text-xs text-muted-foreground">{tx.name}</span>
-              <TransactionTypeBadge type={tx.type} />
-              <span className="ml-2 text-muted-foreground">{tx.date}</span>
+          <div
+            key={tx.id}
+            className={`grid items-center gap-2 border-b py-2 text-sm ${manageMode ? "grid-cols-[90px_1fr_70px_80px_80px_80px_32px]" : "grid-cols-[90px_1fr_70px_80px_80px_80px]"}`}
+          >
+            <span className="text-muted-foreground">{tx.date}</span>
+            <div className="min-w-0">
+              <div className="truncate font-medium">{tx.symbol}</div>
+              <div className="truncate text-xs text-muted-foreground">{tx.name}</div>
             </div>
-            <div className="flex items-center gap-3">
-              <span>
-                {tx.quantity} × {tx.price}
-              </span>
-              {tx.fee > 0 && <span className="text-muted-foreground">fee {tx.fee}</span>}
+            <TransactionTypeBadge type={tx.type} />
+            <span className="text-right">{tx.quantity}</span>
+            <span className="text-right">{tx.price.toFixed(3)}</span>
+            <span className="text-right text-muted-foreground">{tx.fee > 0 ? tx.fee : ""}</span>
+            {manageMode && (
               <Button
-                variant="link"
-                className="h-auto p-0 text-xs text-destructive"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground hover:text-destructive"
                 onClick={() => setDeleteId(tx.id)}
               >
-                Delete
+                <Trash2 className="h-4 w-4 text-destructive" />
               </Button>
-            </div>
+            )}
           </div>
         ))}
         {filteredTransactions.length === 0 && <EmptyState message="No transactions yet." />}

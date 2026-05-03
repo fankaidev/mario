@@ -21,18 +21,20 @@ function Th({
   field,
   sort,
   onSort,
+  align,
 }: {
   label: string;
   field: SortField;
   sort: SortState;
   onSort: (s: SortState) => void;
+  align?: "left" | "right";
 }) {
   const isActive = sort.field === field;
   const arrow = isActive ? (sort.direction === "asc" ? "↑" : "↓") : "";
 
   return (
     <TableHead
-      className="cursor-pointer select-none"
+      className={`cursor-pointer select-none ${align === "right" ? "text-right" : ""}`}
       onClick={() =>
         onSort({
           field,
@@ -94,25 +96,25 @@ function LotDetailsRow({
             </div>
           )}
         </TableCell>
-        <TableCell>{holding.quantity}</TableCell>
-        <TableCell>{(holding.cost / holding.quantity).toFixed(3)}</TableCell>
-        <TableCell>{holding.price?.toFixed(3) ?? "-"}</TableCell>
-        <TableCell>
+        <TableCell className="text-right">{holding.quantity}</TableCell>
+        <TableCell className="text-right">{(holding.cost / holding.quantity).toFixed(3)}</TableCell>
+        <TableCell className="text-right">{holding.price?.toFixed(3) ?? "-"}</TableCell>
+        <TableCell className="text-right">
           {holding.market_value != null ? Math.round(holding.market_value).toLocaleString() : "-"}
         </TableCell>
         <TableCell
-          className={(holding.unrealized_pnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"}
+          className={`text-right ${(holding.unrealized_pnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}
         >
           {holding.unrealized_pnl != null
             ? Math.round(holding.unrealized_pnl).toLocaleString()
             : "-"}
         </TableCell>
         <TableCell
-          className={(holding.unrealized_pnl_rate ?? 0) >= 0 ? "text-green-600" : "text-red-600"}
+          className={`text-right ${(holding.unrealized_pnl_rate ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}
         >
-          {holding.unrealized_pnl_rate != null ? `${holding.unrealized_pnl_rate}%` : "-"}
+          {holding.unrealized_pnl_rate != null ? `${holding.unrealized_pnl_rate.toFixed(1)}%` : "-"}
         </TableCell>
-        <TableCell className="text-muted-foreground">
+        <TableCell className="text-right text-muted-foreground">
           {totalMarketValue > 0
             ? `${(((holding.market_value ?? 0) / totalMarketValue) * 100).toFixed(1)}%`
             : "-"}
@@ -205,7 +207,11 @@ function MobileLotDetailsCard({
             {holding.unrealized_pnl != null
               ? Math.round(holding.unrealized_pnl).toLocaleString()
               : "-"}{" "}
-            ({holding.unrealized_pnl_rate != null ? `${holding.unrealized_pnl_rate}%` : "-"})
+            (
+            {holding.unrealized_pnl_rate != null
+              ? `${holding.unrealized_pnl_rate.toFixed(1)}%`
+              : "-"}
+            )
           </span>
         </div>
       </CardContent>
@@ -347,13 +353,25 @@ export function HoldingsTab({
           <TableHeader>
             <TableRow>
               <Th label="Symbol" field="symbol" sort={sort} onSort={setSort} />
-              <Th label="Qty" field="quantity" sort={sort} onSort={setSort} />
-              <Th label="Avg Cost" field="cost" sort={sort} onSort={setSort} />
-              <Th label="Price" field="price" sort={sort} onSort={setSort} />
-              <Th label="Mkt Value" field="marketValue" sort={sort} onSort={setSort} />
-              <Th label="P&L" field="unrealizedPnl" sort={sort} onSort={setSort} />
-              <Th label="P&L%" field="unrealizedPnlRate" sort={sort} onSort={setSort} />
-              <Th label="Weight%" field="weight" sort={sort} onSort={setSort} />
+              <Th label="Qty" field="quantity" sort={sort} onSort={setSort} align="right" />
+              <Th label="Avg Cost" field="cost" sort={sort} onSort={setSort} align="right" />
+              <Th label="Price" field="price" sort={sort} onSort={setSort} align="right" />
+              <Th
+                label="Mkt Value"
+                field="marketValue"
+                sort={sort}
+                onSort={setSort}
+                align="right"
+              />
+              <Th label="P&L" field="unrealizedPnl" sort={sort} onSort={setSort} align="right" />
+              <Th
+                label="P&L%"
+                field="unrealizedPnlRate"
+                sort={sort}
+                onSort={setSort}
+                align="right"
+              />
+              <Th label="Weight%" field="weight" sort={sort} onSort={setSort} align="right" />
             </TableRow>
           </TableHeader>
           <TableBody>

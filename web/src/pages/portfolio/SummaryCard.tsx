@@ -13,12 +13,12 @@ function MetricBox({
   highlight?: boolean;
 }) {
   return (
-    <div>
+    <div className="text-center">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p
         className={`text-base md:text-lg font-medium ${highlight ? "font-bold" : ""} ${typeof value === "number" && value >= 0 ? "text-green-700" : typeof value === "number" ? "text-red-700" : ""}`}
       >
-        {typeof value === "number" ? value.toLocaleString() : value}
+        {typeof value === "number" ? Math.round(value).toLocaleString() : value}
       </p>
     </div>
   );
@@ -38,13 +38,21 @@ export function SummaryCard({ id }: { id: string }) {
     <Card>
       <CardContent className="p-4">
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-          <MetricBox label="Total Investment" value={s.total_investment} />
+          <MetricBox label="Portfolio Value" value={s.portfolio_value} />
           <MetricBox label="Securities Value" value={s.securities_value} />
           <MetricBox label="Cash Balance" value={s.cash_balance} />
-          <MetricBox label="Portfolio Value" value={s.portfolio_value} />
-          <MetricBox label="Total P&L" value={s.total_pnl} highlight />
+          <MetricBox label="Total Investment" value={s.total_investment} />
+          <MetricBox label="Dividend Income" value={s.dividend_income} />
           <MetricBox label="Return Rate" value={`${s.return_rate}%`} />
+          <MetricBox label="Total P&L" value={s.total_pnl} highlight />
+          <MetricBox label="Unrealized P&L" value={s.unrealized_pnl} />
+          <MetricBox label="Realized P&L" value={s.realized_pnl} />
         </div>
+        {s.price_updated_at && (
+          <p className="mt-3 text-right text-xs text-muted-foreground">
+            Prices as of: {s.price_updated_at}
+          </p>
+        )}
       </CardContent>
     </Card>
   );
