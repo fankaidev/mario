@@ -113,7 +113,7 @@ export function LineChart({ data, height = 200, formatValue, minValue, markers }
       const gap = 8;
       let tx = x + gap;
       if (tx + tw > chartWidth - rightPad) {
-        tx = x - tw - gap;
+        tx = Math.max(leftPad, x - tw - gap);
       }
       const ty = topPad + 4;
 
