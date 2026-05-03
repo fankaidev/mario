@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { AuthVariables } from "../middleware/auth";
 import type { Bindings } from "../types";
 import type { Transfer, TransferType } from "../../shared/types/api";
+import { calculateCashBalance } from "./portfolios";
 
 const transfers = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
@@ -40,6 +41,15 @@ transfers.post("/", async (c) => {
 
   const fee = typeof body.fee === "number" && body.fee >= 0 ? body.fee : 0;
   const transferType = body.type as TransferType;
+
+  // withdrawal validation: check if sufficient balance
+  if (transferType === "withdrawal") {
+    const cashChange = body.amount + fee;
+    const currentCashBalance = await calculateCashBalance(c.env.DB, portfolioId);
+    if (currentCashBalance < cashChange) {
+      return c.json({ error: "Insufficient cash balance" }, 400);
+    }
+  }
 
   const result = await c.env.DB.prepare(
     "INSERT INTO transfers (portfolio_id, type, amount, fee, date, note) VALUES (?, ?, ?, ?, ?, ?)",
@@ -96,6 +106,15 @@ transfers.delete("/:transferId", async (c) => {
     .bind(transferId, portfolioId)
     .first<{ id: number; type: string; amount: number; fee: number }>();
   if (!transfer) return c.json({ error: "Transfer not found" }, 404);
+
+  // Check if deleting deposit would cause negative balance
+  if (transfer.type === "deposit") {
+    const currentBalance = await calculateCashBalance(c.env.DB, portfolioId);
+    const cashChange = transfer.amount - transfer.fee;
+    if (currentBalance - cashChange < 0) {
+      return c.json({ error: "Would result in negative cash balance" }, 400);
+    }
+  }
 
   await c.env.DB.prepare("DELETE FROM transfers WHERE id = ?").bind(transferId).run();
 
