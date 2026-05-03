@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2, Wrench, Check } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
@@ -143,6 +143,17 @@ export function TransfersTab({ id, currency }: { id: string; currency: string })
     },
   });
 
+  const transfersWithRunningTotal = useMemo(() => {
+    const transfers = data?.data ?? [];
+    const sorted = [...transfers].sort((a, b) => a.date.localeCompare(b.date));
+    let runningTotal = 0;
+    return sorted.map((t) => {
+      const netEffect = t.type === "deposit" ? t.amount - t.fee : -(t.amount + t.fee);
+      runningTotal += netEffect;
+      return { ...t, runningTotal };
+    });
+  }, [data?.data]);
+
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
 
   return (
@@ -164,7 +175,7 @@ export function TransfersTab({ id, currency }: { id: string; currency: string })
 
       <div className="space-y-1">
         <div
-          className={`grid items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground ${manageMode ? "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_32px]" : "grid-cols-[90px_90px_1fr_60px_100px_80px_100px]"}`}
+          className={`grid items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground ${manageMode ? "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_100px_32px]" : "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_100px]"}`}
         >
           <span>Date</span>
           <span>Type</span>
@@ -173,14 +184,15 @@ export function TransfersTab({ id, currency }: { id: string; currency: string })
           <span className="text-right">Amount</span>
           <span className="text-right">Fee</span>
           <span className="text-right">Net</span>
+          <span className="text-right">Investment</span>
           {manageMode && <span />}
         </div>
-        {data?.data.map((t) => {
+        {transfersWithRunningTotal.map((t) => {
           const netEffect = t.type === "deposit" ? t.amount - t.fee : -(t.amount + t.fee);
           return (
             <div
               key={t.id}
-              className={`grid items-center gap-2 border-b py-2 text-sm ${manageMode ? "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_32px]" : "grid-cols-[90px_90px_1fr_60px_100px_80px_100px]"}`}
+              className={`grid items-center gap-2 border-b py-2 text-sm ${manageMode ? "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_100px_32px]" : "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_100px]"}`}
             >
               <span className="text-muted-foreground">{t.date}</span>
               <Badge
@@ -198,6 +210,9 @@ export function TransfersTab({ id, currency }: { id: string; currency: string })
               <span className={`text-right ${netEffect >= 0 ? "text-green-600" : "text-red-600"}`}>
                 {netEffect >= 0 ? "+" : ""}
                 {netEffect.toLocaleString()}
+              </span>
+              <span className="text-right font-medium">
+                {Math.round(t.runningTotal).toLocaleString()}
               </span>
               {manageMode && (
                 <Button
