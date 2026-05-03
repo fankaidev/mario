@@ -37,4 +37,8 @@
 | UC-PORTFOLIO-006-S10 | P1 | ❌ | Given portfolio holds AAPL (price updated 2024-03-01) and TSLA (price updated 2024-03-02), When viewing portfolio summary, Then return price_updated_at 2024-03-01 (the oldest latest date) | R13 |
 
 ### ai-e2e
-(none)
+
+| ID | Priority | Status | Scenario |
+|----|----------|--------|----------|
+| UC-PORTFOLIO-006-S11 | P2 | ❌ | Given portfolio summary with historical snapshots, When user hovers over the market value chart, Then a crosshair vertical line appears at the nearest data point, tooltip shows the date and all series values at that point, and cursor changes to crosshair |
+| UC-PORTFOLIO-006-S12 | P2 | ❌ | Given portfolio summary chart with hover tooltip visible, When user moves mouse away from the chart, Then the crosshair line and tooltip disappear |
