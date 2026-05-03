@@ -27,6 +27,7 @@ export function PortfolioList() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [manageMode, setManageMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [chartRange, setChartRange] = useState<"1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL">("1Y");
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["portfolios"],
@@ -61,29 +62,89 @@ export function PortfolioList() {
     })
     .flat();
 
+  const chartCutoff = useMemo(() => {
+    const today = new Date();
+    let start: Date;
+    switch (chartRange) {
+      case "1M":
+        start = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+        break;
+      case "3M":
+        start = new Date(today.getFullYear(), today.getMonth() - 3, today.getDate());
+        break;
+      case "6M":
+        start = new Date(today.getFullYear(), today.getMonth() - 6, today.getDate());
+        break;
+      case "YTD":
+        start = new Date(today.getFullYear(), 0, 1);
+        break;
+      case "1Y":
+        start = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+        break;
+      case "ALL":
+        return undefined;
+    }
+    return start.toISOString().split("T")[0];
+  }, [chartRange]);
+
   const chartData = useMemo(() => {
     if (allSnapshotData.length === 0) return [];
     const portfoliosById = new Map(portfolios.map((p) => [p.id, p]));
-    const byDate = new Map<string, Array<{ label: string; value: number; color: string }>>();
+
+    // Build a map of portfolio_id -> sorted snapshots
+    const snapshotsByPortfolio = new Map<number, Array<Snapshot & { portfolio_id: number }>>();
     for (const snap of allSnapshotData) {
-      if (!byDate.has(snap.date)) {
-        byDate.set(snap.date, []);
+      if (!snapshotsByPortfolio.has(snap.portfolio_id)) {
+        snapshotsByPortfolio.set(snap.portfolio_id, []);
       }
-      const p = portfoliosById.get(snap.portfolio_id);
-      if (!p) continue;
-      const idx = portfolios.findIndex((pf) => pf.id === p.id);
-      byDate.get(snap.date)!.push({
-        label: p.name,
-        value: snap.market_value,
-        color: getPortfolioColor(idx),
-      });
+      snapshotsByPortfolio.get(snap.portfolio_id)!.push(snap);
     }
-    const sortedDates = [...byDate.keys()].sort();
-    return sortedDates.map((date) => ({
-      label: date,
-      segments: byDate.get(date) ?? [],
-    }));
-  }, [allSnapshotData, portfolios]);
+    // Sort each portfolio's snapshots by date
+    for (const [_, snaps] of snapshotsByPortfolio) {
+      snaps.sort((a, b) => a.date.localeCompare(b.date));
+    }
+
+    // Collect all unique dates across all portfolios (filter by cutoff)
+    const allDates = new Set<string>();
+    for (const snap of allSnapshotData) {
+      if (!chartCutoff || snap.date >= chartCutoff) {
+        allDates.add(snap.date);
+      }
+    }
+    const sortedDates = [...allDates].sort();
+
+    // For each date, get value for each portfolio (forward-fill if missing)
+    return sortedDates.map((date) => {
+      const segments: Array<{ label: string; value: number; color: string }> = [];
+      for (const [portfolioId, snaps] of snapshotsByPortfolio) {
+        const p = portfoliosById.get(portfolioId);
+        if (!p) continue;
+
+        // Find the last snapshot on or before this date
+        let lastSnap: (Snapshot & { portfolio_id: number }) | undefined;
+        for (const snap of snaps) {
+          if (snap.date <= date) {
+            lastSnap = snap;
+          } else {
+            break;
+          }
+        }
+
+        if (lastSnap) {
+          const idx = portfolios.findIndex((pf) => pf.id === p.id);
+          segments.push({
+            label: p.name,
+            value: lastSnap.market_value + lastSnap.cash_balance,
+            color: getPortfolioColor(idx),
+          });
+        }
+      }
+      return {
+        label: date,
+        segments,
+      };
+    });
+  }, [allSnapshotData, portfolios, chartCutoff]);
 
   const togglePortfolio = (id: number) => {
     setSelectedIds((prev) => {
@@ -164,28 +225,43 @@ export function PortfolioList() {
 
       {!manageMode && portfolios.length > 0 && chartData.length > 0 && (
         <div className="mb-6">
-          <div className="mb-3 flex flex-wrap items-center gap-1">
-            {portfolios.map((p, i) => (
-              <Button
-                key={p.id}
-                size="sm"
-                variant={selectedIds.has(p.id) ? "default" : "outline"}
-                className="h-6 px-2 text-xs"
-                onClick={() => togglePortfolio(p.id)}
-              >
-                <span
-                  className="mr-1 inline-block h-2 w-2 rounded-full"
-                  style={{
-                    backgroundColor: selectedIds.has(p.id) ? "#fff" : getPortfolioColor(i),
-                  }}
-                />
-                {p.name}
-              </Button>
-            ))}
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1">
+              {portfolios.map((p, i) => (
+                <Button
+                  key={p.id}
+                  size="sm"
+                  variant={selectedIds.has(p.id) ? "default" : "outline"}
+                  className="h-6 px-2 text-xs"
+                  onClick={() => togglePortfolio(p.id)}
+                >
+                  <span
+                    className="mr-1 inline-block h-2 w-2 rounded-full"
+                    style={{
+                      backgroundColor: selectedIds.has(p.id) ? "#fff" : getPortfolioColor(i),
+                    }}
+                  />
+                  {p.name}
+                </Button>
+              ))}
+            </div>
+            <div className="flex items-center gap-1">
+              {(["1M", "3M", "6M", "YTD", "1Y", "ALL"] as const).map((r) => (
+                <Button
+                  key={r}
+                  size="sm"
+                  variant={chartRange === r ? "default" : "outline"}
+                  className="h-6 px-2 text-xs"
+                  onClick={() => setChartRange(r)}
+                >
+                  {r}
+                </Button>
+              ))}
+            </div>
           </div>
           <Card>
             <CardContent className="p-4">
-              <h3 className="mb-3 text-sm font-semibold">Assets Over Time</h3>
+              <h3 className="mb-3 text-sm font-semibold">Portfolio Value Over Time</h3>
               <StackedBarChart
                 data={chartData}
                 height={250}
