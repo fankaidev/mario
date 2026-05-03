@@ -138,6 +138,24 @@ curl https://your-app.workers.dev/api/portfolios \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
+#### Delete Portfolio (Soft Delete)
+
+```bash
+curl -X DELETE https://your-app.workers.dev/api/portfolios/{id} \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+Marks portfolio as deleted (sets `deleted_at` timestamp). All data is preserved and can be restored.
+
+#### Restore Portfolio
+
+```bash
+curl -X POST https://your-app.workers.dev/api/portfolios/{id}/restore \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+Restores a soft-deleted portfolio (clears `deleted_at`).
+
 #### Get Portfolio Summary
 
 ```bash

@@ -64,7 +64,7 @@ A personal portfolio tracker for US, HK, and China A-share markets. Deployed on 
    - Verify all `api-test` scenarios have test coverage (ai-e2e scenarios excluded)
    - Confirm no unrelated changes
    - Evaluate implementation approach for correctness and reasonableness
-   - **Submit review via `gh pr review`** (not just a comment)
+    - **Submit review via `gh pr review --comment`** (GitHub blocks self-approve, so use `--comment` instead of `--approve`)
 
 8. **Handle PR comments** — Inspect all PR comments and reviews. Blocking comments must be fixed or answered with a clear reason why no code change is needed. Non-blocking suggestions may be addressed immediately or converted into a follow-up Issue. After any PR follow-up fix, commit and push the fix to the same PR branch. After handling a comment, reply to the original comment with the fix commit, verification result, or follow-up Issue
 
