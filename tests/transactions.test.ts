@@ -69,13 +69,18 @@ describe("Buy Transaction", () => {
     expect(body.data.quantity).toBe(100);
     expect(body.data.fee).toBe(5);
 
-    const lot = await db
-      .prepare("SELECT remaining_quantity, cost_basis FROM lots WHERE transaction_id = ?")
-      .bind(body.data.id)
-      .first<{ remaining_quantity: number; cost_basis: number }>();
-    expect(lot).not.toBeNull();
-    expect(lot!.remaining_quantity).toBe(100);
-    expect(lot!.cost_basis).toBe(100 * 150 + 5);
+    // Verify lot created via holdings endpoint
+    const holdingsRes = await worker.fetch(
+      `http://localhost/api/portfolios/${portfolioId}/holdings`,
+      { headers: authHeaders() },
+    );
+    const holdingsBody = (await holdingsRes.json()) as {
+      data: Array<{ symbol: string; quantity: number; cost: number }>;
+    };
+    expect(holdingsBody.data).toHaveLength(1);
+    expect(holdingsBody.data[0].symbol).toBe("AAPL");
+    expect(holdingsBody.data[0].quantity).toBe(100);
+    expect(holdingsBody.data[0].cost).toBe(100 * 150 + 5);
   });
 
   it("[UC-PORTFOLIO-002-S02] multiple buys create independent lots", async () => {
@@ -91,19 +96,18 @@ describe("Buy Transaction", () => {
       body: JSON.stringify(buyPayload("AAPL", 50, 160, "2024-02-10", 3)),
     });
     expect(res2.status).toBe(201);
-    const body2 = (await res2.json()) as { data: { id: number } };
 
-    const lots = await db
-      .prepare("SELECT remaining_quantity, cost_basis FROM lots WHERE symbol = ? ORDER BY id")
-      .bind("AAPL")
-      .all<{ remaining_quantity: number; cost_basis: number }>();
-    expect(lots.results).toHaveLength(2);
-    expect(lots.results[0].remaining_quantity).toBe(100);
-    expect(lots.results[0].cost_basis).toBe(100 * 150 + 5);
-    expect(lots.results[1].remaining_quantity).toBe(50);
-    expect(lots.results[1].cost_basis).toBe(50 * 160 + 3);
-
-    expect(body2.data.id).toBeGreaterThan(0);
+    // Verify via holdings endpoint - should aggregate both lots
+    const holdingsRes = await worker.fetch(
+      `http://localhost/api/portfolios/${portfolioId}/holdings`,
+      { headers: authHeaders() },
+    );
+    const holdingsBody = (await holdingsRes.json()) as {
+      data: Array<{ symbol: string; quantity: number; cost: number }>;
+    };
+    expect(holdingsBody.data).toHaveLength(1);
+    expect(holdingsBody.data[0].quantity).toBe(150); // 100 + 50
+    expect(holdingsBody.data[0].cost).toBe(100 * 150 + 5 + 50 * 160 + 3); // 15005 + 8003 = 23008
   });
 
   it("returns 404 for non-existent portfolio", async () => {

@@ -110,7 +110,7 @@ prices.post("/sync", async (c) => {
     ? [body.symbol]
     : (
         await c.env.DB.prepare(
-          "SELECT DISTINCT symbol FROM lots WHERE remaining_quantity > 0",
+          "SELECT DISTINCT symbol FROM transactions WHERE type IN ('buy', 'sell', 'initial')",
         ).all<{
           symbol: string;
         }>()

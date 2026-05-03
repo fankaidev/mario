@@ -3,6 +3,8 @@ import type { AuthVariables } from "../middleware/auth";
 import type { Bindings } from "../types";
 import type { IbkrFlexClient } from "../clients/ibkr";
 import { mapIbkrSymbol } from "../clients/ibkr";
+import type { Transaction } from "../../shared/types/api";
+import { replayFIFO } from "../lib/fifo";
 
 const importRoutes = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
@@ -55,9 +57,29 @@ export async function importIbkrStatement(
       }
 
       const txType = trade.buySell === "BUY" ? "buy" : "sell";
-      const costBasis = trade.quantity * trade.tradePrice + trade.ibCommission;
 
-      const txResult = await db
+      // For sells, validate sufficient quantity via FIFO replay before inserting
+      if (txType === "sell") {
+        const txRows = await db
+          .prepare(
+            "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ? ORDER BY date, created_at",
+          )
+          .bind(portfolioId)
+          .all<Transaction>();
+
+        const { lots } = replayFIFO(txRows.results);
+        const symbolLots = lots.filter((l) => l.symbol === symbol && l.remaining_quantity > 0);
+        const totalRemaining = symbolLots.reduce((sum, l) => sum + l.remaining_quantity, 0);
+
+        if (totalRemaining < trade.quantity) {
+          result.errors.push(
+            `Insufficient lots for ${symbol} sell of ${trade.quantity} on ${trade.tradeDate}`,
+          );
+          continue;
+        }
+      }
+
+      await db
         .prepare(
           "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, ?, ?, ?, ?, ?, ?)",
         )
@@ -71,83 +93,6 @@ export async function importIbkrStatement(
           trade.tradeDate,
         )
         .run();
-
-      if (txType === "buy") {
-        await db
-          .prepare(
-            "INSERT INTO lots (transaction_id, portfolio_id, symbol, quantity, remaining_quantity, cost_basis) VALUES (?, ?, ?, ?, ?, ?)",
-          )
-          .bind(
-            txResult.meta.last_row_id,
-            portfolioId,
-            symbol,
-            trade.quantity,
-            trade.quantity,
-            costBasis,
-          )
-          .run();
-      } else {
-        // Sell: consume lots in FIFO order
-        const lots = await db
-          .prepare(
-            "SELECT id, quantity, remaining_quantity, cost_basis FROM lots WHERE portfolio_id = ? AND symbol = ? AND remaining_quantity > 0 ORDER BY created_at ASC",
-          )
-          .bind(portfolioId, symbol)
-          .all<{ id: number; quantity: number; remaining_quantity: number; cost_basis: number }>();
-
-        const totalRemaining = lots.results.reduce((sum, l) => sum + l.remaining_quantity, 0);
-        if (totalRemaining < trade.quantity) {
-          result.errors.push(
-            `Insufficient lots for ${symbol} sell of ${trade.quantity} on ${trade.tradeDate}`,
-          );
-          // Delete the transaction we just inserted
-          await db
-            .prepare("DELETE FROM transactions WHERE id = ?")
-            .bind(txResult.meta.last_row_id)
-            .run();
-          continue;
-        }
-
-        const statements: D1PreparedStatement[] = [];
-        let remainingToSell = trade.quantity;
-
-        for (const lot of lots.results) {
-          if (remainingToSell <= 0) break;
-          const consumed = Math.min(lot.remaining_quantity, remainingToSell);
-          const newRemaining = lot.remaining_quantity - consumed;
-          statements.push(
-            db
-              .prepare("UPDATE lots SET remaining_quantity = ? WHERE id = ?")
-              .bind(newRemaining, lot.id),
-          );
-
-          const lotProceeds =
-            trade.tradePrice * consumed - trade.ibCommission * (consumed / trade.quantity);
-          const cost = (lot.cost_basis / lot.quantity) * consumed;
-          const pnl = lotProceeds - cost;
-          const costPerShare = lot.cost_basis / lot.quantity;
-
-          statements.push(
-            db
-              .prepare(
-                "INSERT INTO realized_pnl (sell_transaction_id, lot_id, quantity, proceeds, cost, pnl, sell_price, cost_per_share) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-              )
-              .bind(
-                txResult.meta.last_row_id,
-                lot.id,
-                consumed,
-                lotProceeds,
-                cost,
-                pnl,
-                trade.tradePrice,
-                costPerShare,
-              ),
-          );
-          remainingToSell -= consumed;
-        }
-
-        await db.batch(statements);
-      }
 
       result.trades_imported++;
     } catch (e) {

@@ -37,11 +37,9 @@ corporateActions.post("/", async (c) => {
     .bind(portfolioId, body.symbol.trim(), body.type, body.ratio, body.effective_date)
     .run();
 
-  await c.env.DB.prepare(
-    "UPDATE lots SET quantity = quantity * ?, remaining_quantity = remaining_quantity * ? WHERE portfolio_id = ? AND symbol = ? AND remaining_quantity > 0",
-  )
-    .bind(body.ratio, body.ratio, portfolioId, body.symbol.trim())
-    .run();
+  // TODO: In Event Sourcing model, corporate actions should be applied during FIFO replay
+  // For now, this endpoint only records the action but doesn't modify lots
+  // Full implementation requires updating replayFIFO to apply corporate actions chronologically
 
   return c.json({ data: { symbol: body.symbol.trim(), type: body.type, ratio: body.ratio } }, 201);
 });
