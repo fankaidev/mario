@@ -499,13 +499,17 @@ function LotDetailsRow({
           )}
         </TableCell>
         <TableCell>{holding.quantity}</TableCell>
-        <TableCell>{(holding.cost / holding.quantity).toFixed(2)}</TableCell>
-        <TableCell>{holding.price?.toLocaleString() ?? "-"}</TableCell>
-        <TableCell>{holding.market_value?.toLocaleString() ?? "-"}</TableCell>
+        <TableCell>{(holding.cost / holding.quantity).toFixed(3)}</TableCell>
+        <TableCell>{holding.price?.toFixed(3) ?? "-"}</TableCell>
+        <TableCell>
+          {holding.market_value != null ? Math.round(holding.market_value).toLocaleString() : "-"}
+        </TableCell>
         <TableCell
           className={(holding.unrealized_pnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"}
         >
-          {holding.unrealized_pnl?.toLocaleString() ?? "-"}
+          {holding.unrealized_pnl != null
+            ? Math.round(holding.unrealized_pnl).toLocaleString()
+            : "-"}
         </TableCell>
         <TableCell
           className={(holding.unrealized_pnl_rate ?? 0) >= 0 ? "text-green-600" : "text-red-600"}
@@ -581,7 +585,7 @@ function MobileLotDetailsCard({
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">
-            Avg Cost: {(holding.cost / holding.quantity).toFixed(2)}
+            Avg Cost: {(holding.cost / holding.quantity).toFixed(3)}
           </span>
           <span className="text-muted-foreground">
             {totalMarketValue > 0
@@ -591,7 +595,8 @@ function MobileLotDetailsCard({
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">
-            Mkt Value: {holding.market_value?.toLocaleString() ?? "-"}
+            Mkt Value:{" "}
+            {holding.market_value != null ? Math.round(holding.market_value).toLocaleString() : "-"}
           </span>
           <span
             className={
@@ -600,8 +605,11 @@ function MobileLotDetailsCard({
                 : "text-red-600"
             }
           >
-            P&L: {holding.unrealized_pnl?.toLocaleString() ?? "-"} (
-            {holding.unrealized_pnl_rate != null ? `${holding.unrealized_pnl_rate}%` : "-"})
+            P&L:{" "}
+            {holding.unrealized_pnl != null
+              ? Math.round(holding.unrealized_pnl).toLocaleString()
+              : "-"}{" "}
+            ({holding.unrealized_pnl_rate != null ? `${holding.unrealized_pnl_rate}%` : "-"})
           </span>
         </div>
       </CardContent>
