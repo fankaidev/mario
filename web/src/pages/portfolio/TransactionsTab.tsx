@@ -396,7 +396,7 @@ export function TransactionsTab({
 
       <div className="space-y-1">
         <div
-          className={`grid items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground ${manageMode ? "grid-cols-[90px_1fr_70px_80px_80px_80px_32px]" : "grid-cols-[90px_1fr_70px_80px_80px_80px]"}`}
+          className={`grid items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground ${manageMode ? "grid-cols-[90px_1fr_70px_80px_80px_80px_100px_32px]" : "grid-cols-[90px_1fr_70px_80px_80px_80px_100px]"}`}
         >
           <span>Date</span>
           <span>Symbol</span>
@@ -404,34 +404,45 @@ export function TransactionsTab({
           <span className="text-right">Qty</span>
           <span className="text-right">Price</span>
           <span className="text-right">Fee</span>
+          <span className="text-right">Proceeds</span>
           {manageMode && <span />}
         </div>
-        {filteredTransactions.map((tx) => (
-          <div
-            key={tx.id}
-            className={`grid items-center gap-2 border-b py-2 text-sm ${manageMode ? "grid-cols-[90px_1fr_70px_80px_80px_80px_32px]" : "grid-cols-[90px_1fr_70px_80px_80px_80px]"}`}
-          >
-            <span className="text-muted-foreground">{tx.date}</span>
-            <div className="min-w-0">
-              <div className="truncate font-medium">{tx.symbol}</div>
-              <div className="truncate text-xs text-muted-foreground">{tx.name}</div>
+        {filteredTransactions.map((tx) => {
+          const proceeds =
+            tx.type === "buy" || tx.type === "initial"
+              ? -(tx.quantity * tx.price + tx.fee)
+              : tx.quantity * tx.price - tx.fee;
+          return (
+            <div
+              key={tx.id}
+              className={`grid items-center gap-2 border-b py-2 text-sm ${manageMode ? "grid-cols-[90px_1fr_70px_80px_80px_80px_100px_32px]" : "grid-cols-[90px_1fr_70px_80px_80px_80px_100px]"}`}
+            >
+              <span className="text-muted-foreground">{tx.date}</span>
+              <div className="min-w-0">
+                <div className="truncate font-medium">{tx.symbol}</div>
+                <div className="truncate text-xs text-muted-foreground">{tx.name}</div>
+              </div>
+              <TransactionTypeBadge type={tx.type} />
+              <span className="text-right">{tx.quantity}</span>
+              <span className="text-right">{tx.price.toFixed(3)}</span>
+              <span className="text-right text-muted-foreground">{tx.fee > 0 ? tx.fee : ""}</span>
+              <span className={`text-right ${proceeds >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {proceeds >= 0 ? "+" : ""}
+                {proceeds.toLocaleString()}
+              </span>
+              {manageMode && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                  onClick={() => setDeleteId(tx.id)}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              )}
             </div>
-            <TransactionTypeBadge type={tx.type} />
-            <span className="text-right">{tx.quantity}</span>
-            <span className="text-right">{tx.price.toFixed(3)}</span>
-            <span className="text-right text-muted-foreground">{tx.fee > 0 ? tx.fee : ""}</span>
-            {manageMode && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                onClick={() => setDeleteId(tx.id)}
-              >
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-            )}
-          </div>
-        ))}
+          );
+        })}
         {filteredTransactions.length === 0 && <EmptyState message="No transactions yet." />}
       </div>
 
