@@ -104,7 +104,9 @@ snapshots.post("/", async (c) => {
   const portfolioId = parseInt(c.req.param("portfolioId") ?? "", 10);
   if (isNaN(portfolioId)) return c.json({ error: "Invalid portfolio ID" }, 400);
 
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+  )
     .bind(portfolioId, user.id)
     .first();
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
@@ -159,7 +161,9 @@ snapshots.post("/calculate", async (c) => {
   const portfolioId = parseInt(c.req.param("portfolioId") ?? "", 10);
   if (isNaN(portfolioId)) return c.json({ error: "Invalid portfolio ID" }, 400);
 
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+  )
     .bind(portfolioId, user.id)
     .first();
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
@@ -215,7 +219,9 @@ snapshots.get("/", async (c) => {
   const portfolioId = parseInt(c.req.param("portfolioId") ?? "", 10);
   if (isNaN(portfolioId)) return c.json({ error: "Invalid portfolio ID" }, 400);
 
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+  )
     .bind(portfolioId, user.id)
     .first();
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
@@ -235,7 +241,9 @@ snapshots.delete("/:snapshotId", async (c) => {
   const snapshotId = parseInt(c.req.param("snapshotId") ?? "", 10);
   if (isNaN(portfolioId) || isNaN(snapshotId)) return c.json({ error: "Invalid ID" }, 400);
 
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+  )
     .bind(portfolioId, user.id)
     .first();
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);

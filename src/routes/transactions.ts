@@ -83,7 +83,9 @@ transactions.post("/", async (c) => {
     return c.json({ error: err.message }, err.status as 400);
   }
 
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+  )
     .bind(portfolioId, user.id)
     .first<{ id: number }>();
   if (!portfolio) {
@@ -114,7 +116,9 @@ transactions.get("/symbols", async (c) => {
     return c.json({ error: "Invalid portfolio ID" }, 400);
   }
 
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+  )
     .bind(portfolioId, user.id)
     .first();
   if (!portfolio) {
@@ -137,7 +141,9 @@ transactions.get("/", async (c) => {
     return c.json({ error: "Invalid portfolio ID" }, 400);
   }
 
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+  )
     .bind(portfolioId, user.id)
     .first();
   if (!portfolio) {
@@ -209,7 +215,9 @@ transactions.delete("/:txId", async (c) => {
     return c.json({ error: "Invalid ID" }, 400);
   }
 
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+  )
     .bind(portfolioId, user.id)
     .first<{ id: number }>();
   if (!portfolio) {
