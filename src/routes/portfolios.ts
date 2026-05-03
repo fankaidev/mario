@@ -146,7 +146,7 @@ portfolios.post("/:id/restore", async (c) => {
   await c.env.DB.prepare("UPDATE portfolios SET deleted_at = NULL WHERE id = ?").bind(id).run();
 
   const restored = await c.env.DB.prepare(
-    "SELECT id, user_id, name, currency, created_at, archived FROM portfolios WHERE id = ?",
+    "SELECT id, user_id, name, currency, created_at, archived, deleted_at FROM portfolios WHERE id = ?",
   )
     .bind(id)
     .first<Portfolio>();
