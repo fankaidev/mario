@@ -1541,6 +1541,15 @@ function SummaryTab({ id }: { id: string }) {
     queryFn: () => get<{ data: Snapshot[] }>(`/portfolios/${id}/snapshots`),
   });
 
+  const deleteSnapshotMutation = useMutation({
+    mutationFn: (snapshotId: number) =>
+      del<{ data: null }>(`/portfolios/${id}/snapshots/${snapshotId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
+      setDeleteSnapshotId(null);
+    },
+  });
+
   if (summaryLoading || snapshotsLoading)
     return <p className="text-sm text-muted-foreground">Loading...</p>;
 
@@ -1582,15 +1591,6 @@ function SummaryTab({ id }: { id: string }) {
       returnRate: Math.round(rate * 100) / 100,
     });
   }
-
-  const deleteSnapshotMutation = useMutation({
-    mutationFn: (snapshotId: number) =>
-      del<{ data: null }>(`/portfolios/${id}/snapshots/${snapshotId}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
-      setDeleteSnapshotId(null);
-    },
-  });
 
   return (
     <div>
