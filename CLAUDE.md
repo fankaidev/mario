@@ -2,7 +2,7 @@
 
 A personal portfolio tracker for US, HK, and China A-share markets. Deployed on Cloudflare Workers with D1 database.
 
-## Development Workflow
+## Mario Workflow
 
 **Always use `pnpm` instead of `npm` for dependency management and script execution.**
 
@@ -14,8 +14,10 @@ A personal portfolio tracker for US, HK, and China A-share markets. Deployed on 
    - Goal: What problem are we solving or what feature are we adding
    - Approach: How we plan to implement it
    - **Checklist** (must complete before merge):
+
      ```markdown
      ## Checklist
+
      - [ ] Use cases and tests updated
      - [ ] CI passes
      - [ ] Sub-agent review submitted on PR
@@ -95,6 +97,7 @@ Example: `feat: add FIFO lot tracking for sell transactions`
 ## Language
 
 **All content must be in English**, including:
+
 - Code (variables, functions, comments)
 - Documentation (README, CLAUDE.md, use cases, specs)
 - Git commit messages
@@ -113,24 +116,29 @@ Example: `feat: add FIFO lot tracking for sell transactions`
 ## Key Design Decisions
 
 ### Multi-Portfolio, Single Currency
+
 - No cross-currency conversion. Each portfolio is isolated to one currency (USD/HKD/CNY).
 - P&L is calculated only within the portfolio's own currency.
 
 ### FIFO Lot Tracking
-- Every buy creates a `lot` with remaining quantity and cost basis (quantity * price, fee tracked on transaction).
+
+- Every buy creates a `lot` with remaining quantity and cost basis (quantity \* price, fee tracked on transaction).
 - Every sell consumes lots in FIFO order, creating `realized_pnl` records.
 - Lots are immutable; sells update `remaining_quantity` and set `closed=1` when exhausted.
 
 ### Fee Semantics by Transaction Type
+
 - `buy`: fee = commission/broker fee
 - `sell`: fee = commission/broker fee
 - `dividend`: fee = withholding tax
 
 ### Append-Only Transactions
+
 - Transactions cannot be edited. Delete + recreate if correction needed.
 - Deleting a transaction rolls back its lot effects (restores consumed quantities for sells, removes created lots for buys).
 
 ### Prices Table
+
 - Shared across all users. Updated by Cron or manual trigger.
 - Only fetches prices for stocks currently held in any portfolio.
 - Null price = stock not updated yet or fetch failed.
@@ -140,6 +148,7 @@ Example: `feat: add FIFO lot tracking for sell transactions`
 **Principle:** Derive data from authoritative sources rather than storing redundant copies. If data can be calculated from other data, calculate it dynamically instead of storing it.
 
 **Benefits:**
+
 - Always correct: if calculation logic is right, result is right
 - Simpler code: no need to update derived values in multiple places
 - Easier to fix bugs: change one calculation, everywhere updates instantly
@@ -163,6 +172,7 @@ Example: `feat: add FIFO lot tracking for sell transactions`
    - Why: Values depend on current prices and lot state; calculation reflects reality
 
 **When to store vs. calculate:**
+
 - Store: Historical snapshots (`portfolio_snapshots`), immutable events (`transactions`, `transfers`)
 - Calculate: Current state that can be derived (`cash_balance`, `holdings`, `summary`)
 
@@ -204,6 +214,7 @@ Dual-auth approach supporting both web UI and remote API access:
    - Tokens stored as SHA-256 hashes in `api_tokens` table
 
 **Auth middleware priority:**
+
 1. If `Authorization: Bearer <token>` exists → validate token hash, get user
 2. Else if a Cloudflare Access JWT exists → verify JWT, issuer, and audience, then get or create user
 3. Else → 401 Unauthorized
@@ -229,6 +240,7 @@ Dual-auth approach supporting both web UI and remote API access:
 - **Build**: Vite builds to `web/dist/`, served as Workers static assets
 
 ### TypeScript Requirements
+
 - All source files must be `.ts` or `.tsx`. No `.js` or `.jsx`.
 - `strict: true` in `tsconfig.json`.
 - All API response types shared between frontend and backend (single source of truth in `shared/types/`).
