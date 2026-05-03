@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 
 interface DataPoint {
   label: string;
@@ -67,14 +67,119 @@ export function LineChart({ data, height = 200, formatValue, minValue, markers }
   // Only show dots when data is sparse
   const showDots = data.length <= 30;
 
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<SVGSVGElement>) => {
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
+      if (rect.width === 0) return;
+      const vb = svg.viewBox.baseVal;
+      const mx = ((e.clientX - rect.left) / rect.width) * vb.width;
+
+      let nearest = 0;
+      let minDist = Infinity;
+      for (let i = 0; i < data.length; i++) {
+        const dist = Math.abs(scaleX(i) - mx);
+        if (dist < minDist) {
+          minDist = dist;
+          nearest = i;
+        }
+      }
+      setHoverIndex(nearest);
+    },
+    [data.length, leftPad, plotWidth],
+  );
+
+  const handleMouseLeave = useCallback(() => {
+    setHoverIndex(null);
+  }, []);
+
   if (data.length === 0) return null;
+
+  let tooltipGroup = null;
+  if (hoverIndex !== null) {
+    const point = data[hoverIndex];
+    if (point) {
+      const x = scaleX(hoverIndex);
+      const tw = 140;
+      const padding = 6;
+      const lineH = 14;
+      const headerH = 16;
+      const th = headerH + point.values.length * lineH + padding * 2;
+
+      const gap = 8;
+      let tx = x + gap;
+      if (tx + tw > chartWidth - rightPad) {
+        tx = x - tw - gap;
+      }
+      const ty = topPad + 4;
+
+      tooltipGroup = (
+        <g>
+          <line
+            x1={x}
+            y1={topPad}
+            x2={x}
+            y2={chartHeight - bottomPad}
+            stroke="#9ca3af"
+            strokeWidth={1}
+            strokeDasharray="3 3"
+            opacity={0.5}
+          />
+          <rect
+            x={tx}
+            y={ty}
+            width={tw}
+            height={th}
+            rx={4}
+            fill="#fff"
+            stroke="#d1d5db"
+            strokeWidth={1}
+          />
+          <text
+            x={tx + padding}
+            y={ty + padding + 11}
+            fontSize={10}
+            fontWeight="bold"
+            fill="#374151"
+          >
+            {point.label}
+          </text>
+          {point.values.map((v, vi) => (
+            <g key={v.key}>
+              <circle
+                cx={tx + padding + 4}
+                cy={ty + headerH + padding + vi * lineH + 7}
+                r={3}
+                fill={v.color}
+              />
+              <text
+                x={tx + padding + 12}
+                y={ty + headerH + padding + vi * lineH + 11}
+                fontSize={10}
+                fill="#374151"
+              >
+                {v.key}: {formatValue ? formatValue(v.value) : v.value}
+              </text>
+            </g>
+          ))}
+        </g>
+      );
+    }
+  }
 
   return (
     <div className="w-full overflow-x-auto">
       <svg
+        ref={svgRef}
         viewBox={`0 0 ${chartWidth} ${chartHeight}`}
         className="w-full"
-        style={{ minHeight: height }}
+        style={{ minHeight: height, cursor: "crosshair" }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
       >
         {yTickValues.map((v) => (
           <g key={v}>
@@ -103,7 +208,7 @@ export function LineChart({ data, height = 200, formatValue, minValue, markers }
               fontSize={7}
               fill="#9ca3af"
             >
-              {point.label.length > 10 ? point.label.slice(0, 10) + "…" : point.label}
+              {point.label.length > 10 ? point.label.slice(0, 10) + "\u2026" : point.label}
             </text>
           );
         })}
@@ -186,6 +291,7 @@ export function LineChart({ data, height = 200, formatValue, minValue, markers }
             </g>
           );
         })}
+        {tooltipGroup}
       </svg>
     </div>
   );
