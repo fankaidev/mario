@@ -81,7 +81,9 @@ export default {
     }
     console.log(`Scheduled price sync: ${totalRecords} records updated`);
 
-    const portfolios = await env.DB.prepare("SELECT id FROM portfolios WHERE archived = 0").all<{
+    const portfolios = await env.DB.prepare(
+      "SELECT id FROM portfolios WHERE archived = 0 AND deleted_at IS NULL",
+    ).all<{
       id: number;
     }>();
     const today = new Date().toISOString().split("T")[0]!;

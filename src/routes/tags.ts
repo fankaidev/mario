@@ -9,7 +9,9 @@ tags.post("/", async (c) => {
   const portfolioId = parseInt(c.req.param("portfolioId") ?? "", 10);
   if (isNaN(portfolioId)) return c.json({ error: "Invalid portfolio ID" }, 400);
 
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+  )
     .bind(portfolioId, user.id)
     .first();
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
@@ -40,7 +42,9 @@ tags.get("/", async (c) => {
   const portfolioId = parseInt(c.req.param("portfolioId") ?? "", 10);
   if (isNaN(portfolioId)) return c.json({ error: "Invalid portfolio ID" }, 400);
 
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+  )
     .bind(portfolioId, user.id)
     .first();
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
@@ -75,7 +79,9 @@ tags.delete("/:tagId", async (c) => {
   const tagId = parseInt(c.req.param("tagId") ?? "", 10);
   if (isNaN(portfolioId) || isNaN(tagId)) return c.json({ error: "Invalid ID" }, 400);
 
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+  )
     .bind(portfolioId, user.id)
     .first();
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
@@ -96,7 +102,9 @@ tags.post("/:tagId/stocks", async (c) => {
   const tagId = parseInt(c.req.param("tagId") ?? "", 10);
   if (isNaN(portfolioId) || isNaN(tagId)) return c.json({ error: "Invalid ID" }, 400);
 
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+  )
     .bind(portfolioId, user.id)
     .first();
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
@@ -128,7 +136,9 @@ tags.delete("/:tagId/stocks/:symbol", async (c) => {
   if (isNaN(portfolioId) || isNaN(tagId) || !symbol)
     return c.json({ error: "Invalid parameters" }, 400);
 
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+  )
     .bind(portfolioId, user.id)
     .first();
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);

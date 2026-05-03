@@ -71,7 +71,7 @@ portfolios.post("/", async (c) => {
 portfolios.get("/", async (c) => {
   const user = c.get("user");
   const rows = await c.env.DB.prepare(
-    "SELECT id, user_id, name, currency, created_at, archived FROM portfolios WHERE user_id = ? ORDER BY created_at DESC",
+    "SELECT id, user_id, name, currency, created_at, archived FROM portfolios WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC",
   )
     .bind(user.id)
     .all<Portfolio>();
@@ -87,7 +87,7 @@ portfolios.get("/:id", async (c) => {
   }
 
   const portfolio = await c.env.DB.prepare(
-    "SELECT id, user_id, name, currency, created_at, archived FROM portfolios WHERE id = ? AND user_id = ?",
+    "SELECT id, user_id, name, currency, created_at, archived FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
   )
     .bind(id, user.id)
     .first<Portfolio>();
@@ -99,6 +99,58 @@ portfolios.get("/:id", async (c) => {
   return c.json({ data: portfolio });
 });
 
+portfolios.delete("/:id", async (c) => {
+  const user = c.get("user");
+  const id = parseInt(c.req.param("id"), 10);
+  if (isNaN(id)) {
+    return c.json({ error: "Invalid portfolio ID" }, 400);
+  }
+
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+  )
+    .bind(id, user.id)
+    .first<{ id: number }>();
+
+  if (!portfolio) {
+    return c.json({ error: "Portfolio not found" }, 404);
+  }
+
+  await c.env.DB.prepare("UPDATE portfolios SET deleted_at = ? WHERE id = ?")
+    .bind(new Date().toISOString(), id)
+    .run();
+
+  return c.json({ data: { message: "Portfolio deleted" } });
+});
+
+portfolios.post("/:id/restore", async (c) => {
+  const user = c.get("user");
+  const id = parseInt(c.req.param("id"), 10);
+  if (isNaN(id)) {
+    return c.json({ error: "Invalid portfolio ID" }, 400);
+  }
+
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NOT NULL",
+  )
+    .bind(id, user.id)
+    .first<{ id: number }>();
+
+  if (!portfolio) {
+    return c.json({ error: "Portfolio not found or not deleted" }, 404);
+  }
+
+  await c.env.DB.prepare("UPDATE portfolios SET deleted_at = NULL WHERE id = ?").bind(id).run();
+
+  const restored = await c.env.DB.prepare(
+    "SELECT id, user_id, name, currency, created_at, archived FROM portfolios WHERE id = ?",
+  )
+    .bind(id)
+    .first<Portfolio>();
+
+  return c.json({ data: restored });
+});
+
 portfolios.get("/:id/holdings", async (c) => {
   const user = c.get("user");
   const portfolioId = parseInt(c.req.param("id") ?? "", 10);
@@ -106,7 +158,9 @@ portfolios.get("/:id/holdings", async (c) => {
     return c.json({ error: "Invalid portfolio ID" }, 400);
   }
 
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+  )
     .bind(portfolioId, user.id)
     .first();
   if (!portfolio) {
@@ -158,7 +212,9 @@ portfolios.get("/:id/holdings/:symbol/lots", async (c) => {
     return c.json({ error: "Symbol is required" }, 400);
   }
 
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+  )
     .bind(portfolioId, user.id)
     .first();
   if (!portfolio) {
@@ -228,7 +284,9 @@ portfolios.get("/:id/summary", async (c) => {
   const portfolioId = parseInt(c.req.param("id") ?? "", 10);
   if (isNaN(portfolioId)) return c.json({ error: "Invalid portfolio ID" }, 400);
 
-  const portfolio = await c.env.DB.prepare("SELECT id FROM portfolios WHERE id = ? AND user_id = ?")
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+  )
     .bind(portfolioId, user.id)
     .first<{ id: number }>();
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);

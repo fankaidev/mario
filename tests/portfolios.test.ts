@@ -105,4 +105,193 @@ describe("Portfolio CRUD", () => {
     });
     expect(res.status).toBe(401);
   });
+
+  it("[UC-PORTFOLIO-001-S05] soft deletes portfolio and hides from list", async () => {
+    const createRes = await worker.fetch("http://localhost/api/portfolios", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "US Stocks", currency: "USD" }),
+    });
+    expect(createRes.status).toBe(201);
+    const created = (await createRes.json()) as { data: { id: number } };
+    const portfolioId = created.data.id;
+
+    const deleteRes = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+    expect(deleteRes.status).toBe(200);
+    const deleteBody = (await deleteRes.json()) as { data: { message: string } };
+    expect(deleteBody.data.message).toBe("Portfolio deleted");
+
+    const listRes = await worker.fetch("http://localhost/api/portfolios", {
+      headers: authHeaders(),
+    });
+    expect(listRes.status).toBe(200);
+    const listBody = (await listRes.json()) as { data: Array<{ id: number }> };
+    expect(listBody.data).toHaveLength(0);
+  });
+
+  it("[UC-PORTFOLIO-001-S06] deleted portfolio returns 404 on GET by id", async () => {
+    const createRes = await worker.fetch("http://localhost/api/portfolios", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "US Stocks", currency: "USD" }),
+    });
+    const created = (await createRes.json()) as { data: { id: number } };
+    const portfolioId = created.data.id;
+
+    await worker.fetch(`http://localhost/api/portfolios/${portfolioId}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+
+    const getRes = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}`, {
+      headers: authHeaders(),
+    });
+    expect(getRes.status).toBe(404);
+  });
+
+  it("[UC-PORTFOLIO-001-S07] restores deleted portfolio", async () => {
+    const createRes = await worker.fetch("http://localhost/api/portfolios", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "US Stocks", currency: "USD" }),
+    });
+    const created = (await createRes.json()) as { data: { id: number; name: string } };
+    const portfolioId = created.data.id;
+
+    await worker.fetch(`http://localhost/api/portfolios/${portfolioId}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+
+    const restoreRes = await worker.fetch(
+      `http://localhost/api/portfolios/${portfolioId}/restore`,
+      {
+        method: "POST",
+        headers: authHeaders(),
+      },
+    );
+    expect(restoreRes.status).toBe(200);
+    const restored = (await restoreRes.json()) as { data: { id: number; name: string } };
+    expect(restored.data.id).toBe(portfolioId);
+    expect(restored.data.name).toBe("US Stocks");
+
+    const listRes = await worker.fetch("http://localhost/api/portfolios", {
+      headers: authHeaders(),
+    });
+    const listBody = (await listRes.json()) as { data: Array<{ id: number }> };
+    expect(listBody.data).toHaveLength(1);
+    expect(listBody.data[0].id).toBe(portfolioId);
+  });
+
+  it("[UC-PORTFOLIO-001-S08] non-owner cannot delete portfolio", async () => {
+    const createRes = await worker.fetch("http://localhost/api/portfolios", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "US Stocks", currency: "USD" }),
+    });
+    const created = (await createRes.json()) as { data: { id: number } };
+    const portfolioId = created.data.id;
+
+    const otherUser = await db
+      .prepare("INSERT INTO users (email) VALUES (?) RETURNING id")
+      .bind("other@example.com")
+      .first<{ id: number }>();
+    const otherToken = await createApiTokenForUser(db, otherUser!.id);
+
+    const deleteRes = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${otherToken}` },
+    });
+    expect(deleteRes.status).toBe(404);
+  });
+
+  it("[UC-PORTFOLIO-001-S09] unauthenticated delete returns 401", async () => {
+    const deleteRes = await worker.fetch("http://localhost/api/portfolios/1", {
+      method: "DELETE",
+    });
+    expect(deleteRes.status).toBe(401);
+  });
+
+  it("deleted portfolio returns 404 for holdings endpoint", async () => {
+    const createRes = await worker.fetch("http://localhost/api/portfolios", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "US Stocks", currency: "USD" }),
+    });
+    const created = (await createRes.json()) as { data: { id: number } };
+    const portfolioId = created.data.id;
+
+    await worker.fetch(`http://localhost/api/portfolios/${portfolioId}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/holdings`, {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("deleted portfolio returns 404 for summary endpoint", async () => {
+    const createRes = await worker.fetch("http://localhost/api/portfolios", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "US Stocks", currency: "USD" }),
+    });
+    const created = (await createRes.json()) as { data: { id: number } };
+    const portfolioId = created.data.id;
+
+    await worker.fetch(`http://localhost/api/portfolios/${portfolioId}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/summary`, {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("restoring non-deleted portfolio returns 404", async () => {
+    const createRes = await worker.fetch("http://localhost/api/portfolios", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "US Stocks", currency: "USD" }),
+    });
+    const created = (await createRes.json()) as { data: { id: number } };
+    const portfolioId = created.data.id;
+
+    const restoreRes = await worker.fetch(
+      `http://localhost/api/portfolios/${portfolioId}/restore`,
+      {
+        method: "POST",
+        headers: authHeaders(),
+      },
+    );
+    expect(restoreRes.status).toBe(404);
+  });
+
+  it("deleting already deleted portfolio returns 404", async () => {
+    const createRes = await worker.fetch("http://localhost/api/portfolios", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "US Stocks", currency: "USD" }),
+    });
+    const created = (await createRes.json()) as { data: { id: number } };
+    const portfolioId = created.data.id;
+
+    await worker.fetch(`http://localhost/api/portfolios/${portfolioId}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+
+    const deleteRes2 = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+    expect(deleteRes2.status).toBe(404);
+  });
 });

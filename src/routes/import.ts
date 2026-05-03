@@ -265,7 +265,7 @@ importRoutes.post("/ibkr", async (c) => {
   if (isNaN(portfolioId)) return c.json({ error: "Invalid portfolio ID" }, 400);
 
   const portfolio = await c.env.DB.prepare(
-    "SELECT id, currency FROM portfolios WHERE id = ? AND user_id = ?",
+    "SELECT id, currency FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
   )
     .bind(portfolioId, user.id)
     .first<{ id: number; currency: string }>();
