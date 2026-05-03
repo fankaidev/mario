@@ -11,6 +11,8 @@
 | R3 | Portfolio currency cannot be changed once set (USD/HKD/CNY) |
 | R4 | Deleted portfolios can be restored by owner, making them visible again |
 | R5 | Only portfolio owner can delete or restore a portfolio |
+| R6 | Delete buttons on portfolio cards are hidden by default and only visible in Manage mode |
+| R7 | Manage mode reveals delete buttons on portfolio cards, shows the trash section with deleted portfolios, and changes the Manage button to "Done" to exit |
 
 ## Scenarios
 
@@ -27,6 +29,8 @@
 | UC-PORTFOLIO-001-S07 | P0 | ✅ | Given user has deleted a portfolio, When restoring it, Then return success, restored portfolio appears in list again | R4 |
 | UC-PORTFOLIO-001-S08 | P1 | ✅ | Given user has a portfolio, When another user tries to delete it, Then return 404 not found | R5 |
 | UC-PORTFOLIO-001-S09 | P1 | ✅ | Given user has a portfolio, When making an unauthenticated delete request, Then return 401 unauthorized |
+| UC-PORTFOLIO-001-S10 | P2 | ❌ | Given user views the portfolio list, When not in Manage mode, Then delete buttons are hidden and trash section is not visible | R6 |
+| UC-PORTFOLIO-001-S11 | P2 | ❌ | Given user enters Manage mode, When viewing the portfolio list, Then delete buttons appear on portfolio cards, trash section with deleted portfolios is visible, and Manage button changes to Done | R7 |
 
 ### ai-e2e
 (none)
