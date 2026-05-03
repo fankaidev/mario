@@ -201,16 +201,14 @@ export function PortfolioList() {
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {data?.data.map((p) => (
-          <Card key={p.id} className="h-full transition-all hover:shadow-md">
-            <CardHeader className="flex-row items-start justify-between space-y-0">
-              <div>
-                <Link to={`/portfolios/${p.id}`}>
-                  <CardTitle className="hover:underline">{p.name}</CardTitle>
-                </Link>
-                <CardDescription>{p.currency}</CardDescription>
-              </div>
-              {manageMode && (
+        {data?.data.map((p) =>
+          manageMode ? (
+            <Card key={p.id} className="h-full">
+              <CardHeader className="flex-row items-start justify-between space-y-0">
+                <div>
+                  <CardTitle>{p.name}</CardTitle>
+                  <CardDescription>{p.currency}</CardDescription>
+                </div>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -219,15 +217,29 @@ export function PortfolioList() {
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
-              )}
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">
-                Created {new Date(p.created_at).toLocaleDateString()}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">
+                  Created {new Date(p.created_at).toLocaleDateString()}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Link key={p.id} to={`/portfolios/${p.id}`}>
+              <Card className="h-full cursor-pointer transition-all hover:shadow-md">
+                <CardHeader>
+                  <CardTitle>{p.name}</CardTitle>
+                  <CardDescription>{p.currency}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-muted-foreground">
+                    Created {new Date(p.created_at).toLocaleDateString()}
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+          ),
+        )}
       </div>
 
       {manageMode && (
