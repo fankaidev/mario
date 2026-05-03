@@ -110,6 +110,16 @@ describe("Cash Transactions", () => {
     expect(await getCashBalance()).toBe(7000);
   });
 
+  it("[UC-PORTFOLIO-006-S03] withdrawal fails with insufficient balance", async () => {
+    // Seed initial cash via deposit
+    await createTransfer("deposit", 1000, 0);
+
+    const result = await createTransfer("withdrawal", 2000, 0);
+    expect(result.status).toBe(400);
+
+    expect(await getCashBalance()).toBe(1000);
+  });
+
   it("[UC-PORTFOLIO-006-S04] buy decreases cash_balance", async () => {
     // Seed initial cash via deposit
     await createTransfer("deposit", 10000, 0);
@@ -177,6 +187,20 @@ describe("Cash Transactions", () => {
     expect(res.status).toBe(200);
 
     expect(await getCashBalance()).toBe(10000);
+  });
+
+  it("[UC-PORTFOLIO-006-S09] deleting deposit fails if would cause negative balance from withdrawals", async () => {
+    const depositResult = await createTransfer("deposit", 10000, 0);
+    expect(depositResult.status).toBe(201);
+
+    const withdrawalResult = await createTransfer("withdrawal", 6000, 0);
+    expect(withdrawalResult.status).toBe(201);
+    expect(await getCashBalance()).toBe(4000);
+
+    const res = await deleteTransfer(depositResult.data!.id);
+    expect(res.status).toBe(400);
+
+    expect(await getCashBalance()).toBe(4000);
   });
 
   it("[UC-PORTFOLIO-006-S10] buy with insufficient cash allowed (negative balance)", async () => {
