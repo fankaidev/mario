@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, RotateCcw } from "lucide-react";
+import { Check, Plus, Trash2, RotateCcw, Wrench } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -23,7 +23,7 @@ export function PortfolioList() {
   const queryClient = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [showTrash, setShowTrash] = useState(false);
+  const [manageMode, setManageMode] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["portfolios"],
@@ -33,7 +33,7 @@ export function PortfolioList() {
   const { data: trashData } = useQuery({
     queryKey: ["portfolios", "trash"],
     queryFn: () => get<{ data: Portfolio[] }>("/portfolios?include_deleted=true"),
-    enabled: showTrash,
+    enabled: manageMode,
   });
 
   const deletedPortfolios = (trashData?.data ?? []).filter((p) => p.deleted_at !== null);
@@ -75,9 +75,18 @@ export function PortfolioList() {
           <p className="mt-1 text-sm text-muted-foreground">Track assets by market and currency.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowTrash(!showTrash)}>
-            <Trash2 className="h-4 w-4" />
-            Trash
+          <Button variant="outline" onClick={() => setManageMode(!manageMode)}>
+            {manageMode ? (
+              <>
+                <Check className="h-4 w-4" />
+                Done
+              </>
+            ) : (
+              <>
+                <Wrench className="h-4 w-4" />
+                Manage
+              </>
+            )}
           </Button>
           <Button onClick={() => setShowCreate(true)}>
             <Plus className="h-4 w-4" />
@@ -86,7 +95,7 @@ export function PortfolioList() {
         </div>
       </div>
 
-      {data?.data.length === 0 && !showTrash && (
+      {data?.data.length === 0 && !manageMode && (
         <EmptyState message="No portfolios yet. Create one to get started." />
       )}
 
@@ -100,14 +109,16 @@ export function PortfolioList() {
                 </Link>
                 <CardDescription>{p.currency}</CardDescription>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                onClick={() => setDeleteId(p.id)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              {manageMode && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => setDeleteId(p.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               <p className="text-xs text-muted-foreground">
@@ -118,7 +129,7 @@ export function PortfolioList() {
         ))}
       </div>
 
-      {showTrash && (
+      {manageMode && (
         <div className="mt-8">
           <h2 className="mb-4 text-lg font-semibold">Trash</h2>
           {deletedPortfolios.length === 0 ? (
