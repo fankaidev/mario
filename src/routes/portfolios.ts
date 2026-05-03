@@ -60,7 +60,7 @@ portfolios.post("/", async (c) => {
     .run();
 
   const portfolio = await c.env.DB.prepare(
-    "SELECT id, user_id, name, currency, created_at, archived FROM portfolios WHERE id = ?",
+    "SELECT id, user_id, name, currency, created_at, archived, deleted_at FROM portfolios WHERE id = ?",
   )
     .bind(result.meta.last_row_id)
     .first<Portfolio>();
@@ -70,8 +70,11 @@ portfolios.post("/", async (c) => {
 
 portfolios.get("/", async (c) => {
   const user = c.get("user");
+  const includeDeleted = c.req.query("include_deleted") === "true";
   const rows = await c.env.DB.prepare(
-    "SELECT id, user_id, name, currency, created_at, archived FROM portfolios WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC",
+    includeDeleted
+      ? "SELECT id, user_id, name, currency, created_at, archived, deleted_at FROM portfolios WHERE user_id = ? ORDER BY created_at DESC"
+      : "SELECT id, user_id, name, currency, created_at, archived, deleted_at FROM portfolios WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC",
   )
     .bind(user.id)
     .all<Portfolio>();
@@ -87,7 +90,7 @@ portfolios.get("/:id", async (c) => {
   }
 
   const portfolio = await c.env.DB.prepare(
-    "SELECT id, user_id, name, currency, created_at, archived FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+    "SELECT id, user_id, name, currency, created_at, archived, deleted_at FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
   )
     .bind(id, user.id)
     .first<Portfolio>();

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Plus, Trash2, RotateCcw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -8,6 +8,7 @@ import { EmptyState } from "../components/EmptyState";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -15,17 +16,27 @@ import {
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Select } from "../components/ui/select";
-import { get, post } from "../lib/api";
+import { get, post, del } from "../lib/api";
 import type { Portfolio } from "../../../shared/types/api";
 
 export function PortfolioList() {
   const queryClient = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [showTrash, setShowTrash] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["portfolios"],
     queryFn: () => get<{ data: Portfolio[] }>("/portfolios"),
   });
+
+  const { data: trashData } = useQuery({
+    queryKey: ["portfolios", "trash"],
+    queryFn: () => get<{ data: Portfolio[] }>("/portfolios?include_deleted=true"),
+    enabled: showTrash,
+  });
+
+  const deletedPortfolios = (trashData?.data ?? []).filter((p) => p.deleted_at !== null);
 
   const createMutation = useMutation({
     mutationFn: (body: { name: string; currency: string }) =>
@@ -33,6 +44,23 @@ export function PortfolioList() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["portfolios"] });
       setShowCreate(false);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => del<{ data: { message: string } }>(`/portfolios/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["portfolios"] });
+      queryClient.invalidateQueries({ queryKey: ["portfolios", "trash"] });
+      setDeleteId(null);
+    },
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: (id: number) => post<{ data: Portfolio }>(`/portfolios/${id}/restore`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["portfolios"] });
+      queryClient.invalidateQueries({ queryKey: ["portfolios", "trash"] });
     },
   });
 
@@ -46,33 +74,85 @@ export function PortfolioList() {
           <h1 className="text-2xl font-semibold tracking-normal">Portfolios</h1>
           <p className="mt-1 text-sm text-muted-foreground">Track assets by market and currency.</p>
         </div>
-        <Button onClick={() => setShowCreate(true)}>
-          <Plus className="h-4 w-4" />
-          New Portfolio
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowTrash(!showTrash)}>
+            <Trash2 className="h-4 w-4" />
+            Trash
+          </Button>
+          <Button onClick={() => setShowCreate(true)}>
+            <Plus className="h-4 w-4" />
+            New Portfolio
+          </Button>
+        </div>
       </div>
 
-      {data?.data.length === 0 && (
+      {data?.data.length === 0 && !showTrash && (
         <EmptyState message="No portfolios yet. Create one to get started." />
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {data?.data.map((p) => (
-          <Link key={p.id} to={`/portfolios/${p.id}`} className="block">
-            <Card className="h-full transition-all hover:bg-accent hover:shadow-md">
-              <CardHeader>
-                <CardTitle>{p.name}</CardTitle>
+          <Card key={p.id} className="h-full transition-all hover:shadow-md">
+            <CardHeader className="flex-row items-start justify-between space-y-0">
+              <div>
+                <Link to={`/portfolios/${p.id}`}>
+                  <CardTitle className="hover:underline">{p.name}</CardTitle>
+                </Link>
                 <CardDescription>{p.currency}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground">
-                  Created {new Date(p.created_at).toLocaleDateString()}
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                onClick={() => setDeleteId(p.id)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">
+                Created {new Date(p.created_at).toLocaleDateString()}
+              </p>
+            </CardContent>
+          </Card>
         ))}
       </div>
+
+      {showTrash && (
+        <div className="mt-8">
+          <h2 className="mb-4 text-lg font-semibold">Trash</h2>
+          {deletedPortfolios.length === 0 ? (
+            <EmptyState message="No deleted portfolios." />
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {deletedPortfolios.map((p) => (
+                <Card key={p.id} className="h-full opacity-70">
+                  <CardHeader className="flex-row items-start justify-between space-y-0">
+                    <div>
+                      <CardTitle>{p.name}</CardTitle>
+                      <CardDescription>{p.currency}</CardDescription>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-green-600"
+                      onClick={() => restoreMutation.mutate(p.id)}
+                      disabled={restoreMutation.isPending}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-muted-foreground">
+                      Deleted {p.deleted_at ? new Date(p.deleted_at).toLocaleDateString() : ""}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {showCreate && (
         <CreatePortfolioModal
@@ -80,6 +160,30 @@ export function PortfolioList() {
           onCreate={(name, currency) => createMutation.mutate({ name, currency })}
           error={createMutation.error ? createMutation.error.message : undefined}
         />
+      )}
+      {deleteId !== null && (
+        <Dialog open onOpenChange={(open) => !open && setDeleteId(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Delete Portfolio</DialogTitle>
+              <DialogDescription>
+                This portfolio will be moved to trash. You can restore it later.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteId(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => deleteMutation.mutate(deleteId)}
+                disabled={deleteMutation.isPending}
+              >
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
