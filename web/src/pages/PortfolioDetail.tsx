@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import { LineChart } from "../components/LineChart";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -81,7 +81,8 @@ type TabName = "holdings" | "transactions" | "transfers" | "summary" | "tags";
 
 export function PortfolioDetail() {
   const { id } = useParams<{ id: string }>();
-  const [tab, setTab] = useState<TabName>("holdings");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = (searchParams.get("tab") as TabName) || "holdings";
   const [selectedSymbols, setSelectedSymbols] = useState<Set<string>>(new Set());
 
   const { data: portfolioData } = useQuery({
@@ -107,7 +108,14 @@ export function PortfolioDetail() {
 
         <SummaryCard id={id!} />
 
-        <Tabs value={tab} onValueChange={(value) => setTab(value as TabName)} className="mt-6">
+        <Tabs
+          value={tab}
+          onValueChange={(value) => {
+            const next = value as TabName;
+            setSearchParams(next === "holdings" ? {} : { tab: next }, { replace: true });
+          }}
+          className="mt-6"
+        >
           <TabsList className="mb-4 w-full justify-start overflow-x-auto">
             {(
               [
@@ -129,7 +137,7 @@ export function PortfolioDetail() {
               id={id!}
               onSelectSymbol={(s) => {
                 setSelectedSymbols(new Set([s]));
-                setTab("transactions");
+                setSearchParams({ tab: "transactions" }, { replace: true });
               }}
             />
           )}
