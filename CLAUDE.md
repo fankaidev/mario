@@ -10,7 +10,7 @@ A personal portfolio tracker for US, HK, and China A-share markets. Deployed on 
 
 **All changes must be issue-driven and follow the BDD workflow (see `docs/bdd.md`):**
 
-1. **Create Issue first** — Before making any changes, create a GitHub Issue describing:
+1. **Create Issue first** — Before making any changes, create a GitHub Issue with a priority label (`P0`, `P1`, or `P2`) describing:
    - Goal: What problem are we solving or what feature are we adding
    - Approach: How we plan to implement it
    - **Checklist** (must complete before merge):
