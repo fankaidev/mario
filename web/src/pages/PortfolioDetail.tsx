@@ -673,13 +673,18 @@ function PriceHistorySection({
   const prices = data?.data?.prices ?? [];
 
   const { data: txData } = useQuery({
-    queryKey: ["transactions", id, symbol],
-    queryFn: () => get<{ data: Transaction[] }>(`/portfolios/${id}/transactions?symbol=${symbol}`),
+    queryKey: ["transactions", id],
+    queryFn: () => get<{ data: Transaction[] }>(`/portfolios/${id}/transactions`),
     enabled: isVisible,
   });
 
+  const symbolTransactions = useMemo(
+    () => (txData?.data ?? []).filter((tx) => tx.symbol === symbol),
+    [txData?.data, symbol],
+  );
+
   const markers = useMemo(() => {
-    const txs = txData?.data ?? [];
+    const txs = symbolTransactions;
     const result: Array<{ index: number; label: string; color: string }> = [];
     for (const tx of txs) {
       if (tx.type !== "buy" && tx.type !== "sell" && tx.type !== "initial") continue;
@@ -706,7 +711,7 @@ function PriceHistorySection({
       }
     }
     return result;
-  }, [txData, prices]);
+  }, [symbolTransactions, prices]);
 
   if (!isVisible) return null;
 
@@ -765,9 +770,14 @@ function HoldingDetailPanel({ id, symbol }: { id: string; symbol: string }) {
   });
 
   const { data: txData } = useQuery({
-    queryKey: ["transactions", id, symbol],
-    queryFn: () => get<{ data: Transaction[] }>(`/portfolios/${id}/transactions?symbol=${symbol}`),
+    queryKey: ["transactions", id],
+    queryFn: () => get<{ data: Transaction[] }>(`/portfolios/${id}/transactions`),
   });
+
+  const symbolTransactions = useMemo(
+    () => (txData?.data ?? []).filter((tx) => tx.symbol === symbol),
+    [txData?.data, symbol],
+  );
 
   return (
     <div>
@@ -788,7 +798,7 @@ function HoldingDetailPanel({ id, symbol }: { id: string; symbol: string }) {
 
         {activeTab === "transactions" && (
           <div className="space-y-1">
-            {txData?.data.map((tx) => (
+            {symbolTransactions.map((tx) => (
               <div key={tx.id} className="flex items-center justify-between border-b py-1 text-xs">
                 <div>
                   <span className="font-medium">{tx.date}</span>
@@ -800,7 +810,7 @@ function HoldingDetailPanel({ id, symbol }: { id: string; symbol: string }) {
                 {tx.fee > 0 && <span className="text-muted-foreground">fee {tx.fee}</span>}
               </div>
             ))}
-            {(!txData?.data || txData.data.length === 0) && (
+            {symbolTransactions.length === 0 && (
               <p className="text-xs text-muted-foreground">No transactions</p>
             )}
           </div>
@@ -917,20 +927,26 @@ function TransactionsTab({
 
   const endDate = datePreset === "CUSTOM" ? customEnd || undefined : undefined;
 
-  const symbolParam = selectedSymbols.size > 0 ? [...selectedSymbols].join(",") : undefined;
-  const typeParam = selectedTypes.size > 0 ? [...selectedTypes].join(",") : undefined;
-
   const params = new URLSearchParams();
-  if (symbolParam) params.set("symbol", symbolParam);
-  if (typeParam) params.set("type", typeParam);
   if (startDate) params.set("startDate", startDate);
   if (endDate) params.set("endDate", endDate);
   const queryString = params.toString() ? `?${params.toString()}` : "";
 
   const { data, isLoading } = useQuery({
-    queryKey: ["transactions", id, symbolParam, typeParam, startDate, endDate],
+    queryKey: ["transactions", id, startDate, endDate],
     queryFn: () => get<{ data: Transaction[] }>(`/portfolios/${id}/transactions${queryString}`),
   });
+
+  const filteredTransactions = useMemo(() => {
+    let filtered = data?.data ?? [];
+    if (selectedSymbols.size > 0) {
+      filtered = filtered.filter((tx) => selectedSymbols.has(tx.symbol));
+    }
+    if (selectedTypes.size > 0) {
+      filtered = filtered.filter((tx) => selectedTypes.has(tx.type));
+    }
+    return filtered;
+  }, [data?.data, selectedSymbols, selectedTypes]);
 
   const deleteMutation = useMutation({
     mutationFn: (txId: number) => del<{ data: null }>(`/portfolios/${id}/transactions/${txId}`),
@@ -1010,8 +1026,30 @@ function TransactionsTab({
         )}
       </div>
 
+      <div className="mb-3 flex flex-wrap gap-1">
+        <Button
+          size="sm"
+          variant={selectedTypes.size === 0 ? "default" : "outline"}
+          className="h-6 px-2 text-xs"
+          onClick={() => setSelectedTypes(new Set())}
+        >
+          All
+        </Button>
+        {transactionTypes.map((type) => (
+          <Button
+            key={type}
+            size="sm"
+            variant={selectedTypes.has(type) ? "default" : "outline"}
+            className="h-6 px-2 text-xs capitalize"
+            onClick={() => toggleType(type)}
+          >
+            {type}
+          </Button>
+        ))}
+      </div>
+
       {symbols.length > 1 && (
-        <div className="mb-3 flex flex-wrap gap-1">
+        <div className="mb-4 flex flex-wrap gap-1">
           <Button
             size="sm"
             variant={selectedSymbols.size === 0 ? "default" : "outline"}
@@ -1034,30 +1072,8 @@ function TransactionsTab({
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap gap-1">
-        <Button
-          size="sm"
-          variant={selectedTypes.size === 0 ? "default" : "outline"}
-          className="h-6 px-2 text-xs"
-          onClick={() => setSelectedTypes(new Set())}
-        >
-          All
-        </Button>
-        {transactionTypes.map((type) => (
-          <Button
-            key={type}
-            size="sm"
-            variant={selectedTypes.has(type) ? "default" : "outline"}
-            className="h-6 px-2 text-xs capitalize"
-            onClick={() => toggleType(type)}
-          >
-            {type}
-          </Button>
-        ))}
-      </div>
-
       <div className="space-y-1">
-        {data?.data.map((tx) => (
+        {filteredTransactions.map((tx) => (
           <div key={tx.id} className="flex items-center justify-between border-b py-2 text-sm">
             <div>
               <span className="font-medium">{tx.symbol}</span>
@@ -1080,7 +1096,7 @@ function TransactionsTab({
             </div>
           </div>
         ))}
-        {data?.data.length === 0 && <EmptyState message="No transactions yet." />}
+        {filteredTransactions.length === 0 && <EmptyState message="No transactions yet." />}
       </div>
 
       {showAdd && (

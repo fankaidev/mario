@@ -150,43 +150,12 @@ transactions.get("/", async (c) => {
     return c.json({ error: "Portfolio not found" }, 404);
   }
 
-  const symbolParam = c.req.query("symbol")?.trim().toUpperCase();
-  const symbols = symbolParam
-    ? symbolParam
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-    : [];
   const startDate = c.req.query("startDate")?.trim();
   const endDate = c.req.query("endDate")?.trim();
-  const typeParam = c.req.query("type")?.trim().toLowerCase();
-  const validTypes: TransactionType[] = ["buy", "sell", "dividend", "initial"];
-  const types = typeParam
-    ? typeParam
-        .split(",")
-        .map((t) => t.trim())
-        .filter((t): t is TransactionType => validTypes.includes(t as TransactionType))
-    : [];
 
   let query =
     "SELECT t.id, t.portfolio_id, t.symbol, t.type, t.quantity, t.price, t.fee, t.date, t.created_at, COALESCE(s.name, t.symbol) AS name FROM transactions t LEFT JOIN stocks s ON t.symbol = s.symbol WHERE t.portfolio_id = ?";
   const params: (number | string)[] = [portfolioId];
-
-  if (symbols.length === 1) {
-    query += " AND t.symbol = ?";
-    params.push(symbols[0]!);
-  } else if (symbols.length > 1) {
-    query += ` AND t.symbol IN (${symbols.map(() => "?").join(", ")})`;
-    params.push(...symbols);
-  }
-
-  if (types.length === 1) {
-    query += " AND t.type = ?";
-    params.push(types[0]!);
-  } else if (types.length > 1) {
-    query += ` AND t.type IN (${types.map(() => "?").join(", ")})`;
-    params.push(...types);
-  }
 
   if (startDate) {
     query += " AND t.date >= ?";
