@@ -1053,7 +1053,7 @@ function TransactionsTab({
           <Button
             size="sm"
             variant={selectedSymbols.size === 0 ? "default" : "outline"}
-            className="h-6 px-2 text-xs"
+            className="h-6 px-2 text-[10px]"
             onClick={() => onSelectedSymbolsChange(new Set())}
           >
             All
@@ -1063,7 +1063,7 @@ function TransactionsTab({
               key={symbol}
               size="sm"
               variant={selectedSymbols.has(symbol) ? "default" : "outline"}
-              className="h-6 px-2 text-xs"
+              className="h-6 px-2 text-[10px]"
               onClick={() => toggleSymbol(symbol)}
             >
               {symbol}
