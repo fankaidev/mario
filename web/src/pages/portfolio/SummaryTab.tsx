@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
@@ -132,6 +132,29 @@ export function SummaryTab({ id }: { id: string }) {
   const queryClient = useQueryClient();
   const [showAddSnapshot, setShowAddSnapshot] = useState(false);
   const [deleteSnapshotId, setDeleteSnapshotId] = useState<number | null>(null);
+  const [chartRange, setChartRange] = useState<"1M" | "3M" | "6M" | "1Y" | "ALL">("1Y");
+
+  const chartCutoff = useMemo(() => {
+    const today = new Date();
+    let start: Date;
+    switch (chartRange) {
+      case "1M":
+        start = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+        break;
+      case "3M":
+        start = new Date(today.getFullYear(), today.getMonth() - 3, today.getDate());
+        break;
+      case "6M":
+        start = new Date(today.getFullYear(), today.getMonth() - 6, today.getDate());
+        break;
+      case "1Y":
+        start = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+        break;
+      case "ALL":
+        return undefined;
+    }
+    return start.toISOString().split("T")[0];
+  }, [chartRange]);
 
   const { data: summaryData, isLoading: summaryLoading } = useQuery({
     queryKey: ["summary", id],
@@ -178,6 +201,7 @@ export function SummaryTab({ id }: { id: string }) {
           ? ((snap.market_value - snap.total_investment) / snap.total_investment) * 100
           : 0,
     }))
+    .filter((p) => !chartCutoff || p.date >= chartCutoff)
     .reverse();
 
   if (currentSummary) {
@@ -235,7 +259,23 @@ export function SummaryTab({ id }: { id: string }) {
 
       {points.length > 0 && (
         <>
-          <h3 className="mt-6 mb-4 font-semibold">Market Value Over Time</h3>
+          <div className="mt-6 mb-4 flex items-center justify-between">
+            <h3 className="font-semibold">Charts</h3>
+            <div className="flex items-center gap-1">
+              {(["1M", "3M", "6M", "1Y", "ALL"] as const).map((r) => (
+                <Button
+                  key={r}
+                  size="sm"
+                  variant={chartRange === r ? "default" : "outline"}
+                  className="h-6 px-2 text-xs"
+                  onClick={() => setChartRange(r)}
+                >
+                  {r}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <h3 className="mb-4 font-semibold">Market Value Over Time</h3>
           <Card className="mb-6">
             <CardContent className="p-4">
               <LineChart
