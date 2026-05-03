@@ -17,7 +17,7 @@ Pick and start work on a GitHub issue.
 1. **Get issue** - if no ID provided, find open issue without `in-progress` label, sorted by:
    - Priority label first (P0 > P1 > P2 > no priority)
    - Then by issue number (lowest first)
-2. **Add label** - mark issue as `in-progress`
+2. **Add labels** - mark issue as `in-progress` and add `worker:{dirname}` label (e.g., `worker:mario2`) where `dirname` is the current directory name
 3. **Ensure checklist** - check if issue body contains the required checklist. If missing, append it:
    ```markdown
    ## Checklist
@@ -36,8 +36,9 @@ Pick and start work on a GitHub issue.
 # List available issues
 gh issue list --state open --json number,title,labels,body
 
-# Add label
+# Add labels
 gh issue edit {ID} --add-label "in-progress"
+gh issue edit {ID} --add-label "worker:$(basename $PWD)"
 
 # Create branch from origin/main
 git fetch origin main
