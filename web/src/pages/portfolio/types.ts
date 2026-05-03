@@ -22,6 +22,7 @@ export interface Snapshot {
   date: string;
   total_investment: number;
   market_value: number;
+  cash_balance: number;
   note: string | null;
 }
 
