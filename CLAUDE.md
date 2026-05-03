@@ -10,7 +10,7 @@ A personal portfolio tracker for US, HK, and China A-share markets. Deployed on 
 
 **All changes must be issue-driven and follow the BDD workflow (see `docs/bdd.md`):**
 
-1. **Create Issue first** — Before making any changes, create a GitHub Issue describing:
+1. **Create Issue first** — Before making any changes, create a GitHub Issue with a priority label (`P0`, `P1`, or `P2`) describing:
    - Goal: What problem are we solving or what feature are we adding
    - Approach: How we plan to implement it
    - **Checklist** (must complete before merge):
@@ -64,7 +64,7 @@ A personal portfolio tracker for US, HK, and China A-share markets. Deployed on 
    - Verify all `api-test` scenarios have test coverage (ai-e2e scenarios excluded)
    - Confirm no unrelated changes
    - Evaluate implementation approach for correctness and reasonableness
-   - **Submit review via `gh pr review`** (not just a comment)
+    - **Submit review via `gh pr review --comment`** (GitHub blocks self-approve, so use `--comment` instead of `--approve`)
 
 8. **Handle PR comments** — Inspect all PR comments and reviews. Blocking comments must be fixed or answered with a clear reason why no code change is needed. Non-blocking suggestions may be addressed immediately or converted into a follow-up Issue. After any PR follow-up fix, commit and push the fix to the same PR branch. After handling a comment, reply to the original comment with the fix commit, verification result, or follow-up Issue
 
@@ -74,7 +74,11 @@ A personal portfolio tracker for US, HK, and China A-share markets. Deployed on 
 
 This ensures all work is traceable, specified, tested, and documented.
 
-**Exception for trivial changes:** Typos, dependency updates, and config tweaks can skip the full workflow — commit directly to main with a clear commit message.
+**Exception for trivial changes:** Typos, dependency updates, and config tweaks can skip the full BDD workflow, but must still go through a branch + PR. **Never commit directly to `main`.**
+
+## Autopilot Mode
+
+When instructed to enter **Autopilot**, keep using the `next-issue` skill and processing each issue through the full Mario Workflow (design → implement → PR → review → merge → deploy) until no open issues remain without the `in-progress` label.
 
 ### Git Commit Rules
 
