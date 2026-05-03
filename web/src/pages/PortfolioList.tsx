@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Plus, Trash2, RotateCcw, Wrench } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/ui/button";
@@ -17,18 +17,85 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Select } from "../components/ui/select";
 import { get, post, del } from "../lib/api";
+import { StackedBarChart, getPortfolioColor } from "../components/StackedBarChart";
 import type { Portfolio } from "../../../shared/types/api";
+import type { Snapshot } from "./portfolio/types";
 
 export function PortfolioList() {
   const queryClient = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [manageMode, setManageMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["portfolios"],
     queryFn: () => get<{ data: Portfolio[] }>("/portfolios"),
   });
+
+  const portfolios = data?.data ?? [];
+
+  useEffect(() => {
+    if (portfolios.length > 0 && selectedIds.size === 0) {
+      setSelectedIds(new Set(portfolios.map((p) => p.id)));
+    }
+  }, [portfolios, selectedIds.size]);
+
+  const snapshotQueries = useQueries({
+    queries: portfolios
+      .filter((p) => selectedIds.has(p.id))
+      .map((p) => ({
+        queryKey: ["snapshots", p.id] as const,
+        queryFn: () => get<{ data: Snapshot[] }>(`/portfolios/${p.id}/snapshots`),
+        staleTime: 5 * 60 * 1000,
+      })),
+  });
+
+  const selectedPortfolios = portfolios.filter((p) => selectedIds.has(p.id));
+
+  const allSnapshotData: Array<Snapshot & { portfolio_id: number }> = snapshotQueries
+    .map((q, i) => {
+      const pId = selectedPortfolios[i]?.id;
+      if (!pId || !q.data?.data) return [];
+      return q.data.data.map((s) => ({ ...s, portfolio_id: pId }));
+    })
+    .flat();
+
+  const chartData = useMemo(() => {
+    if (allSnapshotData.length === 0) return [];
+    const portfoliosById = new Map(portfolios.map((p) => [p.id, p]));
+    const byDate = new Map<string, Array<{ label: string; value: number; color: string }>>();
+    for (const snap of allSnapshotData) {
+      if (!byDate.has(snap.date)) {
+        byDate.set(snap.date, []);
+      }
+      const p = portfoliosById.get(snap.portfolio_id);
+      if (!p) continue;
+      const idx = portfolios.findIndex((pf) => pf.id === p.id);
+      byDate.get(snap.date)!.push({
+        label: p.name,
+        value: snap.market_value,
+        color: getPortfolioColor(idx),
+      });
+    }
+    const sortedDates = [...byDate.keys()].sort();
+    return sortedDates.map((date) => ({
+      label: date,
+      segments: byDate.get(date) ?? [],
+    }));
+  }, [allSnapshotData, portfolios]);
+
+  const togglePortfolio = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   const { data: trashData } = useQuery({
     queryKey: ["portfolios", "trash"],
@@ -94,6 +161,40 @@ export function PortfolioList() {
           </Button>
         </div>
       </div>
+
+      {!manageMode && portfolios.length > 0 && chartData.length > 0 && (
+        <div className="mb-6">
+          <div className="mb-3 flex flex-wrap items-center gap-1">
+            {portfolios.map((p, i) => (
+              <Button
+                key={p.id}
+                size="sm"
+                variant={selectedIds.has(p.id) ? "default" : "outline"}
+                className="h-6 px-2 text-xs"
+                onClick={() => togglePortfolio(p.id)}
+              >
+                <span
+                  className="mr-1 inline-block h-2 w-2 rounded-full"
+                  style={{
+                    backgroundColor: selectedIds.has(p.id) ? "#fff" : getPortfolioColor(i),
+                  }}
+                />
+                {p.name}
+              </Button>
+            ))}
+          </div>
+          <Card>
+            <CardContent className="p-4">
+              <h3 className="mb-3 text-sm font-semibold">Assets Over Time</h3>
+              <StackedBarChart
+                data={chartData}
+                height={250}
+                formatValue={(v) => v.toLocaleString()}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {data?.data.length === 0 && !manageMode && (
         <EmptyState message="No portfolios yet. Create one to get started." />
