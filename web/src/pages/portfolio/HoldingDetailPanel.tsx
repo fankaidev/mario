@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Badge } from "../../components/ui/badge";
 import {
   Table,
   TableBody,
@@ -13,25 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { get } from "../../lib/api";
 import type { HoldingLots, Transaction } from "../../../../shared/types/api";
 import { PriceHistorySection } from "./PriceHistorySection";
-
-function TransactionTypeBadge({ type }: { type: string }) {
-  const className =
-    type === "buy"
-      ? "bg-green-100 text-green-700"
-      : type === "sell"
-        ? "bg-red-100 text-red-700"
-        : type === "initial"
-          ? "bg-amber-100 text-amber-700"
-          : "bg-blue-100 text-blue-700";
-
-  return (
-    <Badge variant="secondary" className={`ml-2 border-transparent ${className}`}>
-      {type}
-    </Badge>
-  );
-}
-
-export { TransactionTypeBadge };
+import { TransactionTypeBadge } from "./TransactionTypeBadge";
 
 export function HoldingDetailPanel({ id, symbol }: { id: string; symbol: string }) {
   const [activeTab, setActiveTab] = useState<"chart" | "transactions" | "lots">("chart");
