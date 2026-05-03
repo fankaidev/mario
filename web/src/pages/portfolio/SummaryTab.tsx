@@ -17,29 +17,6 @@ import { get, post, del } from "../../lib/api";
 import type { Snapshot, Summary } from "./types";
 import { ConfirmModal } from "./ConfirmModal";
 
-function Metric({
-  label,
-  value,
-  highlight,
-}: {
-  label: string;
-  value: number | string;
-  highlight?: boolean;
-}) {
-  return (
-    <Card className="transition-all hover:shadow-md">
-      <CardContent className="p-3">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p
-          className={`text-lg ${highlight ? "font-bold" : "font-medium"} ${typeof value === "number" && value >= 0 ? "text-green-700" : "text-red-700"}`}
-        >
-          {typeof value === "number" ? value.toLocaleString() : value}
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
-
 function AddSnapshotModal({
   portfolioId,
   onClose,
@@ -132,7 +109,7 @@ export function SummaryTab({ id }: { id: string }) {
   const queryClient = useQueryClient();
   const [showAddSnapshot, setShowAddSnapshot] = useState(false);
   const [deleteSnapshotId, setDeleteSnapshotId] = useState<number | null>(null);
-  const [chartRange, setChartRange] = useState<"1M" | "3M" | "6M" | "1Y" | "ALL">("1Y");
+  const [chartRange, setChartRange] = useState<"1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL">("1Y");
 
   const chartCutoff = useMemo(() => {
     const today = new Date();
@@ -146,6 +123,9 @@ export function SummaryTab({ id }: { id: string }) {
         break;
       case "6M":
         start = new Date(today.getFullYear(), today.getMonth() - 6, today.getDate());
+        break;
+      case "YTD":
+        start = new Date(today.getFullYear(), 0, 1);
         break;
       case "1Y":
         start = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
@@ -220,49 +200,34 @@ export function SummaryTab({ id }: { id: string }) {
 
   return (
     <div>
-      <div className="mb-4">
-        <h3 className="font-semibold">Summary</h3>
-      </div>
-      {s.price_updated_at && (
-        <p className="mb-4 text-xs text-muted-foreground">Prices as of: {s.price_updated_at}</p>
-      )}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-        <Metric label="Total Investment" value={s.total_investment} />
-        <Metric label="Securities Value" value={s.securities_value} />
-        <Metric label="Cash Balance" value={s.cash_balance} />
-        <Metric label="Portfolio Value" value={s.portfolio_value} />
-        <Metric label="Unrealized P&L" value={s.unrealized_pnl} />
-        <Metric label="Realized P&L" value={s.realized_pnl} />
-        <Metric label="Dividend Income" value={s.dividend_income} />
-        <Metric label="Total P&L" value={s.total_pnl} highlight />
-        <Metric label="Return Rate" value={`${s.return_rate}%`} />
-      </div>
-      <h4 className="mt-6 mb-2 font-semibold">Fees</h4>
-      <div className="grid grid-cols-2 gap-4 text-sm">
-        <div className="flex justify-between rounded-md bg-muted p-2">
-          <span>Buy Fees</span>
-          <span>{s.cumulative_buy_fees}</span>
-        </div>
-        <div className="flex justify-between rounded-md bg-muted p-2">
-          <span>Sell Fees</span>
-          <span>{s.cumulative_sell_fees}</span>
-        </div>
-        <div className="flex justify-between rounded-md bg-muted p-2">
-          <span>Withholding Tax</span>
-          <span>{s.cumulative_withholding_tax}</span>
-        </div>
-        <div className="flex justify-between rounded-md bg-muted p-2 font-medium">
-          <span>Total Fees</span>
-          <span>{s.cumulative_total_fees}</span>
-        </div>
-      </div>
+      <h4 className="mb-2 font-semibold">Fees</h4>
+      <Card>
+        <CardContent className="grid grid-cols-4 gap-4 p-4 text-sm">
+          <div className="text-center">
+            <p className="text-xs text-muted-foreground">Buy</p>
+            <p className="font-medium">{s.cumulative_buy_fees}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs text-muted-foreground">Sell</p>
+            <p className="font-medium">{s.cumulative_sell_fees}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs text-muted-foreground">Withholding Tax</p>
+            <p className="font-medium">{s.cumulative_withholding_tax}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs text-muted-foreground">Total</p>
+            <p className="font-semibold">{s.cumulative_total_fees}</p>
+          </div>
+        </CardContent>
+      </Card>
 
       {points.length > 0 && (
         <>
           <div className="mt-6 mb-4 flex items-center justify-between">
             <h3 className="font-semibold">Charts</h3>
             <div className="flex items-center gap-1">
-              {(["1M", "3M", "6M", "1Y", "ALL"] as const).map((r) => (
+              {(["1M", "3M", "6M", "YTD", "1Y", "ALL"] as const).map((r) => (
                 <Button
                   key={r}
                   size="sm"
@@ -287,7 +252,7 @@ export function SummaryTab({ id }: { id: string }) {
                   ],
                 }))}
                 height={250}
-                formatValue={(v) => v.toLocaleString()}
+                formatValue={(v) => Math.round(v).toLocaleString()}
               />
               <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
@@ -297,6 +262,21 @@ export function SummaryTab({ id }: { id: string }) {
                   <span className="inline-block h-0.5 w-3 bg-[#9ca3af]" /> Investment
                 </span>
               </div>
+            </CardContent>
+          </Card>
+
+          <h3 className="mb-4 font-semibold">Total P&L Over Time</h3>
+          <Card className="mb-6">
+            <CardContent className="p-4">
+              <LineChart
+                data={points.map((p) => ({
+                  label: p.date,
+                  values: [{ key: "pnl", value: p.marketValue - p.investment, color: "#7c3aed" }],
+                }))}
+                height={250}
+                formatValue={(v) => Math.round(v).toLocaleString()}
+                minValue={0}
+              />
             </CardContent>
           </Card>
 
@@ -324,30 +304,37 @@ export function SummaryTab({ id }: { id: string }) {
       </div>
       {snapshots.length === 0 && <EmptyState message="No snapshots yet." />}
       <div className="space-y-1">
+        <div className="grid grid-cols-[100px_1fr_100px_120px_140px_60px] items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground">
+          <span>Date</span>
+          <span>Note</span>
+          <span className="text-right">Investment</span>
+          <span className="text-right">Market Value</span>
+          <span className="text-right">P&L</span>
+          <span />
+        </div>
         {snapshots.map((snap) => {
           const pnl = snap.market_value - snap.total_investment;
           const rate = snap.total_investment > 0 ? (pnl / snap.total_investment) * 100 : 0;
           return (
-            <div key={snap.id} className="flex items-center justify-between border-b py-2 text-sm">
-              <div>
-                <span className="font-medium">{snap.date}</span>
-                {snap.note && <span className="ml-2 text-muted-foreground">{snap.note}</span>}
-              </div>
-              <div className="flex items-center gap-3">
-                <span>Inv: {snap.total_investment.toLocaleString()}</span>
-                <span>Mkt: {snap.market_value.toLocaleString()}</span>
-                <span className={pnl >= 0 ? "text-green-600" : "text-red-600"}>
-                  P&L: {pnl.toLocaleString()} ({rate >= 0 ? "+" : ""}
-                  {rate.toFixed(1)}%)
-                </span>
-                <Button
-                  variant="link"
-                  className="h-auto p-0 text-xs text-destructive"
-                  onClick={() => setDeleteSnapshotId(snap.id)}
-                >
-                  Delete
-                </Button>
-              </div>
+            <div
+              key={snap.id}
+              className="grid grid-cols-[100px_1fr_100px_120px_140px_60px] items-center gap-2 border-b py-2 text-sm"
+            >
+              <span className="font-medium">{snap.date}</span>
+              <span className="truncate text-muted-foreground">{snap.note || ""}</span>
+              <span className="text-right">{snap.total_investment.toLocaleString()}</span>
+              <span className="text-right">{snap.market_value.toLocaleString()}</span>
+              <span className={`text-right ${pnl >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {pnl.toLocaleString()} ({rate >= 0 ? "+" : ""}
+                {rate.toFixed(1)}%)
+              </span>
+              <Button
+                variant="link"
+                className="h-auto p-0 text-xs text-destructive"
+                onClick={() => setDeleteSnapshotId(snap.id)}
+              >
+                Delete
+              </Button>
             </div>
           );
         })}

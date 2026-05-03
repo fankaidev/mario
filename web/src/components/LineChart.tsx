@@ -86,13 +86,13 @@ export function LineChart({ data, height = 200, formatValue, minValue, markers }
               stroke="#e5e7eb"
               strokeWidth={0.5}
             />
-            <text x={leftPad - 4} y={scaleY(v) + 4} textAnchor="end" fontSize={10} fill="#9ca3af">
-              {formatValue ? formatValue(v) : v.toLocaleString()}
+            <text x={leftPad - 4} y={scaleY(v) + 4} textAnchor="end" fontSize={8} fill="#9ca3af">
+              {formatValue ? formatValue(v) : Math.round(v).toLocaleString()}
             </text>
           </g>
         ))}
         {data.map((point, i) => {
-          if (i % labelStep !== 0 && i !== data.length - 1) return null;
+          if (i % labelStep !== 0) return null;
           const x = scaleX(i);
           return (
             <text
@@ -100,7 +100,7 @@ export function LineChart({ data, height = 200, formatValue, minValue, markers }
               x={x}
               y={chartHeight - 2}
               textAnchor="middle"
-              fontSize={9}
+              fontSize={7}
               fill="#9ca3af"
             >
               {point.label.length > 10 ? point.label.slice(0, 10) + "…" : point.label}
