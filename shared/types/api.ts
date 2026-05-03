@@ -17,6 +17,7 @@ export interface Portfolio {
   created_at: string;
   archived: number;
   cash_balance: number;
+  deleted_at: string | null;
 }
 
 export interface CreatePortfolioRequest {

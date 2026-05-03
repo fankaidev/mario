@@ -294,4 +294,30 @@ describe("Portfolio CRUD", () => {
     });
     expect(deleteRes2.status).toBe(404);
   });
+
+  it("include_deleted returns deleted portfolios", async () => {
+    const createRes = await worker.fetch("http://localhost/api/portfolios", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "US Stocks", currency: "USD" }),
+    });
+    const created = (await createRes.json()) as { data: { id: number } };
+    const portfolioId = created.data.id;
+
+    await worker.fetch(`http://localhost/api/portfolios/${portfolioId}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+
+    const listRes = await worker.fetch("http://localhost/api/portfolios?include_deleted=true", {
+      headers: authHeaders(),
+    });
+    expect(listRes.status).toBe(200);
+    const body = (await listRes.json()) as {
+      data: Array<{ id: number; deleted_at: string | null }>;
+    };
+    const deleted = body.data.find((p) => p.id === portfolioId);
+    expect(deleted).toBeDefined();
+    expect(deleted!.deleted_at).not.toBeNull();
+  });
 });
