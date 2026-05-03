@@ -159,16 +159,14 @@ curl https://your-app.workers.dev/api/portfolios/{id}/holdings \
 curl https://your-app.workers.dev/api/portfolios/{id}/transactions \
   -H "Authorization: Bearer YOUR_TOKEN"
 
-# Filter by symbol, date range, and type
-curl "https://your-app.workers.dev/api/portfolios/{id}/transactions?symbol=AAPL&startDate=2024-01-01&endDate=2024-12-31&type=buy,sell" \
+# Filter by date range
+curl "https://your-app.workers.dev/api/portfolios/{id}/transactions?startDate=2024-01-01&endDate=2024-12-31" \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
 **Query parameters:**
-- `symbol` - Filter by one or more symbols (comma-separated)
 - `startDate` - Filter transactions from this date (YYYY-MM-DD)
 - `endDate` - Filter transactions up to this date (YYYY-MM-DD)
-- `type` - Filter by transaction types: `buy`, `sell`, `dividend`, `initial` (comma-separated)
 
 #### Add Transaction
 

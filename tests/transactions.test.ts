@@ -464,44 +464,6 @@ describe("Transaction History", () => {
     expect(body.data).toHaveLength(0);
   });
 
-  it("[UC-PORTFOLIO-004-S07] filters transactions by symbol query parameter", async () => {
-    await makeBuy("AAPL", 100, 150, "2024-01-15");
-    await makeBuy("TSLA", 50, 200, "2024-02-01");
-
-    const sellRes = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/transactions`,
-      {
-        method: "POST",
-        headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify(sellPayload("AAPL", 30, 170, "2024-03-01")),
-      },
-    );
-    expect(sellRes.status).toBe(201);
-
-    const res = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/transactions?symbol=AAPL`,
-      { headers: authHeaders() },
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { data: Array<{ symbol: string; date: string }> };
-    expect(body.data).toHaveLength(2);
-    expect(body.data.every((tx) => tx.symbol === "AAPL")).toBe(true);
-    expect(body.data[0].date).toBe("2024-03-01");
-    expect(body.data[1].date).toBe("2024-01-15");
-  });
-
-  it("returns empty array when symbol filter matches nothing", async () => {
-    await makeBuy("AAPL", 100, 150, "2024-01-15");
-
-    const res = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/transactions?symbol=UNKNOWN`,
-      { headers: authHeaders() },
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { data: unknown[] };
-    expect(body.data).toHaveLength(0);
-  });
-
   it("[UC-PORTFOLIO-004-S08] returns stock name from stocks table", async () => {
     await makeBuy("AAPL", 100, 150, "2024-01-15");
     await db
@@ -559,18 +521,6 @@ describe("Transaction History", () => {
     expect(body.data[0].date).toBe("2024-01-15");
   });
 
-  it("filters transactions by multiple comma-separated symbols", async () => {
-    await makeBuy("AAPL", 10, 150, "2024-01-15");
-    await makeBuy("TSLA", 5, 200, "2024-02-01");
-    await makeBuy("NVDA", 8, 100, "2024-03-01");
-
-    const body = await getTransactionsWithParams("?symbol=AAPL,TSLA");
-    expect(body.data).toHaveLength(2);
-    const symbols = body.data.map((tx) => (tx as { symbol: string }).symbol);
-    expect(symbols).toContain("AAPL");
-    expect(symbols).toContain("TSLA");
-  });
-
   it("GET /symbols returns distinct symbols for a portfolio", async () => {
     await makeBuy("AAPL", 10, 150, "2024-01-15");
     await makeBuy("TSLA", 5, 200, "2024-02-01");
@@ -593,71 +543,5 @@ describe("Transaction History", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: string[] };
     expect(body.data).toEqual([]);
-  });
-
-  it("filters transactions by single type", async () => {
-    await makeBuy("AAPL", 10, 150, "2024-01-15");
-    await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
-      method: "POST",
-      headers: { ...authHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({
-        symbol: "AAPL",
-        type: "sell",
-        quantity: 5,
-        price: 170,
-        fee: 0,
-        date: "2024-02-01",
-      }),
-    });
-    await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
-      method: "POST",
-      headers: { ...authHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({
-        symbol: "AAPL",
-        type: "dividend",
-        quantity: 0,
-        price: 50,
-        fee: 10,
-        date: "2024-03-01",
-      }),
-    });
-
-    const body = await getTransactionsWithParams("?type=buy");
-    expect(body.data).toHaveLength(1);
-    expect((body.data[0] as { type: string }).type).toBe("buy");
-  });
-
-  it("filters transactions by multiple comma-separated types", async () => {
-    await makeBuy("AAPL", 10, 150, "2024-01-15");
-    await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
-      method: "POST",
-      headers: { ...authHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({
-        symbol: "AAPL",
-        type: "sell",
-        quantity: 5,
-        price: 170,
-        fee: 0,
-        date: "2024-02-01",
-      }),
-    });
-    await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
-      method: "POST",
-      headers: { ...authHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({
-        symbol: "AAPL",
-        type: "dividend",
-        quantity: 0,
-        price: 50,
-        fee: 10,
-        date: "2024-03-01",
-      }),
-    });
-
-    const body = await getTransactionsWithParams("?type=buy,sell");
-    expect(body.data).toHaveLength(2);
-    const types = body.data.map((tx) => (tx as { type: string }).type);
-    expect(types).toContain("buy");
-    expect(types).toContain("sell");
   });
 });
