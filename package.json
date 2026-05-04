@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm build:web && wrangler dev",
-    "typecheck": "tsc --noEmit -p tsconfig.worker.json && tsc --noEmit -p web/tsconfig.json",
+    "typecheck": "tsgo --noEmit -p tsconfig.worker.json & tsgo --noEmit -p web/tsconfig.json & wait",
     "build:web": "vite build --config web/vite.config.ts",
     "build": "pnpm typecheck && pnpm build:web",
     "check": "pnpm lint && pnpm format:check && pnpm build && pnpm test",
@@ -44,6 +44,7 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@types/ws": "^8.18.1",
+    "@typescript/native-preview": "7.0.0-dev.20260421.2",
     "better-sqlite3": "^12.9.0",
     "lefthook": "^1.13.6",
     "oxfmt": "^0.47.0",
