@@ -8,7 +8,7 @@
     "typecheck": "tsgo --noEmit -p tsconfig.worker.json & tsgo --noEmit -p web/tsconfig.json & wait",
     "build:web": "vite build --config web/vite.config.ts",
     "build": "pnpm typecheck && pnpm build:web",
-    "check": "pnpm lint && pnpm format:check && pnpm build && pnpm test",
+    "check": "pnpm lint & pnpm format:check & pnpm typecheck & pnpm build:web & wait && vitest run",
     "test": "pnpm build:web && vitest run",
     "deploy": "pnpm build && wrangler deploy",
     "prepare": "lefthook install",
