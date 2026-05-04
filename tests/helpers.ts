@@ -22,14 +22,26 @@ export async function cleanDatabase(db: D1Database) {
     "CREATE TABLE IF NOT EXISTS price_history (symbol TEXT NOT NULL, date TEXT NOT NULL, close REAL NOT NULL, PRIMARY KEY (symbol, date))",
   );
 
+  // Delete in order respecting foreign key constraints
+  // Note: lots and realized_pnl tables still exist in local DB until migration runs
   await db.exec("DELETE FROM stock_tags");
-  await db.exec("DELETE FROM realized_pnl");
-  await db.exec("DELETE FROM lots");
+  await db.exec("DELETE FROM corporate_actions");
+  // realized_pnl must be deleted before lots (FK: lot_id -> lots.id)
+  // lots must be deleted before transactions (FK: transaction_id -> transactions.id)
+  try {
+    await db.exec("DELETE FROM realized_pnl");
+  } catch {
+    // table may not exist after migration
+  }
+  try {
+    await db.exec("DELETE FROM lots");
+  } catch {
+    // table may not exist after migration
+  }
   await db.exec("DELETE FROM transactions");
   await db.exec("DELETE FROM transfers");
   await db.exec("DELETE FROM portfolio_snapshots");
   await db.exec("DELETE FROM price_history");
-  await db.exec("DELETE FROM corporate_actions");
   await db.exec("DELETE FROM stocks");
   await db.exec("DELETE FROM tags");
   await db.exec("DELETE FROM api_tokens");
