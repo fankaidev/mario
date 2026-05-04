@@ -40,7 +40,6 @@ jobs:
   deploy:
     name: Deploy Worker
     runs-on: ubuntu-latest
-    needs: check
 
     steps:
       - name: Checkout
