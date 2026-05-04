@@ -1,27 +1,5 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { getPlatformProxy } from "wrangler";
-
-export interface TestContext {
-  db: D1Database;
-  persistTo: string;
-  cleanup: () => void;
-}
-
-export async function createTestContext(): Promise<TestContext> {
-  const persistTo = mkdtempSync(join(tmpdir(), "mario-test-"));
-  const { env } = await getPlatformProxy<{ DB: D1Database }>({
-    persist: { path: join(persistTo, "v3") },
-  });
-  const db = env.DB;
-  await ensureMigrations(db);
-  return {
-    db,
-    persistTo,
-    cleanup: () => rmSync(persistTo, { recursive: true, force: true }),
-  };
-}
 
 export async function ensureMigrations(db: D1Database) {
   // Check if migrations already applied by looking for a known table

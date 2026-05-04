@@ -1,31 +1,28 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { unstable_dev } from "wrangler";
+import { getPlatformProxy, unstable_dev } from "wrangler";
 import type { UnstableDevWorker } from "wrangler";
-import type { TestContext } from "./helpers";
-import { cleanDatabase, createApiTokenForUser, createTestContext } from "./helpers";
+import { cleanDatabase, ensureMigrations, createApiTokenForUser } from "./helpers";
 import { FakePriceFetcher } from "./fake-price-fetcher";
 import { syncPriceHistory, getLatestPrice } from "../src/routes/prices";
 import { FetcherRouter } from "../src/clients/fetcher-router";
 
 let worker: UnstableDevWorker;
 let db: D1Database;
-let ctx: TestContext;
 let portfolioId: number;
 let authToken: string;
 
 beforeAll(async () => {
-  ctx = await createTestContext();
-  db = ctx.db;
+  const { env } = await getPlatformProxy<{ DB: D1Database }>();
+  db = env.DB;
+  await ensureMigrations(db);
   worker = await unstable_dev("src/index.ts", {
     config: "wrangler.toml",
     local: true,
-    persistTo: ctx.persistTo,
   });
 });
 
 afterAll(async () => {
   await worker.stop();
-  ctx.cleanup();
 });
 
 beforeEach(async () => {
