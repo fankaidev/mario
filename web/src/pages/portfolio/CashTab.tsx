@@ -151,7 +151,7 @@ export function CashTab({ id, currency }: { id: string; currency: string }) {
               {m.amount >= 0 ? "+" : ""}
               {m.amount.toLocaleString()}
             </span>
-            <span className="text-right font-medium">{m.cash_balance.toLocaleString()}</span>
+            <span className="text-right font-medium">{m.cash_balance.toFixed(2)}</span>
           </div>
         ))}
         {filteredMovements.length === 0 && data?.data.length !== 0 && (

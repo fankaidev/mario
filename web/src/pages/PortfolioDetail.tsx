@@ -56,7 +56,7 @@ export function PortfolioDetail() {
                 ["holdings", "Holdings"],
                 ["transactions", "Transactions"],
                 ["transfers", "Transfers"],
-                ["cash", "Cash"],
+                ["cash", "Cash Balance"],
                 ["tags", "Tags"],
                 ["summary", "Summary"],
               ] as [TabName, string][]
