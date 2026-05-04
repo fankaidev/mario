@@ -32,9 +32,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Apply local D1 migrations
-        run: pnpm wrangler d1 migrations apply mario --local
-
       - name: Run checks
         run: pnpm check
         env:
