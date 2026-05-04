@@ -38,6 +38,7 @@ export interface Transaction {
   date: string;
   created_at: string;
   name: string | null;
+  cash_balance?: number;
 }
 
 export type TransferType = "deposit" | "withdrawal";
