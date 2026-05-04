@@ -84,7 +84,7 @@ export function PortfolioDetail() {
             />
           )}
           {tab === "transfers" && <TransfersTab id={id!} currency={portfolio?.currency ?? ""} />}
-          {tab === "cash" && <CashTab id={id!} />}
+          {tab === "cash" && <CashTab id={id!} currency={portfolio?.currency ?? ""} />}
           {tab === "tags" && <TagsTab id={id!} />}
           {tab === "summary" && <SummaryTab id={id!} />}
         </Tabs>

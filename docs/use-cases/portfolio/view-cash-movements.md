@@ -18,12 +18,12 @@
 
 | ID | Priority | Status | Scenario | Rules |
 |----|----------|--------|----------|-------|
-| UC-PORTFOLIO-014-S01 | P0 | ❌ | Given portfolio with no transfers or transactions, When fetching cash movements, Then return empty list | R1 |
-| UC-PORTFOLIO-014-S02 | P0 | ❌ | Given portfolio with deposit 10000, When fetching cash movements, Then return one movement with amount=10000 and cash_balance=10000 | R1, R2 |
-| UC-PORTFOLIO-014-S03 | P0 | ❌ | Given deposit 10000 then buy AAPL 10@150 (cost=1500), When fetching cash movements, Then deposit shows balance=10000, buy shows amount=-1500 and balance=8500 | R2, R3 |
-| UC-PORTFOLIO-014-S04 | P0 | ❌ | Given deposit on 2024-01-01 and buy on 2024-01-15, When fetching cash movements, Then deposit appears before buy in chronological order | R4 |
-| UC-PORTFOLIO-014-S05 | P1 | ❌ | Given deposit 10000, buy AAPL 10@150 (fee=5), sell AAPL 5@200 (fee=5), dividend 50 (tax=5), withdrawal 1000 (fee=10), When fetching cash movements, Then all 5 movements appear with correct amounts and running balances | R1, R2, R3 |
-| UC-PORTFOLIO-014-S06 | P1 | ❌ | Given multiple movements, When fetching cash movements, Then results are in reverse chronological order (newest first) | R5 |
+| UC-PORTFOLIO-014-S01 | P0 | ✅ | Given portfolio with no transfers or transactions, When fetching cash movements, Then return empty list | R1 |
+| UC-PORTFOLIO-014-S02 | P0 | ✅ | Given portfolio with deposit 10000, When fetching cash movements, Then return one movement with amount=10000 and cash_balance=10000 | R1, R2 |
+| UC-PORTFOLIO-014-S03 | P0 | ✅ | Given deposit 10000 then buy AAPL 10@150 (cost=1500), When fetching cash movements, Then deposit shows balance=10000, buy shows amount=-1500 and balance=8500 | R2, R3 |
+| UC-PORTFOLIO-014-S04 | P0 | ✅ | Given deposit on 2024-01-01 and buy on 2024-01-15, When fetching cash movements, Then deposit appears before buy in chronological order | R4 |
+| UC-PORTFOLIO-014-S05 | P1 | ✅ | Given deposit 10000, buy AAPL 10@150 (fee=5), sell AAPL 5@200 (fee=5), dividend 50 (tax=5), withdrawal 1000 (fee=10), When fetching cash movements, Then all 5 movements appear with correct amounts and running balances | R1, R2, R3 |
+| UC-PORTFOLIO-014-S06 | P1 | ✅ | Given multiple movements, When fetching cash movements, Then results are in reverse chronological order (newest first) | R5 |
 
 ### ai-e2e
 

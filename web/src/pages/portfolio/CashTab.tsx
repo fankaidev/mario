@@ -9,13 +9,11 @@ import type { CashMovement } from "../../../../shared/types/api";
 
 function CashMovementTypeBadge({ type }: { type: string }) {
   const className =
-    type === "deposit" || type === "buy"
+    type === "deposit" || type === "sell" || type === "dividend"
       ? "bg-green-100 text-green-700"
-      : type === "withdrawal" || type === "sell"
+      : type === "withdrawal" || type === "buy" || type === "initial"
         ? "bg-red-100 text-red-700"
-        : type === "initial"
-          ? "bg-amber-100 text-amber-700"
-          : "bg-blue-100 text-blue-700";
+        : "bg-blue-100 text-blue-700";
 
   return (
     <Badge variant="secondary" className={`w-fit border-transparent ${className}`}>
@@ -24,7 +22,7 @@ function CashMovementTypeBadge({ type }: { type: string }) {
   );
 }
 
-export function CashTab({ id }: { id: string }) {
+export function CashTab({ id, currency }: { id: string; currency: string }) {
   const [datePreset, setDatePreset] = useState<
     "1M" | "3M" | "6M" | "YTD" | "1Y" | "3Y" | "ALL" | "CUSTOM"
   >("ALL");
@@ -130,23 +128,25 @@ export function CashTab({ id }: { id: string }) {
       {data?.data.length === 0 && <EmptyState message="No cash movements yet." />}
 
       <div className="space-y-1">
-        <div className="grid items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground grid-cols-[90px_90px_1fr_100px_100px]">
+        <div className="grid items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground grid-cols-[90px_90px_1fr_60px_100px_100px]">
           <span>Date</span>
           <span>Type</span>
           <span>Description</span>
+          <span>Currency</span>
           <span className="text-right">Amount</span>
           <span className="text-right">Balance</span>
         </div>
         {filteredMovements.map((m) => (
           <div
             key={`${m.type}-${m.id}`}
-            className="grid items-center gap-2 border-b py-2 text-sm grid-cols-[90px_90px_1fr_100px_100px]"
+            className="grid items-center gap-2 border-b py-2 text-sm grid-cols-[90px_90px_1fr_60px_100px_100px]"
           >
             <span className="text-muted-foreground">{m.date}</span>
             <CashMovementTypeBadge type={m.type} />
             <span className="truncate">
               {m.symbol ?? m.note ?? (m.type === "deposit" ? "Deposit" : "Withdrawal")}
             </span>
+            <span>{currency}</span>
             <span className={`text-right ${m.amount >= 0 ? "text-green-600" : "text-red-600"}`}>
               {m.amount >= 0 ? "+" : ""}
               {m.amount.toLocaleString()}
