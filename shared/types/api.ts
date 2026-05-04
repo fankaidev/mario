@@ -170,6 +170,18 @@ export interface PriceHistoryResponse {
   prices: PriceHistoryItem[];
 }
 
+export type CashMovementType = "deposit" | "withdrawal" | "buy" | "sell" | "dividend" | "initial";
+
+export interface CashMovement {
+  id: number;
+  date: string;
+  type: CashMovementType;
+  symbol: string | null;
+  note: string | null;
+  amount: number;
+  cash_balance: number;
+}
+
 export interface CreateTagRequest {
   name: string;
 }

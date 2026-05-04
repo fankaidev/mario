@@ -42,7 +42,7 @@ export interface Portfolio {
   currency: string;
 }
 
-export type TabName = "holdings" | "transactions" | "transfers" | "summary" | "tags";
+export type TabName = "holdings" | "transactions" | "transfers" | "cash" | "summary" | "tags";
 
 export type SortField =
   | "symbol"

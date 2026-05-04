@@ -40,6 +40,8 @@ export async function cleanDatabase(db: D1Database) {
   for (const table of [
     "stock_tags",
     "corporate_actions",
+    "realized_pnl",
+    "lots",
     "transactions",
     "transfers",
     "portfolio_snapshots",
@@ -50,7 +52,11 @@ export async function cleanDatabase(db: D1Database) {
     "portfolios",
     "users",
   ]) {
-    await db.exec(`DELETE FROM ${table}`);
+    try {
+      await db.exec(`DELETE FROM ${table}`);
+    } catch {
+      // Table may not exist (e.g., dropped by migration)
+    }
   }
 }
 

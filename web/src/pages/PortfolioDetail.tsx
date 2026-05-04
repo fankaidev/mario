@@ -9,6 +9,7 @@ import { SummaryCard } from "./portfolio/SummaryCard";
 import { HoldingsTab } from "./portfolio/HoldingsTab";
 import { TransactionsTab } from "./portfolio/TransactionsTab";
 import { TransfersTab } from "./portfolio/TransfersTab";
+import { CashTab } from "./portfolio/CashTab";
 import { SummaryTab } from "./portfolio/SummaryTab";
 import { TagsTab } from "./portfolio/TagsTab";
 
@@ -55,6 +56,7 @@ export function PortfolioDetail() {
                 ["holdings", "Holdings"],
                 ["transactions", "Transactions"],
                 ["transfers", "Transfers"],
+                ["cash", "Cash"],
                 ["tags", "Tags"],
                 ["summary", "Summary"],
               ] as [TabName, string][]
@@ -82,6 +84,7 @@ export function PortfolioDetail() {
             />
           )}
           {tab === "transfers" && <TransfersTab id={id!} currency={portfolio?.currency ?? ""} />}
+          {tab === "cash" && <CashTab id={id!} />}
           {tab === "tags" && <TagsTab id={id!} />}
           {tab === "summary" && <SummaryTab id={id!} />}
         </Tabs>
