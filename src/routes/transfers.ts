@@ -78,13 +78,88 @@ transfers.get("/", async (c) => {
     .first();
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
 
-  const rows = await c.env.DB.prepare(
-    "SELECT id, portfolio_id, type, amount, fee, date, note, created_at FROM transfers WHERE portfolio_id = ? ORDER BY date DESC, created_at DESC",
-  )
-    .bind(portfolioId)
-    .all<Transfer>();
+  const [allTransferRows, txRows] = await Promise.all([
+    c.env.DB.prepare(
+      "SELECT id, portfolio_id, type, amount, fee, date, note, created_at FROM transfers WHERE portfolio_id = ? ORDER BY date, created_at",
+    )
+      .bind(portfolioId)
+      .all<Transfer>(),
+    c.env.DB.prepare(
+      "SELECT id, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ? ORDER BY date, created_at",
+    )
+      .bind(portfolioId)
+      .all<{
+        id: number;
+        type: string;
+        quantity: number;
+        price: number;
+        fee: number;
+        date: string;
+        created_at: string;
+      }>(),
+  ]);
 
-  return c.json({ data: rows.results });
+  type CashEvent = {
+    date: string;
+    created_at: string;
+    kind: "transfer" | "transaction";
+    cash_delta: number;
+    transfer_id?: number;
+  };
+
+  const events: CashEvent[] = [];
+
+  for (const tr of allTransferRows.results) {
+    const delta = tr.type === "deposit" ? tr.amount - tr.fee : -(tr.amount + tr.fee);
+    events.push({
+      date: tr.date,
+      created_at: tr.created_at,
+      kind: "transfer",
+      cash_delta: delta,
+      transfer_id: tr.id,
+    });
+  }
+
+  for (const tx of txRows.results) {
+    let delta: number;
+    if (tx.type === "buy" || tx.type === "initial") {
+      delta = -(tx.quantity * tx.price + tx.fee);
+    } else if (tx.type === "sell") {
+      delta = tx.quantity * tx.price - tx.fee;
+    } else {
+      // dividend
+      delta = tx.quantity * tx.price - tx.fee;
+    }
+    events.push({
+      date: tx.date,
+      created_at: tx.created_at,
+      kind: "transaction",
+      cash_delta: delta,
+    });
+  }
+
+  events.sort((a, b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date);
+    return a.created_at.localeCompare(b.created_at);
+  });
+
+  const balanceByTransferId = new Map<number, number>();
+  let runningBalance = 0;
+  for (const ev of events) {
+    runningBalance += ev.cash_delta;
+    if (ev.kind === "transfer" && ev.transfer_id !== undefined) {
+      balanceByTransferId.set(ev.transfer_id, Math.round(runningBalance * 100) / 100);
+    }
+  }
+
+  const result = allTransferRows.results
+    .map((tr) => ({
+      ...tr,
+      cash_balance: balanceByTransferId.get(tr.id),
+    }))
+    .reverse();
+
+  return c.json({ data: result });
 });
 
 transfers.delete("/:transferId", async (c) => {
