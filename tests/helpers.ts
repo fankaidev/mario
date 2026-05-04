@@ -1,30 +1,17 @@
 export async function cleanDatabase(db: D1Database) {
-  // Get list of existing tables
-  const tables = await db
-    .prepare("SELECT name FROM sqlite_master WHERE type='table'")
-    .all<{ name: string }>();
-  const tableNames = new Set(tables.results.map((t) => t.name));
-
-  // Helper to delete table if it exists
-  const deleteIfExists = async (tableName: string) => {
-    if (tableNames.has(tableName)) {
-      await db.exec(`DELETE FROM ${tableName}`);
-    }
-  };
-
   // Delete in order respecting foreign key constraints
-  // Note: lots and realized_pnl tables removed by migration 0014
-  await deleteIfExists("stock_tags");
-  await deleteIfExists("corporate_actions");
-  await deleteIfExists("transactions");
-  await deleteIfExists("transfers");
-  await deleteIfExists("portfolio_snapshots");
-  await deleteIfExists("price_history");
-  await deleteIfExists("stocks");
-  await deleteIfExists("tags");
-  await deleteIfExists("api_tokens");
-  await deleteIfExists("portfolios");
-  await deleteIfExists("users");
+  // Tables are guaranteed to exist after migrations are applied
+  await db.exec("DELETE FROM stock_tags");
+  await db.exec("DELETE FROM corporate_actions");
+  await db.exec("DELETE FROM transactions");
+  await db.exec("DELETE FROM transfers");
+  await db.exec("DELETE FROM portfolio_snapshots");
+  await db.exec("DELETE FROM price_history");
+  await db.exec("DELETE FROM stocks");
+  await db.exec("DELETE FROM tags");
+  await db.exec("DELETE FROM api_tokens");
+  await db.exec("DELETE FROM portfolios");
+  await db.exec("DELETE FROM users");
 }
 
 export async function createApiTokenForUser(
