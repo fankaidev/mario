@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { AuthVariables } from "../middleware/auth";
 import type { Bindings } from "../types";
 import type { PortfolioSnapshot, Transaction } from "../../shared/types/api";
-import { replayFIFO } from "../lib/fifo";
+import { replayFIFO, type CorporateAction } from "../lib/fifo";
 
 const snapshots = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
@@ -39,7 +39,7 @@ export async function calculateSnapshot(
     .bind(portfolioId, date)
     .first<{ total: number }>();
 
-  // Get transactions up to date and replay FIFO
+  // Get transactions and corporate actions up to date and replay FIFO
   const txRows = await db
     .prepare(
       "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ? AND date <= ? ORDER BY date, created_at",
@@ -47,7 +47,22 @@ export async function calculateSnapshot(
     .bind(portfolioId, date)
     .all<Transaction>();
 
-  const { lots } = replayFIFO(txRows.results);
+  const caRows = await db
+    .prepare(
+      "SELECT id, symbol, type, ratio, effective_date FROM corporate_actions WHERE portfolio_id = ? AND effective_date <= ? ORDER BY effective_date, id",
+    )
+    .bind(portfolioId, date)
+    .all<{ id: number; symbol: string; type: string; ratio: number; effective_date: string }>();
+
+  const corporateActions: CorporateAction[] = caRows.results.map((row) => ({
+    id: row.id,
+    symbol: row.symbol,
+    type: row.type as "split" | "merge",
+    ratio: row.ratio,
+    effective_date: row.effective_date,
+  }));
+
+  const { lots } = replayFIFO(txRows.results, corporateActions);
 
   // Aggregate remaining quantities by symbol
   const symbolHoldings: Map<string, number> = new Map();
