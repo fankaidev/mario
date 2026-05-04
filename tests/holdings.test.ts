@@ -39,32 +39,33 @@ function authHeaders(): Record<string, string> {
   return { Authorization: `Bearer ${authToken}` };
 }
 
-async function seedLot(symbol: string, quantity: number, costBasis: number, remaining?: number) {
-  const txResult = await db
-    .prepare(
-      "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, ?, 'buy', ?, ?, 0, '2024-01-01')",
-    )
-    .bind(portfolioId, symbol, quantity, costBasis / quantity)
-    .run();
-  return db
-    .prepare(
-      "INSERT INTO lots (transaction_id, portfolio_id, symbol, quantity, remaining_quantity, cost_basis) VALUES (?, ?, ?, ?, ?, ?)",
-    )
-    .bind(
-      txResult.meta.last_row_id,
-      portfolioId,
-      symbol,
-      quantity,
-      remaining ?? quantity,
-      costBasis,
-    )
-    .run();
+async function makeBuy(symbol: string, quantity: number, price: number, fee: number = 0) {
+  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ symbol, type: "buy", quantity, price, fee, date: "2024-01-01" }),
+  });
+  return (await res.json()) as { data: { id: number } };
+}
+
+async function makeSell(symbol: string, quantity: number, price: number, fee: number = 0) {
+  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ symbol, type: "sell", quantity, price, fee, date: "2024-01-02" }),
+  });
+  return (await res.json()) as { data: { id: number } };
 }
 
 describe("View Holdings", () => {
   it("[UC-PORTFOLIO-003-S01] calculates holdings with P&L correctly", async () => {
-    await seedLot("AAPL", 100, 15000, 20);
-    await seedLot("AAPL", 50, 8000, 50);
+    // Buy 100 @ 150 = 15000, cost_basis per share = 150
+    await makeBuy("AAPL", 100, 150, 0);
+    // Sell 80 → remaining 20, cost = 20 * 150 = 3000
+    await makeSell("AAPL", 80, 160, 0);
+    // Buy 50 @ 150 = 7500
+    await makeBuy("AAPL", 50, 150, 0);
+
     await db
       .prepare("INSERT INTO price_history (symbol, date, close) VALUES (?, ?, ?)")
       .bind("AAPL", "2024-03-01", 180)
@@ -86,15 +87,16 @@ describe("View Holdings", () => {
     };
     expect(body.data).toHaveLength(1);
     expect(body.data[0].symbol).toBe("AAPL");
-    expect(body.data[0].quantity).toBe(70);
-    expect(body.data[0].cost).toBe(11000);
-    expect(body.data[0].market_value).toBe(12600);
-    expect(body.data[0].unrealized_pnl).toBe(1600);
-    expect(body.data[0].unrealized_pnl_rate).toBe(14.55);
+    expect(body.data[0].quantity).toBe(70); // 20 + 50
+    expect(body.data[0].cost).toBe(10500); // 3000 + 7500
+    expect(body.data[0].market_value).toBe(12600); // 70 * 180
+    expect(body.data[0].unrealized_pnl).toBe(2100);
+    expect(body.data[0].unrealized_pnl_rate).toBe(20);
   });
 
   it("[UC-PORTFOLIO-003-S02] returns empty when all lots closed", async () => {
-    await seedLot("AAPL", 100, 15000, 0);
+    await makeBuy("AAPL", 100, 150, 0);
+    await makeSell("AAPL", 100, 160, 0);
 
     const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/holdings`, {
       headers: authHeaders(),
@@ -105,7 +107,7 @@ describe("View Holdings", () => {
   });
 
   it("[UC-PORTFOLIO-003-S03] shows null P&L when price missing", async () => {
-    await seedLot("AAPL", 100, 15000, 100);
+    await makeBuy("AAPL", 100, 150, 0);
 
     const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/holdings`, {
       headers: authHeaders(),
@@ -129,7 +131,7 @@ describe("View Holdings", () => {
   });
 
   it("[UC-PORTFOLIO-003-S08] returns stock name from stocks table", async () => {
-    await seedLot("AAPL", 100, 15000, 100);
+    await makeBuy("AAPL", 100, 150, 0);
     await db
       .prepare("INSERT INTO stocks (symbol, name) VALUES (?, ?)")
       .bind("AAPL", "Apple Inc")
@@ -144,7 +146,7 @@ describe("View Holdings", () => {
   });
 
   it("[UC-PORTFOLIO-003-S09] falls back to symbol when stocks table has no name", async () => {
-    await seedLot("AAPL", 100, 15000, 100);
+    await makeBuy("AAPL", 100, 150, 0);
 
     const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/holdings`, {
       headers: authHeaders(),

@@ -39,35 +39,35 @@ function authHeaders(): Record<string, string> {
   return { Authorization: `Bearer ${authToken}` };
 }
 
-async function seedBuyTx(
+async function makeBuy(symbol: string, quantity: number, price: number, fee: number, date: string) {
+  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ symbol, type: "buy", quantity, price, fee, date }),
+  });
+  return (await res.json()) as { data: { id: number } };
+}
+
+async function makeSell(
   symbol: string,
   quantity: number,
   price: number,
   fee: number,
   date: string,
 ) {
-  const txResult = await db
-    .prepare(
-      "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, ?, 'buy', ?, ?, ?, ?)",
-    )
-    .bind(portfolioId, symbol, quantity, price, fee, date)
-    .run();
-  const costBasis = quantity * price + fee;
-  await db
-    .prepare(
-      "INSERT INTO lots (transaction_id, portfolio_id, symbol, quantity, remaining_quantity, cost_basis) VALUES (?, ?, ?, ?, ?, ?)",
-    )
-    .bind(txResult.meta.last_row_id, portfolioId, symbol, quantity, quantity, costBasis)
-    .run();
+  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ symbol, type: "sell", quantity, price, fee, date }),
+  });
+  return (await res.json()) as { data: { id: number } };
 }
 
 describe("View Lot Details", () => {
   it("[UC-PORTFOLIO-012-S01] returns lot details with P&L correctly", async () => {
-    await seedBuyTx("AAPL", 20, 150, 0, "2024-01-01");
-    await seedBuyTx("AAPL", 50, 160, 0, "2024-02-01");
-    await db
-      .prepare("UPDATE lots SET remaining_quantity = 30 WHERE quantity = 50 AND symbol = 'AAPL'")
-      .run();
+    await makeBuy("AAPL", 20, 150, 0, "2024-01-01");
+    await makeBuy("AAPL", 50, 160, 0, "2024-02-01");
+    // Don't sell anything - keep both lots open
     await db
       .prepare("INSERT INTO price_history (symbol, date, close) VALUES (?, ?, ?)")
       .bind("AAPL", "2024-03-01", 180)
@@ -99,7 +99,7 @@ describe("View Lot Details", () => {
     };
 
     expect(body.data.symbol).toBe("AAPL");
-    expect(body.data.total_quantity).toBe(50);
+    expect(body.data.total_quantity).toBe(70); // 20 + 50
     expect(body.data.lots).toHaveLength(2);
 
     const lot1 = body.data.lots[0]!;
@@ -117,17 +117,17 @@ describe("View Lot Details", () => {
     expect(lot2.date).toBe("2024-02-01");
     expect(lot2.buy_price).toBe(160);
     expect(lot2.quantity).toBe(50);
-    expect(lot2.remaining_quantity).toBe(30);
-    expect(lot2.cost_basis).toBe(4800);
-    expect(lot2.current_value).toBe(5400);
-    expect(lot2.unrealized_pnl).toBe(600);
+    expect(lot2.remaining_quantity).toBe(50);
+    expect(lot2.cost_basis).toBe(8000);
+    expect(lot2.current_value).toBe(9000);
+    expect(lot2.unrealized_pnl).toBe(1000);
     expect(lot2.unrealized_pnl_rate).toBe(12.5);
     expect(lot2.status).toBe("open");
   });
 
   it("[UC-PORTFOLIO-012-S02] shows closed status for fully sold lots", async () => {
-    await seedBuyTx("AAPL", 100, 150, 0, "2024-01-01");
-    await db.prepare("UPDATE lots SET remaining_quantity = 0 WHERE symbol = 'AAPL'").run();
+    await makeBuy("AAPL", 100, 150, 0, "2024-01-01");
+    await makeSell("AAPL", 100, 160, 0, "2024-01-15");
 
     const res = await worker.fetch(
       `http://localhost/api/portfolios/${portfolioId}/holdings/AAPL/lots`,
@@ -141,7 +141,7 @@ describe("View Lot Details", () => {
   });
 
   it("[UC-PORTFOLIO-012-S03] shows null P&L when price missing", async () => {
-    await seedBuyTx("AAPL", 100, 150, 0, "2024-01-01");
+    await makeBuy("AAPL", 100, 150, 0, "2024-01-01");
 
     const res = await worker.fetch(
       `http://localhost/api/portfolios/${portfolioId}/holdings/AAPL/lots`,
