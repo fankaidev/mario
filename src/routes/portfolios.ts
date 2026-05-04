@@ -9,7 +9,30 @@ import type {
   Transaction,
 } from "../../shared/types/api";
 import { getLatestPrice } from "./prices";
-import { replayFIFO } from "../lib/fifo";
+import { replayFIFO, type CorporateAction } from "../lib/fifo";
+
+/**
+ * Fetch corporate actions for a portfolio.
+ */
+export async function getCorporateActions(
+  db: D1Database,
+  portfolioId: number,
+): Promise<CorporateAction[]> {
+  const rows = await db
+    .prepare(
+      "SELECT id, symbol, type, ratio, effective_date FROM corporate_actions WHERE portfolio_id = ? ORDER BY effective_date, id",
+    )
+    .bind(portfolioId)
+    .all<{ id: number; symbol: string; type: string; ratio: number; effective_date: string }>();
+
+  return rows.results.map((row) => ({
+    id: row.id,
+    symbol: row.symbol,
+    type: row.type as "split" | "merge",
+    ratio: row.ratio,
+    effective_date: row.effective_date,
+  }));
+}
 
 /**
  * Calculate cash balance dynamically from all transfers and transactions.
@@ -177,15 +200,17 @@ portfolios.get("/:id/holdings", async (c) => {
     return c.json({ error: "Portfolio not found" }, 404);
   }
 
-  // Get all transactions for this portfolio
+  // Get all transactions and corporate actions for this portfolio
   const txRows = await c.env.DB.prepare(
     "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ? ORDER BY date, created_at",
   )
     .bind(portfolioId)
     .all<Transaction>();
 
+  const corporateActions = await getCorporateActions(c.env.DB, portfolioId);
+
   // Replay FIFO to get current lots
-  const { lots } = replayFIFO(txRows.results);
+  const { lots } = replayFIFO(txRows.results, corporateActions);
 
   // Group lots by symbol and calculate holdings
   const holdingsBySymbol = new Map<string, { quantity: number; cost: number }>();
@@ -256,15 +281,17 @@ portfolios.get("/:id/holdings/:symbol/lots", async (c) => {
 
   const currentPrice = await getLatestPrice(c.env.DB, symbol);
 
-  // Get all transactions for this portfolio
+  // Get all transactions and corporate actions for this portfolio
   const txRows = await c.env.DB.prepare(
     "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ? ORDER BY date, created_at",
   )
     .bind(portfolioId)
     .all<Transaction>();
 
+  const corporateActions = await getCorporateActions(c.env.DB, portfolioId);
+
   // Replay FIFO to get current lots
-  const { lots } = replayFIFO(txRows.results);
+  const { lots } = replayFIFO(txRows.results, corporateActions);
 
   // Filter lots for this symbol
   const symbolLots = lots.filter((l) => l.symbol === symbol);
@@ -333,15 +360,17 @@ portfolios.get("/:id/summary", async (c) => {
     .bind(portfolioId)
     .first<{ total: number | null }>();
 
-  // Get all transactions for this portfolio
+  // Get all transactions and corporate actions for this portfolio
   const txRows = await c.env.DB.prepare(
     "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ? ORDER BY date, created_at",
   )
     .bind(portfolioId)
     .all<Transaction>();
 
+  const corporateActions = await getCorporateActions(c.env.DB, portfolioId);
+
   // Replay FIFO to get current lots and realized P&L
-  const { lots, realizedPnl } = replayFIFO(txRows.results);
+  const { lots, realizedPnl } = replayFIFO(txRows.results, corporateActions);
 
   // Calculate market value and cost from current lots
   const holdingsBySymbol = new Map<string, { quantity: number; cost: number }>();

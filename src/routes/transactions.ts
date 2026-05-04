@@ -6,7 +6,7 @@ import type {
   Transaction,
   TransactionType,
 } from "../../shared/types/api";
-import { replayFIFO } from "../lib/fifo";
+import { replayFIFO, type CorporateAction } from "../lib/fifo";
 
 const transactions = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
@@ -237,14 +237,28 @@ async function handleSell(
   portfolioId: number,
   body: CreateTransactionRequest,
 ) {
-  // Get all transactions to validate sufficient quantity via FIFO replay
+  // Get all transactions and corporate actions to validate sufficient quantity via FIFO replay
   const txRows = await c.env.DB.prepare(
     "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ? ORDER BY date, created_at",
   )
     .bind(portfolioId)
     .all<Transaction>();
 
-  const { lots } = replayFIFO(txRows.results);
+  const caRows = await c.env.DB.prepare(
+    "SELECT id, symbol, type, ratio, effective_date FROM corporate_actions WHERE portfolio_id = ? ORDER BY effective_date, id",
+  )
+    .bind(portfolioId)
+    .all<{ id: number; symbol: string; type: string; ratio: number; effective_date: string }>();
+
+  const corporateActions: CorporateAction[] = caRows.results.map((row) => ({
+    id: row.id,
+    symbol: row.symbol,
+    type: row.type as "split" | "merge",
+    ratio: row.ratio,
+    effective_date: row.effective_date,
+  }));
+
+  const { lots } = replayFIFO(txRows.results, corporateActions);
 
   const symbolLots = lots.filter((l) => l.symbol === body.symbol && l.remaining_quantity > 0);
   const totalRemaining = symbolLots.reduce((sum, l) => sum + l.remaining_quantity, 0);

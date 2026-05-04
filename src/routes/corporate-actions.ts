@@ -37,10 +37,6 @@ corporateActions.post("/", async (c) => {
     .bind(portfolioId, body.symbol.trim(), body.type, body.ratio, body.effective_date)
     .run();
 
-  // TODO: In Event Sourcing model, corporate actions should be applied during FIFO replay
-  // For now, this endpoint only records the action but doesn't modify lots
-  // Full implementation requires updating replayFIFO to apply corporate actions chronologically
-
   return c.json({ data: { symbol: body.symbol.trim(), type: body.type, ratio: body.ratio } }, 201);
 });
 

@@ -4,7 +4,7 @@ import type { Bindings } from "../types";
 import type { IbkrFlexClient } from "../clients/ibkr";
 import { mapIbkrSymbol } from "../clients/ibkr";
 import type { Transaction } from "../../shared/types/api";
-import { replayFIFO } from "../lib/fifo";
+import { replayFIFO, type CorporateAction } from "../lib/fifo";
 
 const importRoutes = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
@@ -67,7 +67,28 @@ export async function importIbkrStatement(
           .bind(portfolioId)
           .all<Transaction>();
 
-        const { lots } = replayFIFO(txRows.results);
+        const caRows = await db
+          .prepare(
+            "SELECT id, symbol, type, ratio, effective_date FROM corporate_actions WHERE portfolio_id = ? ORDER BY effective_date, id",
+          )
+          .bind(portfolioId)
+          .all<{
+            id: number;
+            symbol: string;
+            type: string;
+            ratio: number;
+            effective_date: string;
+          }>();
+
+        const corporateActions: CorporateAction[] = caRows.results.map((row) => ({
+          id: row.id,
+          symbol: row.symbol,
+          type: row.type as "split" | "merge",
+          ratio: row.ratio,
+          effective_date: row.effective_date,
+        }));
+
+        const { lots } = replayFIFO(txRows.results, corporateActions);
         const symbolLots = lots.filter((l) => l.symbol === symbol && l.remaining_quantity > 0);
         const totalRemaining = symbolLots.reduce((sum, l) => sum + l.remaining_quantity, 0);
 
