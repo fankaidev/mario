@@ -40,70 +40,40 @@ function authHeaders(): Record<string, string> {
   return { Authorization: `Bearer ${authToken}` };
 }
 
-async function seedDeposit(amount: number) {
-  await db
-    .prepare(
-      "INSERT INTO transfers (portfolio_id, type, amount, fee, date) VALUES (?, 'deposit', ?, 0, '2024-01-01')",
-    )
-    .bind(portfolioId, amount)
-    .run();
+async function makeDeposit(amount: number) {
+  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transfers`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "deposit", amount, fee: 0, date: "2024-01-01" }),
+  });
+  return (await res.json()) as { data: { id: number } };
 }
 
-async function seedWithdrawal(amount: number) {
-  await db
-    .prepare(
-      "INSERT INTO transfers (portfolio_id, type, amount, fee, date) VALUES (?, 'withdrawal', ?, 0, '2024-01-01')",
-    )
-    .bind(portfolioId, amount)
-    .run();
+async function makeWithdrawal(amount: number) {
+  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transfers`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "withdrawal", amount, fee: 0, date: "2024-01-01" }),
+  });
+  return (await res.json()) as { data: { id: number } };
 }
 
-async function seedBuy(symbol: string, quantity: number, price: number, fee: number) {
-  const txRes = await db
-    .prepare(
-      "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, ?, 'buy', ?, ?, ?, '2024-01-01')",
-    )
-    .bind(portfolioId, symbol, quantity, price, fee)
-    .run();
-  await db
-    .prepare(
-      "INSERT INTO lots (transaction_id, portfolio_id, symbol, quantity, remaining_quantity, cost_basis) VALUES (?, ?, ?, ?, ?, ?)",
-    )
-    .bind(txRes.meta.last_row_id, portfolioId, symbol, quantity, quantity, quantity * price + fee)
-    .run();
+async function makeBuy(symbol: string, quantity: number, price: number, fee: number) {
+  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ symbol, type: "buy", quantity, price, fee, date: "2024-01-01" }),
+  });
+  return (await res.json()) as { data: { id: number } };
 }
 
-async function seedSell(
-  symbol: string,
-  quantity: number,
-  price: number,
-  fee: number,
-  lotId: number,
-  consumed: number,
-) {
-  const txRes = await db
-    .prepare(
-      "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, ?, 'sell', ?, ?, ?, '2024-02-01')",
-    )
-    .bind(portfolioId, symbol, quantity, price, fee)
-    .run();
-  const lot = await db
-    .prepare("SELECT quantity, cost_basis FROM lots WHERE id = ?")
-    .bind(lotId)
-    .first<{ quantity: number; cost_basis: number }>();
-  const cost = (lot!.cost_basis / lot!.quantity) * consumed;
-  const proceeds = price * consumed - fee * (consumed / quantity);
-  const pnl = proceeds - cost;
-  await db
-    .prepare(
-      "INSERT INTO realized_pnl (sell_transaction_id, lot_id, quantity, proceeds, cost, pnl) VALUES (?, ?, ?, ?, ?, ?)",
-    )
-    .bind(txRes.meta.last_row_id, lotId, consumed, price * consumed, cost, pnl)
-    .run();
-  await db
-    .prepare("UPDATE lots SET remaining_quantity = remaining_quantity - ? WHERE id = ?")
-    .bind(consumed, lotId)
-    .run();
+async function makeSell(symbol: string, quantity: number, price: number, fee: number) {
+  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ symbol, type: "sell", quantity, price, fee, date: "2024-02-01" }),
+  });
+  return (await res.json()) as { data: { id: number } };
 }
 
 async function getSummary() {
@@ -117,9 +87,9 @@ async function getSummary() {
 
 describe("Portfolio Summary", () => {
   it("[UC-PORTFOLIO-006-S01] calculates all metrics correctly", async () => {
-    await seedDeposit(20000);
-    await seedBuy("AAPL", 100, 150, 5);
-    await seedBuy("TSLA", 50, 100, 3);
+    await makeDeposit(20000);
+    await makeBuy("AAPL", 100, 150, 5);
+    await makeBuy("TSLA", 50, 100, 3);
     await db
       .prepare(
         "INSERT INTO price_history (symbol, date, close) VALUES ('AAPL', '2024-03-01', 180), ('TSLA', '2024-03-01', 90)",
@@ -136,10 +106,9 @@ describe("Portfolio Summary", () => {
   });
 
   it("[UC-PORTFOLIO-006-S02] includes realized P&L from sells", async () => {
-    await seedDeposit(25000);
-    await seedBuy("MSFT", 100, 200, 5);
-    const lotRow = await db.prepare("SELECT id FROM lots").first<{ id: number }>();
-    await seedSell("MSFT", 50, 220, 5, lotRow!.id, 50);
+    await makeDeposit(25000);
+    await makeBuy("MSFT", 100, 200, 5);
+    await makeSell("MSFT", 50, 220, 5);
     await db
       .prepare("INSERT INTO price_history (symbol, date, close) VALUES ('MSFT', '2024-03-01', 220)")
       .run();
@@ -173,9 +142,9 @@ describe("Portfolio Summary", () => {
   });
 
   it("[UC-PORTFOLIO-006-S06] calculates total_investment from deposits minus withdrawals", async () => {
-    await seedDeposit(50000);
-    await seedDeposit(20000);
-    await seedWithdrawal(10000);
+    await makeDeposit(50000);
+    await makeDeposit(20000);
+    await makeWithdrawal(10000);
 
     const { data } = await getSummary();
     expect(data.total_investment).toBe(60000);
@@ -184,9 +153,9 @@ describe("Portfolio Summary", () => {
   it("[UC-PORTFOLIO-006-S09] includes cash balance in portfolio value", async () => {
     // Deposit enough to have 198000 cash after buying AAPL (15005) and TSLA (5003)
     // 198000 + 15005 + 5003 = 218008
-    await seedDeposit(218008);
-    await seedBuy("AAPL", 100, 150, 5);
-    await seedBuy("TSLA", 50, 100, 3);
+    await makeDeposit(218008);
+    await makeBuy("AAPL", 100, 150, 5);
+    await makeBuy("TSLA", 50, 100, 3);
     await db
       .prepare(
         "INSERT INTO price_history (symbol, date, close) VALUES ('AAPL', '2024-03-01', 180), ('TSLA', '2024-03-01', 90)",
@@ -200,9 +169,9 @@ describe("Portfolio Summary", () => {
   });
 
   it("[UC-PORTFOLIO-006-S10] returns price_updated_at as oldest latest date among held symbols", async () => {
-    await seedDeposit(20000);
-    await seedBuy("AAPL", 100, 150, 5);
-    await seedBuy("TSLA", 50, 100, 3);
+    await makeDeposit(20000);
+    await makeBuy("AAPL", 100, 150, 5);
+    await makeBuy("TSLA", 50, 100, 3);
     await db
       .prepare(
         "INSERT INTO price_history (symbol, date, close) VALUES ('AAPL', '2024-03-01', 180), ('TSLA', '2024-03-02', 90)",
@@ -214,7 +183,7 @@ describe("Portfolio Summary", () => {
   });
 
   it("[UC-PORTFOLIO-006-S10b] returns null price_updated_at when no holdings", async () => {
-    await seedDeposit(20000);
+    await makeDeposit(20000);
 
     const { data } = await getSummary();
     expect(data.price_updated_at).toBeNull();

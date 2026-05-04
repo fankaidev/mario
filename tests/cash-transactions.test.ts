@@ -134,18 +134,7 @@ describe("Cash Transactions", () => {
     // Deposit enough for the buy, then sell
     await createTransfer("deposit", 1500, 0); // Cash = 1500
 
-    const txResult = await db
-      .prepare(
-        "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, 'AAPL', 'buy', 10, 150, 0, '2024-01-01') RETURNING id",
-      )
-      .bind(portfolioId)
-      .first<{ id: number }>();
-    await db
-      .prepare(
-        "INSERT INTO lots (transaction_id, portfolio_id, symbol, quantity, remaining_quantity, cost_basis) VALUES (?, ?, 'AAPL', 10, 10, 1500)",
-      )
-      .bind(txResult!.id, portfolioId)
-      .run();
+    await createTransaction("buy", 150, 0, "AAPL", 10);
     // After buy: 1500 - 1500 = 0
 
     const result = await createTransaction("sell", 180, 5, "AAPL", 5);
@@ -234,32 +223,9 @@ describe("Cash Transactions", () => {
     await createTransfer("deposit", 100000, 0);
     await createTransfer("withdrawal", 10000, 0);
 
-    const buyTx = await db
-      .prepare(
-        "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, 'AAPL', 'buy', 100, 150, 10, '2024-01-01') RETURNING id",
-      )
-      .bind(portfolioId)
-      .first<{ id: number }>();
-    await db
-      .prepare(
-        "INSERT INTO lots (transaction_id, portfolio_id, symbol, quantity, remaining_quantity, cost_basis) VALUES (?, ?, 'AAPL', 100, 50, 15010)",
-      )
-      .bind(buyTx!.id, portfolioId)
-      .run();
-
-    await db
-      .prepare(
-        "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, 'AAPL', 'sell', 50, 180, 5, '2024-02-01')",
-      )
-      .bind(portfolioId)
-      .run();
-
-    await db
-      .prepare(
-        "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, 'AAPL', 'dividend', 400, 0.25, 15, '2024-03-01')",
-      )
-      .bind(portfolioId)
-      .run();
+    await createTransaction("buy", 150, 10, "AAPL", 100);
+    await createTransaction("sell", 180, 5, "AAPL", 50);
+    await createTransaction("dividend", 0.25, 15, "AAPL", 400);
 
     const cashBalance = await getCashBalance();
 
