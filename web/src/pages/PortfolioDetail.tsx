@@ -40,7 +40,7 @@ export function PortfolioDetail() {
           {portfolio ? `${portfolio.name} (${portfolio.currency})` : "Loading..."}
         </h1>
 
-        <SummaryCard id={id!} />
+        <SummaryCard id={id!} currency={portfolio?.currency ?? ""} />
 
         <Tabs
           value={tab}
@@ -86,7 +86,7 @@ export function PortfolioDetail() {
           {tab === "transfers" && <TransfersTab id={id!} currency={portfolio?.currency ?? ""} />}
           {tab === "cash" && <CashTab id={id!} currency={portfolio?.currency ?? ""} />}
           {tab === "tags" && <TagsTab id={id!} />}
-          {tab === "summary" && <SummaryTab id={id!} />}
+          {tab === "summary" && <SummaryTab id={id!} currency={portfolio?.currency ?? ""} />}
         </Tabs>
       </div>
     </div>

@@ -105,7 +105,7 @@ function AddSnapshotModal({
   );
 }
 
-export function SummaryTab({ id }: { id: string }) {
+export function SummaryTab({ id, currency }: { id: string; currency: string }) {
   const queryClient = useQueryClient();
   const [showAddSnapshot, setShowAddSnapshot] = useState(false);
   const [deleteSnapshotId, setDeleteSnapshotId] = useState<number | null>(null);
@@ -205,19 +205,27 @@ export function SummaryTab({ id }: { id: string }) {
         <CardContent className="grid grid-cols-4 gap-4 p-4 text-sm">
           <div className="text-center">
             <p className="text-xs text-muted-foreground">Buy</p>
-            <p className="font-medium">{s.cumulative_buy_fees}</p>
+            <p className="font-medium">
+              {s.cumulative_buy_fees.toLocaleString()} {currency}
+            </p>
           </div>
           <div className="text-center">
             <p className="text-xs text-muted-foreground">Sell</p>
-            <p className="font-medium">{s.cumulative_sell_fees}</p>
+            <p className="font-medium">
+              {s.cumulative_sell_fees.toLocaleString()} {currency}
+            </p>
           </div>
           <div className="text-center">
             <p className="text-xs text-muted-foreground">Withholding Tax</p>
-            <p className="font-medium">{s.cumulative_withholding_tax}</p>
+            <p className="font-medium">
+              {s.cumulative_withholding_tax.toLocaleString()} {currency}
+            </p>
           </div>
           <div className="text-center">
             <p className="text-xs text-muted-foreground">Total</p>
-            <p className="font-semibold">{s.cumulative_total_fees}</p>
+            <p className="font-semibold">
+              {s.cumulative_total_fees.toLocaleString()} {currency}
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -322,10 +330,14 @@ export function SummaryTab({ id }: { id: string }) {
             >
               <span className="font-medium">{snap.date}</span>
               <span className="truncate text-muted-foreground">{snap.note || ""}</span>
-              <span className="text-right">{snap.total_investment.toLocaleString()}</span>
-              <span className="text-right">{snap.market_value.toLocaleString()}</span>
+              <span className="text-right">
+                {snap.total_investment.toLocaleString()} {currency}
+              </span>
+              <span className="text-right">
+                {snap.market_value.toLocaleString()} {currency}
+              </span>
               <span className={`text-right ${pnl >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {pnl.toLocaleString()} ({rate >= 0 ? "+" : ""}
+                {pnl.toLocaleString()} {currency} ({rate >= 0 ? "+" : ""}
                 {rate.toFixed(1)}%)
               </span>
               <Button
