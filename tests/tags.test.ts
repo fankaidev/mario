@@ -1,21 +1,20 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { getPlatformProxy, unstable_dev } from "wrangler";
-import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase, ensureMigrations, createApiTokenForUser } from "./helpers";
+import { createTestContext, cleanDatabase, createApiTokenForUser } from "./helpers";
+import type { TestContext } from "./helpers";
 
-let worker: UnstableDevWorker;
+let ctx: TestContext;
 let db: D1Database;
 let portfolioId: number;
 let authToken: string;
 
 beforeAll(async () => {
-  const { env } = await getPlatformProxy<{ DB: D1Database }>();
-  db = env.DB;
-  await ensureMigrations(db);
-  worker = await unstable_dev("src/index.ts", { config: "wrangler.toml", local: true });
+  ctx = await createTestContext();
+  db = ctx.db;
 });
 
-afterAll(async () => await worker.stop());
+afterAll(async () => {
+  await ctx.clean();
+});
 
 beforeEach(async () => {
   await cleanDatabase(db);
@@ -36,11 +35,11 @@ function authHeaders(): Record<string, string> {
 }
 
 function tagUrl(path = "") {
-  return `http://localhost/api/portfolios/${portfolioId}/tags${path}`;
+  return `/api/portfolios/${portfolioId}/tags${path}`;
 }
 
 async function createTag(name: string) {
-  const res = await worker.fetch(tagUrl(), {
+  const res = await ctx.request(tagUrl(), {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
@@ -53,16 +52,15 @@ describe("Stock Tags", () => {
     const { data } = await createTag("High Dividend");
     expect(data.name).toBe("High Dividend");
 
-    const { data: list } = (await worker
-      .fetch(tagUrl(), { headers: authHeaders() })
-      .then((r) => r.json())) as { data: Array<{ name: string }> };
+    const res = await ctx.request(tagUrl(), { headers: authHeaders() });
+    const { data: list } = (await res.json()) as { data: Array<{ name: string }> };
     expect(list.some((t) => t.name === "High Dividend")).toBe(true);
   });
 
   it("[UC-PORTFOLIO-007-S02] tags a stock with a tag", async () => {
     const { data: tag } = await createTag("High Dividend");
 
-    await worker.fetch(tagUrl(`/${tag.id}/stocks`), {
+    await ctx.request(tagUrl(`/${tag.id}/stocks`), {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ symbol: "AAPL" }),
@@ -79,12 +77,12 @@ describe("Stock Tags", () => {
     const { data: tag1 } = await createTag("High Dividend");
     const { data: tag2 } = await createTag("Tech");
 
-    await worker.fetch(tagUrl(`/${tag1.id}/stocks`), {
+    await ctx.request(tagUrl(`/${tag1.id}/stocks`), {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ symbol: "AAPL" }),
     });
-    await worker.fetch(tagUrl(`/${tag2.id}/stocks`), {
+    await ctx.request(tagUrl(`/${tag2.id}/stocks`), {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ symbol: "AAPL" }),
@@ -97,13 +95,13 @@ describe("Stock Tags", () => {
   it("[UC-PORTFOLIO-007-S05] deleting tag cascades stock associations", async () => {
     const { data: tag } = await createTag("High Dividend");
 
-    await worker.fetch(tagUrl(`/${tag.id}/stocks`), {
+    await ctx.request(tagUrl(`/${tag.id}/stocks`), {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ symbol: "AAPL" }),
     });
 
-    await worker.fetch(tagUrl(`/${tag.id}`), { method: "DELETE", headers: authHeaders() });
+    await ctx.request(tagUrl(`/${tag.id}`), { method: "DELETE", headers: authHeaders() });
 
     const stockTags = await db
       .prepare("SELECT * FROM stock_tags WHERE tag_id = ?")
@@ -118,18 +116,18 @@ describe("Stock Tags", () => {
   it("[UC-PORTFOLIO-007-S07] list tags includes stock symbols when include_stocks=true", async () => {
     const { data: tag } = await createTag("Tech");
 
-    await worker.fetch(tagUrl(`/${tag.id}/stocks`), {
+    await ctx.request(tagUrl(`/${tag.id}/stocks`), {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ symbol: "AAPL" }),
     });
-    await worker.fetch(tagUrl(`/${tag.id}/stocks`), {
+    await ctx.request(tagUrl(`/${tag.id}/stocks`), {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ symbol: "NVDA" }),
     });
 
-    const res = await worker.fetch(tagUrl("?include_stocks=true"), {
+    const res = await ctx.request(tagUrl("?include_stocks=true"), {
       headers: authHeaders(),
     });
     expect(res.status).toBe(200);

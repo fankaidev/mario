@@ -1,29 +1,23 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { getPlatformProxy, unstable_dev } from "wrangler";
-import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase, ensureMigrations, createApiTokenForUser } from "./helpers";
+import { createTestContext, cleanDatabase, createApiTokenForUser } from "./helpers";
+import type { TestContext } from "./helpers";
 import { FakeIbkrFlexClient } from "./fake-ibkr-client";
 import { importIbkrStatement } from "../src/routes/import";
 import { parseFlexStatement, mapIbkrSymbol } from "../src/clients/ibkr";
 
-let worker: UnstableDevWorker;
+let ctx: TestContext;
 let db: D1Database;
 let portfolioId: number;
 let userId: number;
 let authToken: string;
 
 beforeAll(async () => {
-  const { env } = await getPlatformProxy<{ DB: D1Database }>();
-  db = env.DB;
-  await ensureMigrations(db);
-  worker = await unstable_dev("src/index.ts", {
-    config: "wrangler.toml",
-    local: true,
-  });
+  ctx = await createTestContext();
+  db = ctx.db;
 });
 
 afterAll(async () => {
-  await worker.stop();
+  await ctx.clean();
 });
 
 beforeEach(async () => {
@@ -159,10 +153,9 @@ describe("IBKR Import", () => {
     expect(txRow!.fee).toBe(1);
 
     // Verify via holdings API instead of checking lots table
-    const holdingsRes = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/holdings`,
-      { headers: authHeaders() },
-    );
+    const holdingsRes = await ctx.request(`/api/portfolios/${portfolioId}/holdings`, {
+      headers: authHeaders(),
+    });
     const holdingsBody = (await holdingsRes.json()) as {
       data: Array<{ symbol: string; quantity: number; cost: number }>;
     };
@@ -274,7 +267,7 @@ describe("IBKR Import", () => {
   });
 
   it("[UC-IMPORT-001-S05] returns 401 when unauthenticated", async () => {
-    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/import/ibkr`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/import/ibkr`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: "test", query_id: "123" }),

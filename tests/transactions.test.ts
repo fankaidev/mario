@@ -1,25 +1,19 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { getPlatformProxy, unstable_dev } from "wrangler";
-import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase, ensureMigrations, createApiTokenForUser } from "./helpers";
+import { createTestContext, cleanDatabase, createApiTokenForUser } from "./helpers";
+import type { TestContext } from "./helpers";
 
-let worker: UnstableDevWorker;
+let ctx: TestContext;
 let db: D1Database;
 let portfolioId: number;
 let authToken: string;
 
 beforeAll(async () => {
-  const { env } = await getPlatformProxy<{ DB: D1Database }>();
-  db = env.DB;
-  await ensureMigrations(db);
-  worker = await unstable_dev("src/index.ts", {
-    config: "wrangler.toml",
-    local: true,
-  });
+  ctx = await createTestContext();
+  db = ctx.db;
 });
 
 afterAll(async () => {
-  await worker.stop();
+  await ctx.clean();
 });
 
 beforeEach(async () => {
@@ -49,7 +43,7 @@ function buyPayload(symbol: string, quantity: number, price: number, date: strin
 
 describe("Buy Transaction", () => {
   it("[UC-PORTFOLIO-002-S01] creates transaction and lot for buy", async () => {
-    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify(buyPayload("AAPL", 100, 150, "2024-01-15", 5)),
@@ -71,10 +65,9 @@ describe("Buy Transaction", () => {
     expect(body.data.fee).toBe(5);
 
     // Verify lot created via holdings endpoint
-    const holdingsRes = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/holdings`,
-      { headers: authHeaders() },
-    );
+    const holdingsRes = await ctx.request(`/api/portfolios/${portfolioId}/holdings`, {
+      headers: authHeaders(),
+    });
     const holdingsBody = (await holdingsRes.json()) as {
       data: Array<{ symbol: string; quantity: number; cost: number }>;
     };
@@ -85,13 +78,13 @@ describe("Buy Transaction", () => {
   });
 
   it("[UC-PORTFOLIO-002-S02] multiple buys create independent lots", async () => {
-    await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify(buyPayload("AAPL", 100, 150, "2024-01-15", 5)),
     });
 
-    const res2 = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    const res2 = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify(buyPayload("AAPL", 50, 160, "2024-02-10", 3)),
@@ -99,10 +92,9 @@ describe("Buy Transaction", () => {
     expect(res2.status).toBe(201);
 
     // Verify via holdings endpoint - should aggregate both lots
-    const holdingsRes = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/holdings`,
-      { headers: authHeaders() },
-    );
+    const holdingsRes = await ctx.request(`/api/portfolios/${portfolioId}/holdings`, {
+      headers: authHeaders(),
+    });
     const holdingsBody = (await holdingsRes.json()) as {
       data: Array<{ symbol: string; quantity: number; cost: number }>;
     };
@@ -112,7 +104,7 @@ describe("Buy Transaction", () => {
   });
 
   it("returns 404 for non-existent portfolio", async () => {
-    const res = await worker.fetch("http://localhost/api/portfolios/99999/transactions", {
+    const res = await ctx.request("/api/portfolios/99999/transactions", {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify(buyPayload("AAPL", 100, 150, "2024-01-15")),
@@ -134,14 +126,11 @@ describe("Buy Transaction", () => {
     ];
 
     for (const [_desc, body] of cases) {
-      const res = await worker.fetch(
-        `http://localhost/api/portfolios/${portfolioId}/transactions`,
-        {
-          method: "POST",
-          headers: { ...authHeaders(), "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        },
-      );
+      const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       expect(res.status).toBe(400);
     }
   });
@@ -158,7 +147,7 @@ async function makeBuy(
   date: string,
   fee?: number,
 ) {
-  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+  const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(buyPayload(symbol, quantity, price, date, fee)),
@@ -174,7 +163,7 @@ describe("Sell Transaction", () => {
     date: string,
     fee?: number,
   ) {
-    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify(buyPayload(symbol, quantity, price, date, fee)),
@@ -186,7 +175,7 @@ describe("Sell Transaction", () => {
     await makeBuy("AAPL", 100, 150, "2024-01-15", 5);
     await makeBuy("AAPL", 50, 160, "2024-02-10", 3);
 
-    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify(sellPayload("AAPL", 80, 170, "2024-03-01", 5)),
@@ -194,20 +183,18 @@ describe("Sell Transaction", () => {
     expect(res.status).toBe(201);
 
     // Verify via holdings - should have 70 shares remaining (100 - 80 from first lot, + 50 from second)
-    const holdingsRes = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/holdings`,
-      { headers: authHeaders() },
-    );
+    const holdingsRes = await ctx.request(`/api/portfolios/${portfolioId}/holdings`, {
+      headers: authHeaders(),
+    });
     const holdingsBody = (await holdingsRes.json()) as {
       data: Array<{ symbol: string; quantity: number }>;
     };
     expect(holdingsBody.data[0].quantity).toBe(70); // 20 + 50
 
     // Verify via summary - check realized P&L was recorded
-    const summaryRes = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/summary`,
-      { headers: authHeaders() },
-    );
+    const summaryRes = await ctx.request(`/api/portfolios/${portfolioId}/summary`, {
+      headers: authHeaders(),
+    });
     const summaryBody = (await summaryRes.json()) as {
       data: { realized_pnl: number };
     };
@@ -217,7 +204,7 @@ describe("Sell Transaction", () => {
   it("[UC-PORTFOLIO-002-S04] returns 400 for insufficient quantity", async () => {
     await makeBuy("AAPL", 100, 150, "2024-01-15");
 
-    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify(sellPayload("AAPL", 150, 170, "2024-03-01")),
@@ -231,7 +218,7 @@ describe("Sell Transaction", () => {
     await makeBuy("AAPL", 100, 150, "2024-01-15", 5);
     await makeBuy("AAPL", 50, 160, "2024-02-10", 3);
 
-    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify(sellPayload("AAPL", 20, 170, "2024-03-15", 5)),
@@ -239,20 +226,18 @@ describe("Sell Transaction", () => {
     expect(res.status).toBe(201);
 
     // Verify via holdings - should have 130 shares remaining
-    const holdingsRes = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/holdings`,
-      { headers: authHeaders() },
-    );
+    const holdingsRes = await ctx.request(`/api/portfolios/${portfolioId}/holdings`, {
+      headers: authHeaders(),
+    });
     const holdingsBody = (await holdingsRes.json()) as {
       data: Array<{ quantity: number }>;
     };
     expect(holdingsBody.data[0].quantity).toBe(130); // 80 + 50
 
     // Verify realized P&L via summary
-    const summaryRes = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/summary`,
-      { headers: authHeaders() },
-    );
+    const summaryRes = await ctx.request(`/api/portfolios/${portfolioId}/summary`, {
+      headers: authHeaders(),
+    });
     const summaryBody = (await summaryRes.json()) as {
       data: { realized_pnl: number };
     };
@@ -273,7 +258,7 @@ describe("Dividend Transaction", () => {
   }
 
   it("[UC-PORTFOLIO-002-S06] creates dividend transaction without affecting lots", async () => {
-    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify(divPayload("AAPL", 0.25, 400, 10, "2024-04-01")),
@@ -289,10 +274,9 @@ describe("Dividend Transaction", () => {
     expect(body.data.fee).toBe(10);
 
     // Verify no holdings created (dividend doesn't affect positions)
-    const holdingsRes = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/holdings`,
-      { headers: authHeaders() },
-    );
+    const holdingsRes = await ctx.request(`/api/portfolios/${portfolioId}/holdings`, {
+      headers: authHeaders(),
+    });
     const holdingsBody = (await holdingsRes.json()) as { data: unknown[] };
     expect(holdingsBody.data).toHaveLength(0);
   });
@@ -310,7 +294,7 @@ describe("Initial Transaction", () => {
   }
 
   it("[UC-PORTFOLIO-002-S09] creates transaction and lot for initial holding", async () => {
-    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify(initialPayload("1810.HK", 800, 40, "2026-01-01", 0)),
@@ -333,10 +317,9 @@ describe("Initial Transaction", () => {
     expect(body.data.fee).toBe(0);
 
     // Verify lot created via holdings
-    const holdingsRes = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/holdings`,
-      { headers: authHeaders() },
-    );
+    const holdingsRes = await ctx.request(`/api/portfolios/${portfolioId}/holdings`, {
+      headers: authHeaders(),
+    });
     const holdingsBody = (await holdingsRes.json()) as {
       data: Array<{ symbol: string; quantity: number; cost: number }>;
     };
@@ -346,7 +329,7 @@ describe("Initial Transaction", () => {
   });
 
   it("deleting an initial transaction removes the lot", async () => {
-    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify(initialPayload("1810.HK", 800, 40, "2026-01-01")),
@@ -354,27 +337,22 @@ describe("Initial Transaction", () => {
     const { data: tx } = (await res.json()) as { data: { id: number } };
 
     // Verify holding exists before deletion
-    const holdingsBefore = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/holdings`,
-      { headers: authHeaders() },
-    );
+    const holdingsBefore = await ctx.request(`/api/portfolios/${portfolioId}/holdings`, {
+      headers: authHeaders(),
+    });
     const holdingsBeforeBody = (await holdingsBefore.json()) as { data: unknown[] };
     expect(holdingsBeforeBody.data).toHaveLength(1);
 
-    const delRes = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/transactions/${tx.id}`,
-      {
-        method: "DELETE",
-        headers: authHeaders(),
-      },
-    );
+    const delRes = await ctx.request(`/api/portfolios/${portfolioId}/transactions/${tx.id}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
     expect(delRes.status).toBe(200);
 
     // Verify holding removed after deletion
-    const holdingsAfter = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/holdings`,
-      { headers: authHeaders() },
-    );
+    const holdingsAfter = await ctx.request(`/api/portfolios/${portfolioId}/holdings`, {
+      headers: authHeaders(),
+    });
     const holdingsAfterBody = (await holdingsAfter.json()) as { data: unknown[] };
     expect(holdingsAfterBody.data).toHaveLength(0);
 
@@ -388,22 +366,21 @@ describe("Initial Transaction", () => {
 
 describe("Transaction History", () => {
   async function getTransactions() {
-    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
       headers: authHeaders(),
     });
     return (await res.json()) as { data: Array<{ id: number; type: string; date: string }> };
   }
 
   async function getTransactionsWithParams(params: string) {
-    const res = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/transactions${params}`,
-      { headers: authHeaders() },
-    );
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions${params}`, {
+      headers: authHeaders(),
+    });
     return (await res.json()) as { data: Array<{ id: number; type: string; date: string }> };
   }
 
   async function deleteTransaction(txId: number) {
-    return worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions/${txId}`, {
+    return ctx.request(`/api/portfolios/${portfolioId}/transactions/${txId}`, {
       method: "DELETE",
       headers: authHeaders(),
     });
@@ -412,7 +389,7 @@ describe("Transaction History", () => {
   it("[UC-PORTFOLIO-004-S01] lists transactions sorted by date DESC", async () => {
     const dates = ["2024-01-15", "2024-02-20", "2024-03-10"];
     for (const date of dates) {
-      await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify(buyPayload("AAPL", 10, 150, date)),
@@ -430,10 +407,9 @@ describe("Transaction History", () => {
     const { data: tx } = await makeBuy("AAPL", 100, 150, "2024-01-15", 5);
 
     // Verify holding exists
-    const holdingsBefore = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/holdings`,
-      { headers: authHeaders() },
-    );
+    const holdingsBefore = await ctx.request(`/api/portfolios/${portfolioId}/holdings`, {
+      headers: authHeaders(),
+    });
     const holdingsBeforeBody = (await holdingsBefore.json()) as { data: unknown[] };
     expect(holdingsBeforeBody.data).toHaveLength(1);
 
@@ -441,10 +417,9 @@ describe("Transaction History", () => {
     expect(res.status).toBe(200);
 
     // Verify holding removed
-    const holdingsAfter = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/holdings`,
-      { headers: authHeaders() },
-    );
+    const holdingsAfter = await ctx.request(`/api/portfolios/${portfolioId}/holdings`, {
+      headers: authHeaders(),
+    });
     const holdingsAfterBody = (await holdingsAfter.json()) as { data: unknown[] };
     expect(holdingsAfterBody.data).toHaveLength(0);
 
@@ -458,28 +433,24 @@ describe("Transaction History", () => {
   it("[UC-PORTFOLIO-004-S03] deleting a sell restores lot quantities", async () => {
     await makeBuy("AAPL", 100, 150, "2024-01-15", 5);
 
-    const sellRes = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/transactions`,
-      {
-        method: "POST",
-        headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({
-          symbol: "AAPL",
-          type: "sell",
-          quantity: 50,
-          price: 170,
-          fee: 5,
-          date: "2024-02-01",
-        }),
-      },
-    );
+    const sellRes = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        symbol: "AAPL",
+        type: "sell",
+        quantity: 50,
+        price: 170,
+        fee: 5,
+        date: "2024-02-01",
+      }),
+    });
     const { data: sellTx } = (await sellRes.json()) as { data: { id: number } };
 
     // Verify holding quantity after sell
-    const holdingsBefore = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/holdings`,
-      { headers: authHeaders() },
-    );
+    const holdingsBefore = await ctx.request(`/api/portfolios/${portfolioId}/holdings`, {
+      headers: authHeaders(),
+    });
     const holdingsBeforeBody = (await holdingsBefore.json()) as {
       data: Array<{ quantity: number }>;
     };
@@ -489,10 +460,9 @@ describe("Transaction History", () => {
     expect(res.status).toBe(200);
 
     // Verify holding quantity restored after delete
-    const holdingsAfter = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/holdings`,
-      { headers: authHeaders() },
-    );
+    const holdingsAfter = await ctx.request(`/api/portfolios/${portfolioId}/holdings`, {
+      headers: authHeaders(),
+    });
     const holdingsAfterBody = (await holdingsAfter.json()) as {
       data: Array<{ quantity: number }>;
     };
@@ -511,7 +481,7 @@ describe("Transaction History", () => {
       .bind("AAPL", "Apple Inc")
       .run();
 
-    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
       headers: authHeaders(),
     });
     expect(res.status).toBe(200);
@@ -522,7 +492,7 @@ describe("Transaction History", () => {
   it("[UC-PORTFOLIO-004-S09] falls back to symbol when stocks table has no name", async () => {
     await makeBuy("AAPL", 100, 150, "2024-01-15");
 
-    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
       headers: authHeaders(),
     });
     expect(res.status).toBe(200);
@@ -566,20 +536,18 @@ describe("Transaction History", () => {
     await makeBuy("TSLA", 5, 200, "2024-02-01");
     await makeBuy("AAPL", 20, 160, "2024-03-01");
 
-    const res = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/transactions/symbols`,
-      { headers: authHeaders() },
-    );
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions/symbols`, {
+      headers: authHeaders(),
+    });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: string[] };
     expect(body.data).toEqual(["AAPL", "TSLA"]);
   });
 
   it("GET /symbols returns empty array when no transactions", async () => {
-    const res = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/transactions/symbols`,
-      { headers: authHeaders() },
-    );
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions/symbols`, {
+      headers: authHeaders(),
+    });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: string[] };
     expect(body.data).toEqual([]);

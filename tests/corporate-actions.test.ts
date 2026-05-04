@@ -1,21 +1,20 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { getPlatformProxy, unstable_dev } from "wrangler";
-import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase, ensureMigrations, createApiTokenForUser } from "./helpers";
+import { createTestContext, cleanDatabase, createApiTokenForUser } from "./helpers";
+import type { TestContext } from "./helpers";
 
-let worker: UnstableDevWorker;
+let ctx: TestContext;
 let db: D1Database;
 let portfolioId: number;
 let authToken: string;
 
 beforeAll(async () => {
-  const { env } = await getPlatformProxy<{ DB: D1Database }>();
-  db = env.DB;
-  await ensureMigrations(db);
-  worker = await unstable_dev("src/index.ts", { config: "wrangler.toml", local: true });
+  ctx = await createTestContext();
+  db = ctx.db;
 });
 
-afterAll(async () => await worker.stop());
+afterAll(async () => {
+  await ctx.clean();
+});
 
 beforeEach(async () => {
   await cleanDatabase(db);
@@ -36,7 +35,7 @@ function authHeaders(): Record<string, string> {
 }
 
 async function makeBuy(symbol: string, quantity: number, price: number, fee: number, date: string) {
-  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+  const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ symbol, type: "buy", quantity, price, fee, date }),
@@ -51,7 +50,7 @@ async function makeSell(
   fee: number,
   date: string,
 ) {
-  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+  const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ symbol, type: "sell", quantity, price, fee, date }),
@@ -65,29 +64,25 @@ async function createCorporateAction(
   ratio: number,
   effectiveDate: string,
 ) {
-  const res = await worker.fetch(
-    `http://localhost/api/portfolios/${portfolioId}/corporate-actions`,
-    {
-      method: "POST",
-      headers: { ...authHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({ symbol, type, ratio, effective_date: effectiveDate }),
-    },
-  );
+  const res = await ctx.request(`/api/portfolios/${portfolioId}/corporate-actions`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ symbol, type, ratio, effective_date: effectiveDate }),
+  });
   return res;
 }
 
 async function getHoldings() {
-  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/holdings`, {
+  const res = await ctx.request(`/api/portfolios/${portfolioId}/holdings`, {
     headers: authHeaders(),
   });
   return (await res.json()) as { data: Array<{ symbol: string; quantity: number; cost: number }> };
 }
 
 async function getLotDetails(symbol: string) {
-  const res = await worker.fetch(
-    `http://localhost/api/portfolios/${portfolioId}/holdings/${symbol}/lots`,
-    { headers: authHeaders() },
-  );
+  const res = await ctx.request(`/api/portfolios/${portfolioId}/holdings/${symbol}/lots`, {
+    headers: authHeaders(),
+  });
   return (await res.json()) as {
     data: {
       symbol: string;

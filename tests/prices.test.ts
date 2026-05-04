@@ -1,28 +1,22 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { getPlatformProxy, unstable_dev } from "wrangler";
-import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase, ensureMigrations, createApiTokenForUser } from "./helpers";
+import { createTestContext, cleanDatabase, createApiTokenForUser } from "./helpers";
+import type { TestContext } from "./helpers";
 import { FakePriceFetcher } from "./fake-price-fetcher";
 import { syncPriceHistory, getLatestPrice } from "../src/routes/prices";
 import { FetcherRouter } from "../src/clients/fetcher-router";
 
-let worker: UnstableDevWorker;
+let ctx: TestContext;
 let db: D1Database;
 let portfolioId: number;
 let authToken: string;
 
 beforeAll(async () => {
-  const { env } = await getPlatformProxy<{ DB: D1Database }>();
-  db = env.DB;
-  await ensureMigrations(db);
-  worker = await unstable_dev("src/index.ts", {
-    config: "wrangler.toml",
-    local: true,
-  });
+  ctx = await createTestContext();
+  db = ctx.db;
 });
 
 afterAll(async () => {
-  await worker.stop();
+  await ctx.clean();
 });
 
 beforeEach(async () => {
@@ -44,7 +38,7 @@ function authHeaders(): Record<string, string> {
 }
 
 async function makeBuy(symbol: string) {
-  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+  const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -94,7 +88,7 @@ describe("Price Sync", () => {
   });
 
   it("[UC-PORTFOLIO-005-S05] returns 401 when unauthenticated", async () => {
-    const res = await worker.fetch("http://localhost/api/prices/sync", {
+    const res = await ctx.request("/api/prices/sync", {
       method: "POST",
     });
     expect(res.status).toBe(401);
@@ -215,7 +209,7 @@ describe("Price History", () => {
       )
       .run();
 
-    const res = await worker.fetch("http://localhost/api/prices/history/AAPL", {
+    const res = await ctx.request("/api/prices/history/AAPL", {
       headers: authHeaders(),
     });
     expect(res.status).toBe(200);
@@ -235,8 +229,8 @@ describe("Price History", () => {
       )
       .run();
 
-    const res = await worker.fetch(
-      "http://localhost/api/prices/history/AAPL?start_date=2024-02-01&end_date=2024-02-28",
+    const res = await ctx.request(
+      "/api/prices/history/AAPL?start_date=2024-02-01&end_date=2024-02-28",
       { headers: authHeaders() },
     );
     expect(res.status).toBe(200);
@@ -255,7 +249,7 @@ describe("Price History", () => {
       )
       .run();
 
-    const res = await worker.fetch("http://localhost/api/prices/history/TSLA", {
+    const res = await ctx.request("/api/prices/history/TSLA", {
       headers: authHeaders(),
     });
     expect(res.status).toBe(200);
@@ -269,12 +263,12 @@ describe("Price History", () => {
   });
 
   it("[UC-PORTFOLIO-003-S14] returns 401 when unauthenticated", async () => {
-    const res = await worker.fetch("http://localhost/api/prices/history/AAPL");
+    const res = await ctx.request("/api/prices/history/AAPL");
     expect(res.status).toBe(401);
   });
 
   it("[UC-PORTFOLIO-003-S15] returns empty prices array when no price history exists", async () => {
-    const res = await worker.fetch("http://localhost/api/prices/history/NVDA", {
+    const res = await ctx.request("/api/prices/history/NVDA", {
       headers: authHeaders(),
     });
     expect(res.status).toBe(200);

@@ -1,26 +1,20 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { getPlatformProxy, unstable_dev } from "wrangler";
-import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase, ensureMigrations, createApiTokenForUser } from "./helpers";
+import { createTestContext, cleanDatabase, createApiTokenForUser } from "./helpers";
+import type { TestContext } from "./helpers";
 import { calculateSnapshot } from "../src/routes/snapshots";
 
-let worker: UnstableDevWorker;
+let ctx: TestContext;
 let db: D1Database;
 let portfolioId: number;
 let authToken: string;
 
 beforeAll(async () => {
-  const { env } = await getPlatformProxy<{ DB: D1Database }>();
-  db = env.DB;
-  await ensureMigrations(db);
-  worker = await unstable_dev("src/index.ts", {
-    config: "wrangler.toml",
-    local: true,
-  });
+  ctx = await createTestContext();
+  db = ctx.db;
 });
 
 afterAll(async () => {
-  await worker.stop();
+  await ctx.clean();
 });
 
 beforeEach(async () => {
@@ -46,7 +40,7 @@ function authHeaders(): Record<string, string> {
 
 describe("Portfolio Snapshots", () => {
   it("[UC-PORTFOLIO-008-S01] creates a snapshot", async () => {
-    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/snapshots`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/snapshots`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -77,7 +71,7 @@ describe("Portfolio Snapshots", () => {
   });
 
   it("[UC-PORTFOLIO-008-S02] rejects duplicate date", async () => {
-    await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/snapshots`, {
+    await ctx.request(`/api/portfolios/${portfolioId}/snapshots`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -88,7 +82,7 @@ describe("Portfolio Snapshots", () => {
       }),
     });
 
-    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/snapshots`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/snapshots`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -106,7 +100,7 @@ describe("Portfolio Snapshots", () => {
   it("[UC-PORTFOLIO-008-S03] lists snapshots sorted by date DESC", async () => {
     const dates = ["2024-01-15", "2024-06-30", "2024-12-31"];
     for (const date of dates) {
-      await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/snapshots`, {
+      await ctx.request(`/api/portfolios/${portfolioId}/snapshots`, {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -118,7 +112,7 @@ describe("Portfolio Snapshots", () => {
       });
     }
 
-    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/snapshots`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/snapshots`, {
       headers: authHeaders(),
     });
     expect(res.status).toBe(200);
@@ -130,28 +124,25 @@ describe("Portfolio Snapshots", () => {
   });
 
   it("[UC-PORTFOLIO-008-S04] deletes a snapshot", async () => {
-    const createRes = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/snapshots`,
-      {
-        method: "POST",
-        headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: "2024-12-31",
-          total_investment: 100000,
-          market_value: 120000,
-          cash_balance: 5000,
-        }),
-      },
-    );
+    const createRes = await ctx.request(`/api/portfolios/${portfolioId}/snapshots`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        date: "2024-12-31",
+        total_investment: 100000,
+        market_value: 120000,
+        cash_balance: 5000,
+      }),
+    });
     const { data: snapshot } = (await createRes.json()) as { data: { id: number } };
 
-    const delRes = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/snapshots/${snapshot.id}`,
-      { method: "DELETE", headers: authHeaders() },
-    );
+    const delRes = await ctx.request(`/api/portfolios/${portfolioId}/snapshots/${snapshot.id}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
     expect(delRes.status).toBe(200);
 
-    const listRes = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/snapshots`, {
+    const listRes = await ctx.request(`/api/portfolios/${portfolioId}/snapshots`, {
       headers: authHeaders(),
     });
     const listBody = (await listRes.json()) as { data: unknown[] };
@@ -170,26 +161,23 @@ describe("Portfolio Snapshots", () => {
       .first<{ id: number }>();
     const otherPortfolioId = otherPortfolioResult!.id;
 
-    const res = await worker.fetch(
-      `http://localhost/api/portfolios/${otherPortfolioId}/snapshots`,
-      {
-        method: "POST",
-        headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: "2024-12-31",
-          total_investment: 100000,
-          market_value: 120000,
-          cash_balance: 5000,
-        }),
-      },
-    );
+    const res = await ctx.request(`/api/portfolios/${otherPortfolioId}/snapshots`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        date: "2024-12-31",
+        total_investment: 100000,
+        market_value: 120000,
+        cash_balance: 5000,
+      }),
+    });
     expect(res.status).toBe(404);
   });
 });
 
 describe("Calculated Snapshots", () => {
   async function makeDeposit(amount: number, date = "2024-01-01") {
-    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transfers`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/transfers`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ type: "deposit", amount, fee: 0, date }),
@@ -204,7 +192,7 @@ describe("Calculated Snapshots", () => {
     fee: number,
     date = "2024-01-15",
   ) {
-    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ symbol, type: "buy", quantity, price, fee, date }),
@@ -219,7 +207,7 @@ describe("Calculated Snapshots", () => {
     fee: number,
     date = "2024-06-01",
   ) {
-    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ symbol, type: "sell", quantity, price, fee, date }),
@@ -239,14 +227,11 @@ describe("Calculated Snapshots", () => {
     await makeBuy("AAPL", 100, 150, 5, "2024-01-15");
     await seedPrice("AAPL", "2024-03-01", 180);
 
-    const res = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/snapshots/calculate`,
-      {
-        method: "POST",
-        headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ date: "2024-03-01" }),
-      },
-    );
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/snapshots/calculate`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ date: "2024-03-01" }),
+    });
     expect(res.status).toBe(201);
     const body = (await res.json()) as {
       data: { total_investment: number; market_value: number; cash_balance: number };
@@ -260,35 +245,29 @@ describe("Calculated Snapshots", () => {
     await makeDeposit(20000);
     await makeBuy("AAPL", 100, 150, 5, "2024-01-15");
 
-    const res = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/snapshots/calculate`,
-      {
-        method: "POST",
-        headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ date: "2024-03-01" }),
-      },
-    );
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/snapshots/calculate`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ date: "2024-03-01" }),
+    });
     expect(res.status).toBe(422);
     const body = (await res.json()) as { error: string };
     expect(body.error).toContain("AAPL");
   });
 
   it("[UC-PORTFOLIO-008-S09] rejects future date", async () => {
-    const res = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/snapshots/calculate`,
-      {
-        method: "POST",
-        headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ date: "2099-12-31" }),
-      },
-    );
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/snapshots/calculate`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ date: "2099-12-31" }),
+    });
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string };
     expect(body.error).toContain("future");
   });
 
   it("[UC-PORTFOLIO-008-S10] returns 409 if snapshot exists for date", async () => {
-    await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/snapshots`, {
+    await ctx.request(`/api/portfolios/${portfolioId}/snapshots`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -303,14 +282,11 @@ describe("Calculated Snapshots", () => {
     await makeBuy("AAPL", 100, 150, 5, "2024-01-15");
     await seedPrice("AAPL", "2024-03-01", 180);
 
-    const res = await worker.fetch(
-      `http://localhost/api/portfolios/${portfolioId}/snapshots/calculate`,
-      {
-        method: "POST",
-        headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ date: "2024-03-01" }),
-      },
-    );
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/snapshots/calculate`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ date: "2024-03-01" }),
+    });
     expect(res.status).toBe(409);
   });
 
@@ -341,14 +317,11 @@ describe("Calculated Snapshots", () => {
       .first<{ id: number }>();
     const otherPortfolioId = otherPortfolioResult!.id;
 
-    const res = await worker.fetch(
-      `http://localhost/api/portfolios/${otherPortfolioId}/snapshots/calculate`,
-      {
-        method: "POST",
-        headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ date: "2024-03-01" }),
-      },
-    );
+    const res = await ctx.request(`/api/portfolios/${otherPortfolioId}/snapshots/calculate`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ date: "2024-03-01" }),
+    });
     expect(res.status).toBe(404);
   });
 });

@@ -2,11 +2,10 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { exportJWK, generateKeyPair, SignJWT, type JWK, type KeyLike } from "jose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { getPlatformProxy, unstable_dev } from "wrangler";
-import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase, ensureMigrations } from "./helpers";
+import { createTestContext, cleanDatabase } from "./helpers";
+import type { TestContext } from "./helpers";
 
-let worker: UnstableDevWorker;
+let ctx: TestContext;
 let db: D1Database;
 let jwksServer: Server;
 let jwksUrl: string;
@@ -72,22 +71,16 @@ beforeAll(async () => {
   const address = jwksServer.address() as AddressInfo;
   jwksUrl = `http://127.0.0.1:${address.port}/cdn-cgi/access/certs`;
 
-  const { env } = await getPlatformProxy<{ DB: D1Database }>();
-  db = env.DB;
-  await ensureMigrations(db);
-  worker = await unstable_dev("src/index.ts", {
-    config: "wrangler.toml",
-    local: true,
-    vars: {
-      ACCESS_AUD: TEST_ACCESS_AUD,
-      ACCESS_ISSUER: TEST_ACCESS_ISSUER,
-      ACCESS_JWKS_URL: jwksUrl,
-    },
+  ctx = await createTestContext({
+    ACCESS_AUD: TEST_ACCESS_AUD,
+    ACCESS_ISSUER: TEST_ACCESS_ISSUER,
+    ACCESS_JWKS_URL: jwksUrl,
   });
+  db = ctx.db;
 });
 
 afterAll(async () => {
-  await worker.stop();
+  await ctx.clean();
   await new Promise<void>((resolve, reject) => {
     jwksServer.close((err) => {
       if (err) reject(err);
@@ -104,7 +97,7 @@ describe("Auth Middleware", () => {
   it("[UC-AUTH-002-S02] authenticates via Bearer token", async () => {
     const rawToken = await createApiToken("token-user@example.com");
 
-    const res = await worker.fetch("http://localhost/api/me", {
+    const res = await ctx.request("/api/me", {
       headers: { Authorization: `Bearer ${rawToken}` },
     });
     expect(res.status).toBe(200);
@@ -124,7 +117,7 @@ describe("Auth Middleware", () => {
     const rawToken = await createApiToken("token-user@example.com");
     const accessJwt = await createAccessJwt("access-user@example.com");
 
-    const res = await worker.fetch("http://localhost/api/me", {
+    const res = await ctx.request("/api/me", {
       headers: {
         Authorization: `Bearer ${rawToken}`,
         "Cf-Access-Jwt-Assertion": accessJwt,
@@ -136,14 +129,14 @@ describe("Auth Middleware", () => {
   });
 
   it("[UC-AUTH-002-S04] returns 401 when no auth header present", async () => {
-    const res = await worker.fetch("http://localhost/api/me");
+    const res = await ctx.request("/api/me");
     expect(res.status).toBe(401);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("Unauthorized");
   });
 
   it("[UC-AUTH-002-S05] returns 401 for invalid Bearer token", async () => {
-    const res = await worker.fetch("http://localhost/api/me", {
+    const res = await ctx.request("/api/me", {
       headers: { Authorization: "Bearer invalid-token-12345" },
     });
     expect(res.status).toBe(401);
@@ -154,7 +147,7 @@ describe("Auth Middleware", () => {
   it("[UC-AUTH-002-S07] authenticates via verified Access JWT header", async () => {
     const accessJwt = await createAccessJwt("access-user@example.com");
 
-    const res = await worker.fetch("http://localhost/api/me", {
+    const res = await ctx.request("/api/me", {
       headers: { "Cf-Access-Jwt-Assertion": accessJwt },
     });
     expect(res.status).toBe(200);
@@ -164,7 +157,7 @@ describe("Auth Middleware", () => {
   });
 
   it("[UC-AUTH-002-S08] rejects spoofed CF-Access-Authenticated-User-Email header", async () => {
-    const res = await worker.fetch("http://localhost/api/me", {
+    const res = await ctx.request("/api/me", {
       headers: { "CF-Access-Authenticated-User-Email": "user@example.com" },
     });
     expect(res.status).toBe(401);
@@ -179,7 +172,7 @@ describe("Auth Middleware", () => {
     expect(userBefore).toBeNull();
 
     const accessJwt = await createAccessJwt(email);
-    const res = await worker.fetch("http://localhost/api/me", {
+    const res = await ctx.request("/api/me", {
       headers: { Cookie: `CF_Authorization=${accessJwt}` },
     });
     expect(res.status).toBe(200);
@@ -198,7 +191,7 @@ describe("Auth Middleware", () => {
       "wrong-audience",
     );
 
-    const res = await worker.fetch("http://localhost/api/me", {
+    const res = await ctx.request("/api/me", {
       headers: { "Cf-Access-Jwt-Assertion": accessJwt },
     });
     expect(res.status).toBe(401);
