@@ -8,6 +8,7 @@ import prices, { syncPriceHistory } from "./routes/prices";
 import tokens from "./routes/tokens";
 import tags from "./routes/tags";
 import corporateActions from "./routes/corporate-actions";
+import cashMovements from "./routes/cash-movements";
 import snapshots, { calculateSnapshot } from "./routes/snapshots";
 import importRoutes from "./routes/import";
 import type { PriceFetcher } from "./clients/price-fetcher";
@@ -31,6 +32,7 @@ app.route("/api/prices", prices);
 app.route("/api/tokens", tokens);
 app.route("/api/portfolios/:portfolioId/tags", tags);
 app.route("/api/portfolios/:portfolioId/corporate-actions", corporateActions);
+app.route("/api/portfolios/:portfolioId/cash-movements", cashMovements);
 app.route("/api/portfolios/:portfolioId/snapshots", snapshots);
 app.route("/api/portfolios/:portfolioId/import", importRoutes);
 
