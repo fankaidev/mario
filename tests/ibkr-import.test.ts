@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getPlatformProxy, unstable_dev } from "wrangler";
 import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase } from "./helpers";
+import { cleanDatabase, createApiTokenForUser } from "./helpers";
 import { FakeIbkrFlexClient } from "./fake-ibkr-client";
 import { importIbkrStatement } from "../src/routes/import";
 import { parseFlexStatement, mapIbkrSymbol } from "../src/clients/ibkr";
@@ -9,6 +9,8 @@ import { parseFlexStatement, mapIbkrSymbol } from "../src/clients/ibkr";
 let worker: UnstableDevWorker;
 let db: D1Database;
 let portfolioId: number;
+let userId: number;
+let authToken: string;
 
 beforeAll(async () => {
   const { env } = await getPlatformProxy<{ DB: D1Database }>();
@@ -30,7 +32,8 @@ beforeEach(async () => {
     .prepare("INSERT INTO users (email) VALUES (?) RETURNING id")
     .bind("test@example.com")
     .first<{ id: number }>();
-  const userId = userResult!.id;
+  userId = userResult!.id;
+  authToken = await createApiTokenForUser(db, userId);
 
   const portfolioResult = await db
     .prepare("INSERT INTO portfolios (user_id, name, currency) VALUES (?, ?, ?) RETURNING id")
@@ -38,6 +41,10 @@ beforeEach(async () => {
     .first<{ id: number }>();
   portfolioId = portfolioResult!.id;
 });
+
+function authHeaders(): Record<string, string> {
+  return { Authorization: `Bearer ${authToken}` };
+}
 
 describe("IBKR Symbol Mapping", () => {
   it("maps US stock symbols directly", () => {
@@ -150,12 +157,17 @@ describe("IBKR Import", () => {
     expect(txRow!.price).toBe(150);
     expect(txRow!.fee).toBe(1);
 
-    const lotRow = await db
-      .prepare("SELECT quantity, remaining_quantity, cost_basis FROM lots WHERE portfolio_id = ?")
-      .bind(portfolioId)
-      .first<{ quantity: number; remaining_quantity: number; cost_basis: number }>();
-    expect(lotRow!.quantity).toBe(100);
-    expect(lotRow!.remaining_quantity).toBe(100);
+    // Verify via holdings API instead of checking lots table
+    const holdingsRes = await worker.fetch(
+      `http://localhost/api/portfolios/${portfolioId}/holdings`,
+      { headers: authHeaders() },
+    );
+    const holdingsBody = (await holdingsRes.json()) as {
+      data: Array<{ symbol: string; quantity: number; cost: number }>;
+    };
+    expect(holdingsBody.data[0].symbol).toBe("AAPL");
+    expect(holdingsBody.data[0].quantity).toBe(100);
+    expect(holdingsBody.data[0].cost).toBe(15001); // 100 * 150 + 1
   });
 
   it("[UC-IMPORT-001-S02] imports deposits as transfers", async () => {

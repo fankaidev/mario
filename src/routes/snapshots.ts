@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import type { AuthVariables } from "../middleware/auth";
 import type { Bindings } from "../types";
-import type { PortfolioSnapshot } from "../../shared/types/api";
+import type { PortfolioSnapshot, Transaction } from "../../shared/types/api";
+import { replayFIFO } from "../lib/fifo";
 
 const snapshots = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
@@ -38,39 +39,24 @@ export async function calculateSnapshot(
     .bind(portfolioId, date)
     .first<{ total: number }>();
 
-  // market_value: lots from buys up to date, minus consumed quantities from sells up to date
-  const lots = await db
+  // Get transactions up to date and replay FIFO
+  const txRows = await db
     .prepare(
-      "SELECT l.id, l.symbol, l.quantity FROM lots l JOIN transactions t ON l.transaction_id = t.id WHERE l.portfolio_id = ? AND t.date <= ? ORDER BY l.created_at ASC",
+      "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ? AND date <= ? ORDER BY date, created_at",
     )
     .bind(portfolioId, date)
-    .all<{ id: number; symbol: string; quantity: number }>();
+    .all<Transaction>();
 
-  const lotQuantities: Map<number, number> = new Map();
-  for (const lot of lots.results) {
-    lotQuantities.set(lot.id, lot.quantity);
-  }
-
-  const consumed = await db
-    .prepare(
-      "SELECT rp.lot_id, SUM(rp.quantity) AS consumed_qty FROM realized_pnl rp JOIN transactions t ON rp.sell_transaction_id = t.id WHERE t.portfolio_id = ? AND t.date <= ? GROUP BY rp.lot_id",
-    )
-    .bind(portfolioId, date)
-    .all<{ lot_id: number; consumed_qty: number }>();
-
-  for (const row of consumed.results) {
-    const original = lotQuantities.get(row.lot_id);
-    if (original !== undefined) {
-      lotQuantities.set(row.lot_id, original - row.consumed_qty);
-    }
-  }
+  const { lots } = replayFIFO(txRows.results);
 
   // Aggregate remaining quantities by symbol
   const symbolHoldings: Map<string, number> = new Map();
-  for (const lot of lots.results) {
-    const remaining = lotQuantities.get(lot.id) ?? 0;
-    if (remaining > 0) {
-      symbolHoldings.set(lot.symbol, (symbolHoldings.get(lot.symbol) ?? 0) + remaining);
+  for (const lot of lots) {
+    if (lot.remaining_quantity > 0) {
+      symbolHoldings.set(
+        lot.symbol,
+        (symbolHoldings.get(lot.symbol) ?? 0) + lot.remaining_quantity,
+      );
     }
   }
 

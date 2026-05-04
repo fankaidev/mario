@@ -42,25 +42,26 @@ function authHeaders(): Record<string, string> {
   return { Authorization: `Bearer ${authToken}` };
 }
 
-async function seedLot(symbol: string) {
-  const txResult = await db
-    .prepare(
-      "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, ?, 'buy', 100, 150, 0, '2024-01-01')",
-    )
-    .bind(portfolioId, symbol)
-    .run();
-  await db
-    .prepare(
-      "INSERT INTO lots (transaction_id, portfolio_id, symbol, quantity, remaining_quantity, cost_basis) VALUES (?, ?, ?, 100, 100, 15000)",
-    )
-    .bind(txResult.meta.last_row_id, portfolioId, symbol)
-    .run();
+async function makeBuy(symbol: string) {
+  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      symbol,
+      type: "buy",
+      quantity: 100,
+      price: 150,
+      fee: 0,
+      date: "2024-01-01",
+    }),
+  });
+  return (await res.json()) as { data: { id: number } };
 }
 
 describe("Price Sync", () => {
   it("[UC-PORTFOLIO-005-S01] syncs prices for held stocks", async () => {
-    await seedLot("AAPL");
-    await seedLot("TSLA");
+    await makeBuy("AAPL");
+    await makeBuy("TSLA");
 
     const finnhub = new FakePriceFetcher();
     const yahoo = new FakePriceFetcher();
@@ -99,8 +100,8 @@ describe("Price Sync", () => {
   });
 
   it("[UC-PORTFOLIO-005-S07] syncs prices for HK/SS/SZ stocks via Eastmoney", async () => {
-    await seedLot("0700.HK");
-    await seedLot("600519.SS");
+    await makeBuy("0700.HK");
+    await makeBuy("600519.SS");
 
     const finnhub = new FakePriceFetcher();
     const yahoo = new FakePriceFetcher();
@@ -125,8 +126,8 @@ describe("Price Sync", () => {
   });
 
   it("[UC-PORTFOLIO-005-S08] routes mixed portfolio to correct fetchers", async () => {
-    await seedLot("AAPL");
-    await seedLot("0700.HK");
+    await makeBuy("AAPL");
+    await makeBuy("0700.HK");
 
     const finnhub = new FakePriceFetcher();
     const yahoo = new FakePriceFetcher();
@@ -149,8 +150,8 @@ describe("Price Sync", () => {
   });
 
   it("[UC-PORTFOLIO-005-S09] syncs NAV for mutual funds via Eastmoney", async () => {
-    await seedLot("000979");
-    await seedLot("000217");
+    await makeBuy("000979");
+    await makeBuy("000217");
 
     const finnhub = new FakePriceFetcher();
     const yahoo = new FakePriceFetcher();
@@ -175,9 +176,9 @@ describe("Price Sync", () => {
   });
 
   it("[UC-PORTFOLIO-005-S10] routes all symbol types correctly", async () => {
-    await seedLot("AAPL");
-    await seedLot("0700.HK");
-    await seedLot("000979");
+    await makeBuy("AAPL");
+    await makeBuy("0700.HK");
+    await makeBuy("000979");
 
     const finnhub = new FakePriceFetcher();
     const yahoo = new FakePriceFetcher();
@@ -206,7 +207,7 @@ describe("Price Sync", () => {
 
 describe("Price History", () => {
   it("[UC-PORTFOLIO-003-S12] returns price history for held stock", async () => {
-    await seedLot("AAPL");
+    await makeBuy("AAPL");
     await db
       .prepare(
         "INSERT INTO price_history (symbol, date, close) VALUES ('AAPL', '2024-01-15', 150), ('AAPL', '2024-02-15', 160), ('AAPL', '2024-03-15', 170)",

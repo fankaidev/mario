@@ -6,6 +6,7 @@ import type {
   Transaction,
   TransactionType,
 } from "../../shared/types/api";
+import { replayFIFO } from "../lib/fifo";
 
 const transactions = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
@@ -202,32 +203,8 @@ transactions.delete("/:txId", async (c) => {
     return c.json({ error: "Transaction not found" }, 404);
   }
 
-  const statements: D1PreparedStatement[] = [];
-
-  if (tx.type === "buy" || tx.type === "initial") {
-    statements.push(c.env.DB.prepare("DELETE FROM lots WHERE transaction_id = ?").bind(txId));
-  } else if (tx.type === "sell") {
-    const pnlRows = await c.env.DB.prepare(
-      "SELECT lot_id, quantity FROM realized_pnl WHERE sell_transaction_id = ?",
-    )
-      .bind(txId)
-      .all<{ lot_id: number; quantity: number }>();
-
-    for (const row of pnlRows.results) {
-      statements.push(
-        c.env.DB.prepare(
-          "UPDATE lots SET remaining_quantity = remaining_quantity + ? WHERE id = ?",
-        ).bind(row.quantity, row.lot_id),
-      );
-    }
-    statements.push(
-      c.env.DB.prepare("DELETE FROM realized_pnl WHERE sell_transaction_id = ?").bind(txId),
-    );
-  }
-
-  statements.push(c.env.DB.prepare("DELETE FROM transactions WHERE id = ?").bind(txId));
-
-  await c.env.DB.batch(statements);
+  // Simply delete the transaction - FIFO replay will handle the rest
+  await c.env.DB.prepare("DELETE FROM transactions WHERE id = ?").bind(txId).run();
 
   return c.json({ data: null });
 });
@@ -237,26 +214,16 @@ async function handleBuy(
   portfolioId: number,
   body: CreateTransactionRequest,
 ) {
-  const costBasis = body.quantity! * body.price + body.fee;
-
   const txResult = await c.env.DB.prepare(
     "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, ?, ?, ?, ?, ?, ?)",
   )
     .bind(portfolioId, body.symbol, body.type, body.quantity, body.price, body.fee, body.date)
     .run();
 
-  const txId = txResult.meta.last_row_id;
-
-  await c.env.DB.prepare(
-    "INSERT INTO lots (transaction_id, portfolio_id, symbol, quantity, remaining_quantity, cost_basis) VALUES (?, ?, ?, ?, ?, ?)",
-  )
-    .bind(txId, portfolioId, body.symbol, body.quantity, body.quantity, costBasis)
-    .run();
-
   const transaction = await c.env.DB.prepare(
     "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE id = ?",
   )
-    .bind(txId)
+    .bind(txResult.meta.last_row_id)
     .first<Transaction>();
 
   return new Response(JSON.stringify({ data: transaction }), {
@@ -270,13 +237,18 @@ async function handleSell(
   portfolioId: number,
   body: CreateTransactionRequest,
 ) {
-  const lots = await c.env.DB.prepare(
-    "SELECT id, quantity, remaining_quantity, cost_basis FROM lots WHERE portfolio_id = ? AND symbol = ? AND remaining_quantity > 0 ORDER BY created_at ASC",
+  // Get all transactions to validate sufficient quantity via FIFO replay
+  const txRows = await c.env.DB.prepare(
+    "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ? ORDER BY date, created_at",
   )
-    .bind(portfolioId, body.symbol)
-    .all<{ id: number; quantity: number; remaining_quantity: number; cost_basis: number }>();
+    .bind(portfolioId)
+    .all<Transaction>();
 
-  const totalRemaining = lots.results.reduce((sum, l) => sum + l.remaining_quantity, 0);
+  const { lots } = replayFIFO(txRows.results);
+
+  const symbolLots = lots.filter((l) => l.symbol === body.symbol && l.remaining_quantity > 0);
+  const totalRemaining = symbolLots.reduce((sum, l) => sum + l.remaining_quantity, 0);
+
   if (totalRemaining < body.quantity!) {
     return c.json({ error: "Insufficient quantity" }, 400);
   }
@@ -287,43 +259,10 @@ async function handleSell(
     .bind(portfolioId, body.symbol, body.type, body.quantity, body.price, body.fee, body.date)
     .run();
 
-  const txId = txResult.meta.last_row_id;
-
-  const statements: D1PreparedStatement[] = [];
-  let remainingToSell = body.quantity!;
-  for (const lot of lots.results) {
-    if (remainingToSell <= 0) break;
-
-    const consumed = Math.min(lot.remaining_quantity, remainingToSell);
-    const newRemaining = lot.remaining_quantity - consumed;
-
-    statements.push(
-      c.env.DB.prepare("UPDATE lots SET remaining_quantity = ? WHERE id = ?").bind(
-        newRemaining,
-        lot.id,
-      ),
-    );
-
-    const lotProceeds = body.price * consumed - body.fee * (consumed / body.quantity!);
-    const cost = (lot.cost_basis / lot.quantity) * consumed;
-    const pnl = lotProceeds - cost;
-    const costPerShare = lot.cost_basis / lot.quantity;
-
-    statements.push(
-      c.env.DB.prepare(
-        "INSERT INTO realized_pnl (sell_transaction_id, lot_id, quantity, proceeds, cost, pnl, sell_price, cost_per_share) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      ).bind(txId, lot.id, consumed, lotProceeds, cost, pnl, body.price, costPerShare),
-    );
-
-    remainingToSell -= consumed;
-  }
-
-  await c.env.DB.batch(statements);
-
   const transaction = await c.env.DB.prepare(
     "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE id = ?",
   )
-    .bind(txId)
+    .bind(txResult.meta.last_row_id)
     .first<Transaction>();
 
   return c.json({ data: transaction }, 201);

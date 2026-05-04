@@ -187,68 +187,43 @@ describe("Portfolio Snapshots", () => {
 });
 
 describe("Calculated Snapshots", () => {
-  async function seedDeposit(amount: number, date = "2024-01-01") {
-    await db
-      .prepare(
-        "INSERT INTO transfers (portfolio_id, type, amount, fee, date) VALUES (?, 'deposit', ?, 0, ?)",
-      )
-      .bind(portfolioId, amount, date)
-      .run();
+  async function makeDeposit(amount: number, date = "2024-01-01") {
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transfers`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "deposit", amount, fee: 0, date }),
+    });
+    return (await res.json()) as { data: { id: number } };
   }
 
-  async function seedBuy(
+  async function makeBuy(
     symbol: string,
     quantity: number,
     price: number,
     fee: number,
     date = "2024-01-15",
   ) {
-    const txResult = await db
-      .prepare(
-        "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, ?, 'buy', ?, ?, ?, ?)",
-      )
-      .bind(portfolioId, symbol, quantity, price, fee, date)
-      .run();
-    await db
-      .prepare(
-        "INSERT INTO lots (transaction_id, portfolio_id, symbol, quantity, remaining_quantity, cost_basis) VALUES (?, ?, ?, ?, ?, ?)",
-      )
-      .bind(txResult.meta.last_row_id, portfolioId, symbol, quantity, quantity, quantity * price)
-      .run();
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ symbol, type: "buy", quantity, price, fee, date }),
+    });
+    return (await res.json()) as { data: { id: number } };
   }
 
-  async function seedSell(
+  async function makeSell(
     symbol: string,
     quantity: number,
     price: number,
     fee: number,
-    lotId: number,
-    sellQty: number,
     date = "2024-06-01",
   ) {
-    const txResult = await db
-      .prepare(
-        "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, ?, 'sell', ?, ?, ?, ?)",
-      )
-      .bind(portfolioId, symbol, quantity, price, fee, date)
-      .run();
-    await db
-      .prepare(
-        "INSERT INTO realized_pnl (sell_transaction_id, lot_id, quantity, proceeds, cost, pnl) VALUES (?, ?, ?, ?, ?, ?)",
-      )
-      .bind(
-        txResult.meta.last_row_id,
-        lotId,
-        sellQty,
-        sellQty * price,
-        sellQty * 150,
-        sellQty * (price - 150),
-      )
-      .run();
-    await db
-      .prepare("UPDATE lots SET remaining_quantity = remaining_quantity - ? WHERE id = ?")
-      .bind(sellQty, lotId)
-      .run();
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ symbol, type: "sell", quantity, price, fee, date }),
+    });
+    return (await res.json()) as { data: { id: number } };
   }
 
   async function seedPrice(symbol: string, date: string, close: number) {
@@ -259,8 +234,8 @@ describe("Calculated Snapshots", () => {
   }
 
   it("[UC-PORTFOLIO-008-S06] calculates snapshot from transactions and price_history", async () => {
-    await seedDeposit(20000);
-    await seedBuy("AAPL", 100, 150, 5, "2024-01-15");
+    await makeDeposit(20000);
+    await makeBuy("AAPL", 100, 150, 5, "2024-01-15");
     await seedPrice("AAPL", "2024-03-01", 180);
 
     const res = await worker.fetch(
@@ -281,8 +256,8 @@ describe("Calculated Snapshots", () => {
   });
 
   it("[UC-PORTFOLIO-008-S07] returns 422 when price_history missing", async () => {
-    await seedDeposit(20000);
-    await seedBuy("AAPL", 100, 150, 5, "2024-01-15");
+    await makeDeposit(20000);
+    await makeBuy("AAPL", 100, 150, 5, "2024-01-15");
 
     const res = await worker.fetch(
       `http://localhost/api/portfolios/${portfolioId}/snapshots/calculate`,
@@ -323,8 +298,8 @@ describe("Calculated Snapshots", () => {
       }),
     });
 
-    await seedDeposit(20000);
-    await seedBuy("AAPL", 100, 150, 5, "2024-01-15");
+    await makeDeposit(20000);
+    await makeBuy("AAPL", 100, 150, 5, "2024-01-15");
     await seedPrice("AAPL", "2024-03-01", 180);
 
     const res = await worker.fetch(
@@ -339,11 +314,9 @@ describe("Calculated Snapshots", () => {
   });
 
   it("[UC-PORTFOLIO-008-S11] calculates market_value after partial sells", async () => {
-    await seedDeposit(30000);
-    await seedBuy("AAPL", 100, 150, 5, "2024-01-15");
-
-    const lotRow = await db.prepare("SELECT id FROM lots").first<{ id: number }>();
-    await seedSell("AAPL", 50, 200, 5, lotRow!.id, 50, "2024-06-01");
+    await makeDeposit(30000);
+    await makeBuy("AAPL", 100, 150, 5, "2024-01-15");
+    await makeSell("AAPL", 50, 200, 5, "2024-06-01");
 
     await seedPrice("AAPL", "2024-06-30", 190);
 

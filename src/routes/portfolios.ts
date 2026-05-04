@@ -1,8 +1,15 @@
 import { Hono } from "hono";
 import type { AuthVariables } from "../middleware/auth";
 import type { Bindings } from "../types";
-import type { Holding, HoldingLots, LotDetail, Portfolio } from "../../shared/types/api";
+import type {
+  Holding,
+  HoldingLots,
+  LotDetail,
+  Portfolio,
+  Transaction,
+} from "../../shared/types/api";
 import { getLatestPrice } from "./prices";
+import { replayFIFO } from "../lib/fifo";
 
 /**
  * Calculate cash balance dynamically from all transfers and transactions.
@@ -170,28 +177,47 @@ portfolios.get("/:id/holdings", async (c) => {
     return c.json({ error: "Portfolio not found" }, 404);
   }
 
-  const lots = await c.env.DB.prepare(
-    "SELECT symbol, SUM(remaining_quantity) AS quantity, SUM(remaining_quantity * cost_basis / quantity) AS cost FROM lots WHERE portfolio_id = ? AND remaining_quantity > 0 GROUP BY symbol",
+  // Get all transactions for this portfolio
+  const txRows = await c.env.DB.prepare(
+    "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ? ORDER BY date, created_at",
   )
     .bind(portfolioId)
-    .all<{ symbol: string; quantity: number; cost: number }>();
+    .all<Transaction>();
+
+  // Replay FIFO to get current lots
+  const { lots } = replayFIFO(txRows.results);
+
+  // Group lots by symbol and calculate holdings
+  const holdingsBySymbol = new Map<string, { quantity: number; cost: number }>();
+
+  for (const lot of lots) {
+    if (lot.remaining_quantity <= 0) continue;
+
+    const existing = holdingsBySymbol.get(lot.symbol) ?? { quantity: 0, cost: 0 };
+    const proportionalCost = (lot.cost_basis / lot.quantity) * lot.remaining_quantity;
+
+    holdingsBySymbol.set(lot.symbol, {
+      quantity: existing.quantity + lot.remaining_quantity,
+      cost: existing.cost + proportionalCost,
+    });
+  }
 
   const holdings: Holding[] = [];
-  for (const lot of lots.results) {
-    const price = await getLatestPrice(c.env.DB, lot.symbol);
+  for (const [symbol, holding] of holdingsBySymbol) {
+    const price = await getLatestPrice(c.env.DB, symbol);
     const nameRow = await c.env.DB.prepare("SELECT name FROM stocks WHERE symbol = ?")
-      .bind(lot.symbol)
+      .bind(symbol)
       .first<{ name: string }>();
-    const marketValue = price !== null ? lot.quantity * price : null;
-    const unrealizedPnl = marketValue !== null ? marketValue - lot.cost : null;
+    const marketValue = price !== null ? holding.quantity * price : null;
+    const unrealizedPnl = marketValue !== null ? marketValue - holding.cost : null;
     const unrealizedPnlRate =
-      unrealizedPnl !== null && lot.cost > 0 ? (unrealizedPnl / lot.cost) * 100 : null;
+      unrealizedPnl !== null && holding.cost > 0 ? (unrealizedPnl / holding.cost) * 100 : null;
 
     holdings.push({
-      symbol: lot.symbol,
-      name: nameRow?.name ?? lot.symbol,
-      quantity: lot.quantity,
-      cost: Math.round(lot.cost * 100) / 100,
+      symbol,
+      name: nameRow?.name ?? symbol,
+      quantity: holding.quantity,
+      cost: Math.round(holding.cost * 100) / 100,
       price,
       market_value: marketValue !== null ? Math.round(marketValue * 100) / 100 : null,
       unrealized_pnl: unrealizedPnl !== null ? Math.round(unrealizedPnl * 100) / 100 : null,
@@ -230,25 +256,32 @@ portfolios.get("/:id/holdings/:symbol/lots", async (c) => {
 
   const currentPrice = await getLatestPrice(c.env.DB, symbol);
 
-  const lots = await c.env.DB.prepare(
-    "SELECT l.id, l.quantity, l.remaining_quantity, l.cost_basis, l.created_at, t.date, t.price AS buy_price FROM lots l JOIN transactions t ON l.transaction_id = t.id WHERE l.portfolio_id = ? AND l.symbol = ? ORDER BY l.created_at ASC",
+  // Get all transactions for this portfolio
+  const txRows = await c.env.DB.prepare(
+    "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ? ORDER BY date, created_at",
   )
-    .bind(portfolioId, symbol)
-    .all<{
-      id: number;
-      quantity: number;
-      remaining_quantity: number;
-      cost_basis: number;
-      created_at: string;
-      date: string;
-      buy_price: number;
-    }>();
+    .bind(portfolioId)
+    .all<Transaction>();
 
-  const totalQuantity = lots.results
+  // Replay FIFO to get current lots
+  const { lots } = replayFIFO(txRows.results);
+
+  // Filter lots for this symbol
+  const symbolLots = lots.filter((l) => l.symbol === symbol);
+
+  const totalQuantity = symbolLots
     .filter((l) => l.remaining_quantity > 0)
     .reduce((sum, l) => sum + l.remaining_quantity, 0);
 
-  const lotDetails: LotDetail[] = lots.results.map((l) => {
+  // Get buy prices from transactions
+  const buyPricesMap = new Map<number, number>();
+  for (const tx of txRows.results) {
+    if (tx.type === "buy" || tx.type === "initial") {
+      buyPricesMap.set(tx.id, tx.price);
+    }
+  }
+
+  const lotDetails: LotDetail[] = symbolLots.map((l) => {
     const proportionalCost = (l.cost_basis / l.quantity) * l.remaining_quantity;
     const currentValue = currentPrice !== null ? l.remaining_quantity * currentPrice : null;
     const unrealizedPnl = currentValue !== null ? currentValue - proportionalCost : null;
@@ -258,9 +291,9 @@ portfolios.get("/:id/holdings/:symbol/lots", async (c) => {
         : null;
 
     return {
-      id: l.id,
+      id: l.transaction_id,
       date: l.date,
-      buy_price: Math.round(l.buy_price * 100) / 100,
+      buy_price: Math.round((buyPricesMap.get(l.transaction_id) ?? 0) * 100) / 100,
       quantity: l.quantity,
       remaining_quantity: l.remaining_quantity,
       cost_basis: Math.round(proportionalCost * 100) / 100,
@@ -300,27 +333,43 @@ portfolios.get("/:id/summary", async (c) => {
     .bind(portfolioId)
     .first<{ total: number | null }>();
 
-  const lots = await c.env.DB.prepare(
-    "SELECT symbol, SUM(remaining_quantity) AS qty, SUM(remaining_quantity * cost_basis / quantity) AS cost FROM lots WHERE portfolio_id = ? AND remaining_quantity > 0 GROUP BY symbol",
+  // Get all transactions for this portfolio
+  const txRows = await c.env.DB.prepare(
+    "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ? ORDER BY date, created_at",
   )
     .bind(portfolioId)
-    .all<{ symbol: string; qty: number; cost: number }>();
+    .all<Transaction>();
+
+  // Replay FIFO to get current lots and realized P&L
+  const { lots, realizedPnl } = replayFIFO(txRows.results);
+
+  // Calculate market value and cost from current lots
+  const holdingsBySymbol = new Map<string, { quantity: number; cost: number }>();
+
+  for (const lot of lots) {
+    if (lot.remaining_quantity <= 0) continue;
+
+    const existing = holdingsBySymbol.get(lot.symbol) ?? { quantity: 0, cost: 0 };
+    const proportionalCost = (lot.cost_basis / lot.quantity) * lot.remaining_quantity;
+
+    holdingsBySymbol.set(lot.symbol, {
+      quantity: existing.quantity + lot.remaining_quantity,
+      cost: existing.cost + proportionalCost,
+    });
+  }
 
   let totalMarketValue = 0;
   let totalCost = 0;
-  for (const row of lots.results) {
-    const price = await getLatestPrice(c.env.DB, row.symbol);
+  for (const [symbol, holding] of holdingsBySymbol) {
+    const price = await getLatestPrice(c.env.DB, symbol);
     if (price !== null) {
-      totalMarketValue += row.qty * price;
+      totalMarketValue += holding.quantity * price;
     }
-    totalCost += row.cost;
+    totalCost += holding.cost;
   }
 
-  const realizedPnlRow = await c.env.DB.prepare(
-    "SELECT SUM(rp.pnl) AS total FROM realized_pnl rp JOIN transactions t ON rp.sell_transaction_id = t.id WHERE t.portfolio_id = ?",
-  )
-    .bind(portfolioId)
-    .first<{ total: number | null }>();
+  // Calculate realized P&L from replay results
+  const totalRealizedPnl = realizedPnl.reduce((sum, r) => sum + r.pnl, 0);
 
   const dividendRow = await c.env.DB.prepare(
     "SELECT SUM(quantity * price - fee) AS total FROM transactions WHERE portfolio_id = ? AND type = 'dividend'",
@@ -336,8 +385,7 @@ portfolios.get("/:id/summary", async (c) => {
 
   const totalInvestment = investmentRow?.total ?? 0;
   const unrealizedPnl = totalMarketValue - totalCost;
-  const realizedPnl = realizedPnlRow?.total ?? 0;
-  const realizedWithFee = realizedPnl - (feeRow?.sell_fees ?? 0);
+  const realizedWithFee = totalRealizedPnl - (feeRow?.sell_fees ?? 0);
   const dividendIncome = dividendRow?.total ?? 0;
   const totalPnl = unrealizedPnl + realizedWithFee + dividendIncome;
   const returnRate = totalInvestment > 0 ? (totalPnl / totalInvestment) * 100 : 0;
@@ -347,12 +395,13 @@ portfolios.get("/:id/summary", async (c) => {
   const cashBalance = await calculateCashBalance(c.env.DB, portfolioId);
   const portfolioValue = totalMarketValue + cashBalance;
 
+  const symbols = Array.from(holdingsBySymbol.keys());
   const priceUpdatedAtRow =
-    lots.results.length > 0
+    symbols.length > 0
       ? await c.env.DB.prepare(
-          "SELECT MIN(latest_date) as price_updated_at FROM (SELECT symbol, MAX(date) as latest_date FROM price_history WHERE symbol IN (SELECT DISTINCT symbol FROM lots WHERE portfolio_id = ? AND remaining_quantity > 0) GROUP BY symbol)",
+          `SELECT MIN(latest_date) as price_updated_at FROM (SELECT symbol, MAX(date) as latest_date FROM price_history WHERE symbol IN (${symbols.map(() => "?").join(",")}) GROUP BY symbol)`,
         )
-          .bind(portfolioId)
+          .bind(...symbols)
           .first<{ price_updated_at: string | null }>()
       : null;
 
