@@ -52,6 +52,7 @@ export interface Transfer {
   date: string;
   note: string | null;
   created_at: string;
+  cash_balance?: number;
 }
 
 export interface CreateTransferRequest {

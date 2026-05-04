@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getPlatformProxy, unstable_dev } from "wrangler";
 import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase, createApiTokenForUser } from "./helpers";
+import { cleanDatabase, ensureMigrations, createApiTokenForUser } from "./helpers";
 
 let worker: UnstableDevWorker;
 let db: D1Database;
@@ -12,6 +12,7 @@ let authToken: string;
 beforeAll(async () => {
   const { env } = await getPlatformProxy<{ DB: D1Database }>();
   db = env.DB;
+  await ensureMigrations(db);
   worker = await unstable_dev("src/index.ts", { config: "wrangler.toml", local: true });
 });
 
@@ -217,6 +218,56 @@ describe("Cash Transactions", () => {
     expect(result.status).toBe(201);
 
     expect(await getCashBalance()).toBe(3975);
+  });
+
+  it("[UC-PORTFOLIO-006-S14] transfers list includes running cash balance after all events", async () => {
+    // deposit 10000 on 2024-01-01
+    const d1 = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transfers`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "deposit", amount: 10000, fee: 0, date: "2024-01-01" }),
+    });
+    expect(d1.status).toBe(201);
+
+    // buy 1500 on 2024-01-15
+    const b1 = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "buy",
+        symbol: "AAPL",
+        quantity: 10,
+        price: 150,
+        fee: 0,
+        date: "2024-01-15",
+      }),
+    });
+    expect(b1.status).toBe(201);
+
+    // withdrawal 2000 on 2024-02-01
+    const w1 = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transfers`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "withdrawal", amount: 2000, fee: 0, date: "2024-02-01" }),
+    });
+    expect(w1.status).toBe(201);
+
+    const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transfers`, {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: { id: number; type: string; cash_balance: number }[];
+    };
+
+    // Results in DESC order: withdrawal first, then deposit
+    const withdrawal = body.data.find((t) => t.type === "withdrawal")!;
+    const deposit = body.data.find((t) => t.type === "deposit")!;
+
+    // deposit cash_balance: after deposit only = 10000
+    expect(deposit.cash_balance).toBe(10000);
+    // withdrawal cash_balance: after deposit (10000) + buy (-1500) + withdrawal (-2000) = 6500
+    expect(withdrawal.cash_balance).toBe(6500);
   });
 
   it("[UC-PORTFOLIO-006-S13] recalculate cash from all transfers and transactions", async () => {

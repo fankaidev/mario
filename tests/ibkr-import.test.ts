@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getPlatformProxy, unstable_dev } from "wrangler";
 import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase, createApiTokenForUser } from "./helpers";
+import { cleanDatabase, ensureMigrations, createApiTokenForUser } from "./helpers";
 import { FakeIbkrFlexClient } from "./fake-ibkr-client";
 import { importIbkrStatement } from "../src/routes/import";
 import { parseFlexStatement, mapIbkrSymbol } from "../src/clients/ibkr";
@@ -15,6 +15,7 @@ let authToken: string;
 beforeAll(async () => {
   const { env } = await getPlatformProxy<{ DB: D1Database }>();
   db = env.DB;
+  await ensureMigrations(db);
   worker = await unstable_dev("src/index.ts", {
     config: "wrangler.toml",
     local: true,

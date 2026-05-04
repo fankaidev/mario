@@ -35,6 +35,7 @@
 | UC-PORTFOLIO-006-S11 | P1 | ✅ | Given deposit with fee=50, When depositing 10000 USD, Then cash_balance becomes 9950 | R1 |
 | UC-PORTFOLIO-006-S12 | P1 | ✅ | Given withdrawal with fee=25, When withdrawing 1000 from balance=5000, Then cash_balance becomes 3975 | R2 |
 | UC-PORTFOLIO-006-S13 | P1 | ✅ | Given portfolio with deposits, withdrawals, buys, sells, and dividends, When recalculating cash, Then cash_balance equals net of all transfers and transactions | R9 |
+| UC-PORTFOLIO-006-S14 | P1 | ✅ | Given portfolio with deposit 10000 on 2024-01-01, buy 1500 on 2024-01-15, withdrawal 2000 on 2024-02-01, When viewing transfers list, Then deposit shows cash_balance=10000, withdrawal shows cash_balance=6500 (10000-1500-2000) | R9 |
 
 ### ai-e2e
 

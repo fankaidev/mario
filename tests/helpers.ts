@@ -1,17 +1,57 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+export async function ensureMigrations(db: D1Database) {
+  // Check if migrations already applied by looking for a known table
+  try {
+    const result = await db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+      .first();
+    if (result) return;
+  } catch {
+    // sqlite_master may not exist yet
+  }
+
+  const migrationsDir = join(import.meta.dirname, "..", "migrations");
+  const files = readdirSync(migrationsDir)
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
+
+  for (const file of files) {
+    const raw = readFileSync(join(migrationsDir, file), "utf-8");
+    const sql = raw
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("--"))
+      .join("\n");
+    for (const stmt of sql.split(";")) {
+      let collapsed = stmt.replace(/\s+/g, " ").trim();
+      if (!collapsed) continue;
+      collapsed = collapsed.replace(/^CREATE TABLE /, "CREATE TABLE IF NOT EXISTS ");
+      try {
+        await db.exec(collapsed);
+      } catch {
+        // Skip statements that fail on re-run (ALTER/DROP already applied, etc.)
+      }
+    }
+  }
+}
+
 export async function cleanDatabase(db: D1Database) {
-  // Delete in order respecting foreign key constraints
-  // Tables are guaranteed to exist after migrations are applied
-  await db.exec("DELETE FROM stock_tags");
-  await db.exec("DELETE FROM corporate_actions");
-  await db.exec("DELETE FROM transactions");
-  await db.exec("DELETE FROM transfers");
-  await db.exec("DELETE FROM portfolio_snapshots");
-  await db.exec("DELETE FROM price_history");
-  await db.exec("DELETE FROM stocks");
-  await db.exec("DELETE FROM tags");
-  await db.exec("DELETE FROM api_tokens");
-  await db.exec("DELETE FROM portfolios");
-  await db.exec("DELETE FROM users");
+  for (const table of [
+    "stock_tags",
+    "corporate_actions",
+    "transactions",
+    "transfers",
+    "portfolio_snapshots",
+    "price_history",
+    "stocks",
+    "tags",
+    "api_tokens",
+    "portfolios",
+    "users",
+  ]) {
+    await db.exec(`DELETE FROM ${table}`);
+  }
 }
 
 export async function createApiTokenForUser(

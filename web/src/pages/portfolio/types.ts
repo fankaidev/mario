@@ -33,6 +33,7 @@ export interface Transfer {
   fee: number;
   date: string;
   note: string | null;
+  cash_balance?: number;
 }
 
 export interface Portfolio {
