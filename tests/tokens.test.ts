@@ -1,25 +1,19 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { getPlatformProxy, unstable_dev } from "wrangler";
-import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase, ensureMigrations, createApiTokenForUser } from "./helpers";
+import { createTestContext, cleanDatabase, createApiTokenForUser } from "./helpers";
+import type { TestContext } from "./helpers";
 
-let worker: UnstableDevWorker;
+let ctx: TestContext;
 let db: D1Database;
 let userId: number;
 let authToken: string;
 
 beforeAll(async () => {
-  const { env } = await getPlatformProxy<{ DB: D1Database }>();
-  db = env.DB;
-  await ensureMigrations(db);
-  worker = await unstable_dev("src/index.ts", {
-    config: "wrangler.toml",
-    local: true,
-  });
+  ctx = await createTestContext();
+  db = ctx.db;
 });
 
 afterAll(async () => {
-  await worker.stop();
+  await ctx.clean();
 });
 
 beforeEach(async () => {
@@ -42,7 +36,7 @@ function apiHeaders(token: string): Record<string, string> {
 
 describe("API Token Management", () => {
   it("[UC-AUTH-001-S01] creates token and returns raw token once", async () => {
-    const res = await worker.fetch("http://localhost/api/tokens", {
+    const res = await ctx.request("/api/tokens", {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ name: "CLI Tool" }),
@@ -62,13 +56,13 @@ describe("API Token Management", () => {
   });
 
   it("[UC-AUTH-001-S02] lists tokens without raw token", async () => {
-    await worker.fetch("http://localhost/api/tokens", {
+    await ctx.request("/api/tokens", {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ name: "CLI Tool" }),
     });
 
-    const res = await worker.fetch("http://localhost/api/tokens", {
+    const res = await ctx.request("/api/tokens", {
       headers: authHeaders(),
     });
     expect(res.status).toBe(200);
@@ -81,7 +75,7 @@ describe("API Token Management", () => {
   });
 
   it("[UC-AUTH-001-S04] revoked token returns 401", async () => {
-    const createRes = await worker.fetch("http://localhost/api/tokens", {
+    const createRes = await ctx.request("/api/tokens", {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ name: "CLI Tool" }),
@@ -95,19 +89,19 @@ describe("API Token Management", () => {
       .bind(userId, "CLI Tool")
       .first<{ id: number }>();
 
-    await worker.fetch(`http://localhost/api/tokens/${tokenRow!.id}`, {
+    await ctx.request(`/api/tokens/${tokenRow!.id}`, {
       method: "DELETE",
       headers: authHeaders(),
     });
 
-    const res = await worker.fetch("http://localhost/api/me", {
+    const res = await ctx.request("/api/me", {
       headers: apiHeaders(rawToken),
     });
     expect(res.status).toBe(401);
   });
 
   it("[UC-AUTH-001-S06] revoking one token does not affect others", async () => {
-    const res1 = await worker.fetch("http://localhost/api/tokens", {
+    const res1 = await ctx.request("/api/tokens", {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ name: "Token A" }),
@@ -116,7 +110,7 @@ describe("API Token Management", () => {
       data: { token: tokenA },
     } = (await res1.json()) as { data: { token: string } };
 
-    const res2 = await worker.fetch("http://localhost/api/tokens", {
+    const res2 = await ctx.request("/api/tokens", {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ name: "Token B" }),
@@ -130,15 +124,15 @@ describe("API Token Management", () => {
       .bind(userId, "Token A", "Token B")
       .all<{ id: number; name: string }>();
     const tokenARow = rows.results.find((row) => row.name === "Token A");
-    await worker.fetch(`http://localhost/api/tokens/${tokenARow!.id}`, {
+    await ctx.request(`/api/tokens/${tokenARow!.id}`, {
       method: "DELETE",
       headers: authHeaders(),
     });
 
-    const resA = await worker.fetch("http://localhost/api/me", { headers: apiHeaders(tokenA) });
+    const resA = await ctx.request("/api/me", { headers: apiHeaders(tokenA) });
     expect(resA.status).toBe(401);
 
-    const resB = await worker.fetch("http://localhost/api/me", { headers: apiHeaders(tokenB) });
+    const resB = await ctx.request("/api/me", { headers: apiHeaders(tokenB) });
     expect(resB.status).toBe(200);
   });
 });

@@ -1,26 +1,20 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { getPlatformProxy, unstable_dev } from "wrangler";
-import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase, ensureMigrations, createApiTokenForUser } from "./helpers";
+import { createTestContext, cleanDatabase, createApiTokenForUser } from "./helpers";
+import type { TestContext } from "./helpers";
 import type { PortfolioSummary } from "../shared/types/api";
 
-let worker: UnstableDevWorker;
+let ctx: TestContext;
 let db: D1Database;
 let portfolioId: number;
 let authToken: string;
 
 beforeAll(async () => {
-  const { env } = await getPlatformProxy<{ DB: D1Database }>();
-  db = env.DB;
-  await ensureMigrations(db);
-  worker = await unstable_dev("src/index.ts", {
-    config: "wrangler.toml",
-    local: true,
-  });
+  ctx = await createTestContext();
+  db = ctx.db;
 });
 
 afterAll(async () => {
-  await worker.stop();
+  await ctx.clean();
 });
 
 beforeEach(async () => {
@@ -42,7 +36,7 @@ function authHeaders(): Record<string, string> {
 }
 
 async function makeDeposit(amount: number) {
-  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transfers`, {
+  const res = await ctx.request(`/api/portfolios/${portfolioId}/transfers`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ type: "deposit", amount, fee: 0, date: "2024-01-01" }),
@@ -51,7 +45,7 @@ async function makeDeposit(amount: number) {
 }
 
 async function makeWithdrawal(amount: number) {
-  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transfers`, {
+  const res = await ctx.request(`/api/portfolios/${portfolioId}/transfers`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ type: "withdrawal", amount, fee: 0, date: "2024-01-01" }),
@@ -60,7 +54,7 @@ async function makeWithdrawal(amount: number) {
 }
 
 async function makeBuy(symbol: string, quantity: number, price: number, fee: number) {
-  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+  const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ symbol, type: "buy", quantity, price, fee, date: "2024-01-01" }),
@@ -69,7 +63,7 @@ async function makeBuy(symbol: string, quantity: number, price: number, fee: num
 }
 
 async function makeSell(symbol: string, quantity: number, price: number, fee: number) {
-  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+  const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ symbol, type: "sell", quantity, price, fee, date: "2024-02-01" }),
@@ -78,7 +72,7 @@ async function makeSell(symbol: string, quantity: number, price: number, fee: nu
 }
 
 async function getSummary() {
-  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/summary`, {
+  const res = await ctx.request(`/api/portfolios/${portfolioId}/summary`, {
     headers: authHeaders(),
   });
   return (await res.json()) as {

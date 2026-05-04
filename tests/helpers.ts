@@ -1,8 +1,58 @@
+import Database from "better-sqlite3";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { app } from "../src/index";
+import { createD1Adapter } from "./d1-adapter";
+import type { Bindings } from "../src/types";
+
+export interface TestContext {
+  db: D1Database;
+  /** Call app.request() with the DB binding injected */
+  request: (path: string, init?: RequestInit) => Promise<Response>;
+  /** Delete all rows from all tables and close the database */
+  clean: () => Promise<void>;
+}
+
+export async function createTestContext(envVars?: Partial<Bindings>): Promise<TestContext> {
+  const sqlite = new Database(":memory:");
+  const db = createD1Adapter(sqlite) as unknown as D1Database;
+  await ensureMigrations(db as unknown as D1Database);
+
+  const env: Bindings = { DB: db, ...envVars };
+
+  const tables = [
+    "stock_tags",
+    "corporate_actions",
+    "realized_pnl",
+    "lots",
+    "transactions",
+    "transfers",
+    "portfolio_snapshots",
+    "price_history",
+    "stocks",
+    "tags",
+    "api_tokens",
+    "portfolios",
+    "users",
+  ];
+
+  return {
+    db,
+    request: (path, init) => app.request(path, init, env),
+    clean: async () => {
+      for (const table of tables) {
+        try {
+          await db.exec(`DELETE FROM ${table}`);
+        } catch {
+          // Table may not exist
+        }
+      }
+      sqlite.close();
+    },
+  };
+}
 
 export async function ensureMigrations(db: D1Database) {
-  // Check if migrations already applied by looking for a known table
   try {
     const result = await db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
@@ -30,7 +80,7 @@ export async function ensureMigrations(db: D1Database) {
       try {
         await db.exec(collapsed);
       } catch {
-        // Skip statements that fail on re-run (ALTER/DROP already applied, etc.)
+        // Skip statements that fail on re-run
       }
     }
   }
@@ -55,7 +105,7 @@ export async function cleanDatabase(db: D1Database) {
     try {
       await db.exec(`DELETE FROM ${table}`);
     } catch {
-      // Table may not exist (e.g., dropped by migration)
+      // Table may not exist
     }
   }
 }

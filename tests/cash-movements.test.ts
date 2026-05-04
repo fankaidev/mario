@@ -1,23 +1,20 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { getPlatformProxy, unstable_dev } from "wrangler";
-import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase, ensureMigrations, createApiTokenForUser } from "./helpers";
+import { createTestContext, cleanDatabase, createApiTokenForUser } from "./helpers";
+import type { TestContext } from "./helpers";
 
-let worker: UnstableDevWorker;
+let ctx: TestContext;
 let db: D1Database;
 let userId: number;
 let portfolioId: number;
 let authToken: string;
 
 beforeAll(async () => {
-  const { env } = await getPlatformProxy<{ DB: D1Database }>();
-  db = env.DB;
-  await ensureMigrations(db);
-  worker = await unstable_dev("src/index.ts", { config: "wrangler.toml", local: true });
+  ctx = await createTestContext();
+  db = ctx.db;
 });
 
 afterAll(async () => {
-  await worker.stop();
+  await ctx.clean();
 });
 
 beforeEach(async () => {
@@ -51,7 +48,7 @@ async function fetchCashMovements(): Promise<{
     cash_balance: number;
   }>;
 }> {
-  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/cash-movements`, {
+  const res = await ctx.request(`/api/portfolios/${portfolioId}/cash-movements`, {
     headers: authHeaders(),
   });
   const json = (await res.json()) as {
@@ -75,7 +72,7 @@ async function createTransfer(
   date: string,
   note?: string,
 ) {
-  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transfers`, {
+  const res = await ctx.request(`/api/portfolios/${portfolioId}/transfers`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ type, amount, fee, date, note }),
@@ -91,7 +88,7 @@ async function createTransaction(
   fee: number,
   date: string,
 ) {
-  const res = await worker.fetch(`http://localhost/api/portfolios/${portfolioId}/transactions`, {
+  const res = await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ symbol, type, quantity, price, fee, date }),
@@ -194,7 +191,7 @@ describe("GET /api/portfolios/:id/cash-movements", () => {
   });
 
   it("returns 404 for non-existent portfolio", async () => {
-    const res = await worker.fetch(`http://localhost/api/portfolios/99999/cash-movements`, {
+    const res = await ctx.request(`/api/portfolios/99999/cash-movements`, {
       headers: authHeaders(),
     });
     expect(res.status).toBe(404);

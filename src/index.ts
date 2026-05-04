@@ -14,7 +14,7 @@ import importRoutes from "./routes/import";
 import type { PriceFetcher } from "./clients/price-fetcher";
 import { FetcherRouter } from "./clients/fetcher-router";
 
-const app = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
+export const app = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
 app.get("/api/health", (c) => c.json({ status: "ok" }));
 
