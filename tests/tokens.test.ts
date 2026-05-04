@@ -1,25 +1,28 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { getPlatformProxy, unstable_dev } from "wrangler";
+import { unstable_dev } from "wrangler";
 import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase, ensureMigrations, createApiTokenForUser } from "./helpers";
+import type { TestContext } from "./helpers";
+import { cleanDatabase, createApiTokenForUser, createTestContext } from "./helpers";
 
 let worker: UnstableDevWorker;
 let db: D1Database;
+let ctx: TestContext;
 let userId: number;
 let authToken: string;
 
 beforeAll(async () => {
-  const { env } = await getPlatformProxy<{ DB: D1Database }>();
-  db = env.DB;
-  await ensureMigrations(db);
+  ctx = await createTestContext();
+  db = ctx.db;
   worker = await unstable_dev("src/index.ts", {
     config: "wrangler.toml",
     local: true,
+    persistTo: ctx.persistTo,
   });
 });
 
 afterAll(async () => {
   await worker.stop();
+  ctx.cleanup();
 });
 
 beforeEach(async () => {

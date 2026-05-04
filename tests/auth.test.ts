@@ -2,12 +2,14 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { exportJWK, generateKeyPair, SignJWT, type JWK, type KeyLike } from "jose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { getPlatformProxy, unstable_dev } from "wrangler";
+import { unstable_dev } from "wrangler";
 import type { UnstableDevWorker } from "wrangler";
-import { cleanDatabase, ensureMigrations } from "./helpers";
+import type { TestContext } from "./helpers";
+import { cleanDatabase, createTestContext } from "./helpers";
 
 let worker: UnstableDevWorker;
 let db: D1Database;
+let ctx: TestContext;
 let jwksServer: Server;
 let jwksUrl: string;
 let accessPrivateKey: KeyLike;
@@ -72,12 +74,12 @@ beforeAll(async () => {
   const address = jwksServer.address() as AddressInfo;
   jwksUrl = `http://127.0.0.1:${address.port}/cdn-cgi/access/certs`;
 
-  const { env } = await getPlatformProxy<{ DB: D1Database }>();
-  db = env.DB;
-  await ensureMigrations(db);
+  ctx = await createTestContext();
+  db = ctx.db;
   worker = await unstable_dev("src/index.ts", {
     config: "wrangler.toml",
     local: true,
+    persistTo: ctx.persistTo,
     vars: {
       ACCESS_AUD: TEST_ACCESS_AUD,
       ACCESS_ISSUER: TEST_ACCESS_ISSUER,
@@ -88,6 +90,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await worker.stop();
+  ctx.cleanup();
   await new Promise<void>((resolve, reject) => {
     jwksServer.close((err) => {
       if (err) reject(err);
