@@ -11,6 +11,7 @@ import type {
 } from "../../shared/types/api";
 import { getLatestPrice } from "./prices";
 import { replayFIFO, type CorporateAction } from "../lib/fifo";
+import { calculateXIRR, type CashFlow } from "../lib/finance";
 
 /**
  * Fetch corporate actions for a portfolio.
@@ -32,6 +33,29 @@ export async function getCorporateActions(
     type: row.type as "split" | "merge",
     ratio: row.ratio,
     effective_date: row.effective_date,
+  }));
+}
+
+/**
+ * Get cash flows for IRR calculation from transfers (excluding interest).
+ * Deposit/initial → negative (money in). Withdrawal → positive (money out).
+ */
+export async function getIRRCashFlows(
+  db: D1Database,
+  portfolioId: number,
+  upToDate?: string,
+): Promise<CashFlow[]> {
+  const dateFilter = upToDate ? "AND date <= ?" : "";
+  const rows = await db
+    .prepare(
+      `SELECT type, amount, fee, date FROM transfers WHERE portfolio_id = ? AND type != 'interest' ${dateFilter} ORDER BY date`,
+    )
+    .bind(...(upToDate ? [portfolioId, upToDate] : [portfolioId]))
+    .all<{ type: string; amount: number; fee: number; date: string }>();
+
+  return rows.results.map((row) => ({
+    date: row.date,
+    amount: row.type === "withdrawal" ? row.amount + row.fee : -(row.amount - row.fee),
   }));
 }
 
@@ -418,12 +442,20 @@ export async function getPortfolioSummary(
   const realizedWithFee = totalRealizedPnl - (feeRow?.sell_fees ?? 0);
   const dividendIncome = dividendRow?.total ?? 0;
   const totalPnl = unrealizedPnl + realizedWithFee + dividendIncome;
-  const returnRate = totalInvestment > 0 ? (totalPnl / totalInvestment) * 100 : 0;
+
+  // Compute IRR from transfer cash flows + terminal portfolio value
+  const cashBalance = await calculateCashBalance(db, portfolioId);
+  const portfolioValue = totalMarketValue + cashBalance;
+  const irrCashFlows = await getIRRCashFlows(db, portfolioId);
+  if (portfolioValue > 0 || irrCashFlows.length > 0) {
+    irrCashFlows.push({ date: new Date().toISOString().split("T")[0]!, amount: portfolioValue });
+  }
+  const irr = calculateXIRR(irrCashFlows);
+  const returnRate =
+    irr !== null ? irr * 100 : totalInvestment > 0 ? (totalPnl / totalInvestment) * 100 : 0;
   const buyFees = feeRow?.buy_fees ?? 0;
   const sellFees = feeRow?.sell_fees ?? 0;
   const withholdingTax = feeRow?.withholding_tax ?? 0;
-  const cashBalance = await calculateCashBalance(db, portfolioId);
-  const portfolioValue = totalMarketValue + cashBalance;
 
   const symbols = Array.from(holdingsBySymbol.keys());
   const priceUpdatedAtRow =
