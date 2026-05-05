@@ -331,13 +331,14 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
       </div>
       {snapshots.length === 0 && <EmptyState message="No snapshots yet." />}
       <div className="space-y-1">
-        <div className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_32px] items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground">
+        <div className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_1fr_32px] items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground">
           <span>Date</span>
           <span className="text-right">Investment</span>
           <span className="text-right">Securities</span>
           <span className="text-right">Cash</span>
           <span className="text-right">Total</span>
           <span className="text-right">P&L</span>
+          <span className="text-right">Return Rate</span>
           <span />
         </div>
         {snapshots.map((snap) => {
@@ -348,16 +349,20 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
           return (
             <div
               key={snap.id}
-              className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_32px] items-center gap-2 border-b py-2 text-sm"
+              className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_1fr_32px] items-center gap-2 border-b py-2 text-sm"
             >
               <span className="font-medium">{snap.date}</span>
-              <span className="text-right">{snap.total_investment.toLocaleString()}</span>
-              <span className="text-right">{snap.market_value.toLocaleString()}</span>
-              <span className="text-right">{snap.cash_balance.toLocaleString()}</span>
-              <span className="text-right font-medium">{totalValue.toLocaleString()}</span>
+              <span className="text-right">{snap.total_investment.toFixed(2)}</span>
+              <span className="text-right">{snap.market_value.toFixed(2)}</span>
+              <span className="text-right">{snap.cash_balance.toFixed(2)}</span>
+              <span className="text-right font-medium">{totalValue.toFixed(2)}</span>
               <span className={`text-right ${pnl >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {pnl.toLocaleString()} ({rate >= 0 ? "+" : ""}
-                {rate.toFixed(1)}%)
+                {pnl >= 0 ? "+" : ""}
+                {pnl.toFixed(2)}
+              </span>
+              <span className={`text-right ${rate >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {rate >= 0 ? "+" : ""}
+                {rate.toFixed(2)}%
               </span>
               {manageMode && (
                 <Button
