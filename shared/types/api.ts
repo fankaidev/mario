@@ -203,3 +203,40 @@ export interface CorporateAction {
 export interface CreateTagRequest {
   name: string;
 }
+
+export interface ExchangeRateRecord {
+  id: number;
+  from_currency: string;
+  to_currency: string;
+  date: string;
+  rate: number;
+  created_at: string;
+}
+
+export interface AggregatedPortfolioSummary {
+  portfolio_id: number;
+  portfolio_name: string;
+  native_currency: string;
+  native_summary: PortfolioSummary;
+  converted_summary: PortfolioSummary | null;
+}
+
+export interface AggregatedSummary {
+  target_currency: string;
+  total_investment: number;
+  securities_value: number;
+  cash_balance: number;
+  portfolio_value: number;
+  unrealized_pnl: number;
+  realized_pnl: number;
+  dividend_income: number;
+  total_pnl: number;
+  return_rate: number;
+  cumulative_buy_fees: number;
+  cumulative_sell_fees: number;
+  cumulative_withholding_tax: number;
+  cumulative_total_fees: number;
+  price_updated_at: string | null;
+  exchange_rate_updated_at: string | null;
+  portfolios: AggregatedPortfolioSummary[];
+}

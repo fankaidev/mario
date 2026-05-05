@@ -34,6 +34,7 @@ export async function createTestContext(envVars?: Partial<Bindings>): Promise<Te
     "api_tokens",
     "portfolios",
     "users",
+    "exchange_rates",
   ];
 
   return {
@@ -101,6 +102,7 @@ export async function cleanDatabase(db: D1Database) {
     "api_tokens",
     "portfolios",
     "users",
+    "exchange_rates",
   ]) {
     try {
       await db.exec(`DELETE FROM ${table}`);
