@@ -183,7 +183,13 @@ export function CashTab({ id, currency }: { id: string; currency: string }) {
             <span className="text-muted-foreground">{m.date}</span>
             <CashMovementTypeBadge type={m.type} />
             <span className="truncate">
-              {m.symbol ?? m.note ?? (m.type === "deposit" ? "Deposit" : "Withdrawal")}
+              {m.symbol ??
+                m.note ??
+                (m.type === "deposit"
+                  ? "Deposit"
+                  : m.type === "initial"
+                    ? "Initial"
+                    : "Withdrawal")}
             </span>
             <span>{currency}</span>
             <span className={`text-right ${m.amount >= 0 ? "text-green-600" : "text-red-600"}`}>
