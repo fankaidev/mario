@@ -170,7 +170,7 @@ export function LineChart({ data, height = 200, formatValue, minValue, markers }
 
   return (
     <div className="w-full" style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <RechartsLineChart
           data={chartData}
           margin={{ top: hasMarkers ? 45 : 10, right: 10, left: 0, bottom: 5 }}
