@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { AuthVariables } from "../middleware/auth";
 import type { Bindings } from "../types";
 import type { Transfer, TransferType } from "../../shared/types/api";
-import { calculateCashBalance } from "./portfolios";
+import { calculateCashBalance } from "./portfolios"; // used in POST for withdrawal validation
 
 const transfers = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
@@ -176,20 +176,11 @@ transfers.delete("/:transferId", async (c) => {
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
 
   const transfer = await c.env.DB.prepare(
-    "SELECT id, type, amount, fee FROM transfers WHERE id = ? AND portfolio_id = ?",
+    "SELECT id FROM transfers WHERE id = ? AND portfolio_id = ?",
   )
     .bind(transferId, portfolioId)
-    .first<{ id: number; type: string; amount: number; fee: number }>();
+    .first<{ id: number }>();
   if (!transfer) return c.json({ error: "Transfer not found" }, 404);
-
-  // Check if deleting positive transfer would cause negative balance
-  if (transfer.type !== "withdrawal") {
-    const currentBalance = await calculateCashBalance(c.env.DB, portfolioId);
-    const cashChange = transfer.amount - transfer.fee;
-    if (currentBalance - cashChange < 0) {
-      return c.json({ error: "Would result in negative cash balance" }, 400);
-    }
-  }
 
   await c.env.DB.prepare("DELETE FROM transfers WHERE id = ?").bind(transferId).run();
 
