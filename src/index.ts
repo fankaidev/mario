@@ -10,9 +10,12 @@ import tags from "./routes/tags";
 import corporateActions from "./routes/corporate-actions";
 import cashMovements from "./routes/cash-movements";
 import snapshots, { calculateSnapshot } from "./routes/snapshots";
+import exchangeRates from "./routes/exchange-rates";
+import summaryRoutes from "./routes/summary";
 import importRoutes from "./routes/import";
 import type { PriceFetcher } from "./clients/price-fetcher";
 import { FetcherRouter } from "./clients/fetcher-router";
+import { syncExchangeRates } from "./routes/exchange-rates";
 
 export const app = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
@@ -35,6 +38,8 @@ app.route("/api/portfolios/:portfolioId/corporate-actions", corporateActions);
 app.route("/api/portfolios/:portfolioId/cash-movements", cashMovements);
 app.route("/api/portfolios/:portfolioId/snapshots", snapshots);
 app.route("/api/portfolios/:portfolioId/import", importRoutes);
+app.route("/api/exchange-rates", exchangeRates);
+app.route("/api/summary", summaryRoutes);
 
 export default {
   fetch: app.fetch,
@@ -69,6 +74,14 @@ export default {
     };
 
     const fetcher = new FetcherRouter(finnhub);
+
+    // Sync exchange rates before price sync
+    try {
+      const ratesCount = await syncExchangeRates(env.DB);
+      console.log(`Exchange rates synced: ${ratesCount} records`);
+    } catch (err) {
+      console.error("Exchange rate sync failed:", err);
+    }
 
     // Sync price history for all held symbols
     const symbols = await env.DB.prepare(

@@ -6,6 +6,7 @@ import type {
   HoldingLots,
   LotDetail,
   Portfolio,
+  PortfolioSummary,
   Transaction,
 } from "../../shared/types/api";
 import { getLatestPrice } from "./prices";
@@ -342,37 +343,32 @@ portfolios.get("/:id/holdings/:symbol/lots", async (c) => {
   return c.json({ data: holdingLots });
 });
 
-portfolios.get("/:id/summary", async (c) => {
-  const user = c.get("user");
-  const portfolioId = parseInt(c.req.param("id") ?? "", 10);
-  if (isNaN(portfolioId)) return c.json({ error: "Invalid portfolio ID" }, 400);
-
-  const portfolio = await c.env.DB.prepare(
-    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
-  )
-    .bind(portfolioId, user.id)
-    .first<{ id: number }>();
-  if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
-
-  const investmentRow = await c.env.DB.prepare(
-    "SELECT SUM(CASE WHEN type = 'withdrawal' THEN -(amount + fee) WHEN type = 'interest' THEN 0 ELSE amount - fee END) AS total FROM transfers WHERE portfolio_id = ?",
-  )
+/**
+ * Calculate portfolio summary metrics from transactions, transfers, and price data.
+ * All values are in the portfolio's native currency.
+ */
+export async function getPortfolioSummary(
+  db: D1Database,
+  portfolioId: number,
+): Promise<PortfolioSummary> {
+  const investmentRow = await db
+    .prepare(
+      "SELECT SUM(CASE WHEN type = 'withdrawal' THEN -(amount + fee) WHEN type = 'interest' THEN 0 ELSE amount - fee END) AS total FROM transfers WHERE portfolio_id = ?",
+    )
     .bind(portfolioId)
     .first<{ total: number | null }>();
 
-  // Get all transactions and corporate actions for this portfolio
-  const txRows = await c.env.DB.prepare(
-    "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ? ORDER BY date, created_at",
-  )
+  const txRows = await db
+    .prepare(
+      "SELECT id, portfolio_id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ? ORDER BY date, created_at",
+    )
     .bind(portfolioId)
     .all<Transaction>();
 
-  const corporateActions = await getCorporateActions(c.env.DB, portfolioId);
+  const corporateActions = await getCorporateActions(db, portfolioId);
 
-  // Replay FIFO to get current lots and realized P&L
   const { lots, realizedPnl } = replayFIFO(txRows.results, corporateActions);
 
-  // Calculate market value and cost from current lots
   const holdingsBySymbol = new Map<string, { quantity: number; cost: number }>();
 
   for (const lot of lots) {
@@ -390,27 +386,32 @@ portfolios.get("/:id/summary", async (c) => {
   let totalMarketValue = 0;
   let totalCost = 0;
   for (const [symbol, holding] of holdingsBySymbol) {
-    const price = await getLatestPrice(c.env.DB, symbol);
+    const price = await getLatestPrice(db, symbol);
     if (price !== null) {
       totalMarketValue += holding.quantity * price;
     }
     totalCost += holding.cost;
   }
 
-  // Calculate realized P&L from replay results
   const totalRealizedPnl = realizedPnl.reduce((sum, r) => sum + r.pnl, 0);
 
-  const dividendRow = await c.env.DB.prepare(
-    "SELECT SUM(quantity * price - fee) AS total FROM transactions WHERE portfolio_id = ? AND type = 'dividend'",
-  )
+  const dividendRow = await db
+    .prepare(
+      "SELECT SUM(quantity * price - fee) AS total FROM transactions WHERE portfolio_id = ? AND type = 'dividend'",
+    )
     .bind(portfolioId)
     .first<{ total: number | null }>();
 
-  const feeRow = await c.env.DB.prepare(
-    "SELECT SUM(CASE WHEN type IN ('buy', 'initial') THEN fee ELSE 0 END) AS buy_fees, SUM(CASE WHEN type = 'sell' THEN fee ELSE 0 END) AS sell_fees, SUM(CASE WHEN type = 'dividend' THEN fee ELSE 0 END) AS withholding_tax FROM transactions WHERE portfolio_id = ?",
-  )
+  const feeRow = await db
+    .prepare(
+      "SELECT SUM(CASE WHEN type IN ('buy', 'initial') THEN fee ELSE 0 END) AS buy_fees, SUM(CASE WHEN type = 'sell' THEN fee ELSE 0 END) AS sell_fees, SUM(CASE WHEN type = 'dividend' THEN fee ELSE 0 END) AS withholding_tax FROM transactions WHERE portfolio_id = ?",
+    )
     .bind(portfolioId)
-    .first<{ buy_fees: number | null; sell_fees: number | null; withholding_tax: number | null }>();
+    .first<{
+      buy_fees: number | null;
+      sell_fees: number | null;
+      withholding_tax: number | null;
+    }>();
 
   const totalInvestment = investmentRow?.total ?? 0;
   const unrealizedPnl = totalMarketValue - totalCost;
@@ -421,37 +422,52 @@ portfolios.get("/:id/summary", async (c) => {
   const buyFees = feeRow?.buy_fees ?? 0;
   const sellFees = feeRow?.sell_fees ?? 0;
   const withholdingTax = feeRow?.withholding_tax ?? 0;
-  const cashBalance = await calculateCashBalance(c.env.DB, portfolioId);
+  const cashBalance = await calculateCashBalance(db, portfolioId);
   const portfolioValue = totalMarketValue + cashBalance;
 
   const symbols = Array.from(holdingsBySymbol.keys());
   const priceUpdatedAtRow =
     symbols.length > 0
-      ? await c.env.DB.prepare(
-          `SELECT MIN(latest_date) as price_updated_at FROM (SELECT symbol, MAX(date) as latest_date FROM price_history WHERE symbol IN (${symbols.map(() => "?").join(",")}) GROUP BY symbol)`,
-        )
+      ? await db
+          .prepare(
+            `SELECT MIN(latest_date) as price_updated_at FROM (SELECT symbol, MAX(date) as latest_date FROM price_history WHERE symbol IN (${symbols.map(() => "?").join(",")}) GROUP BY symbol)`,
+          )
           .bind(...symbols)
           .first<{ price_updated_at: string | null }>()
       : null;
 
-  return c.json({
-    data: {
-      total_investment: Math.round(totalInvestment * 100) / 100,
-      securities_value: Math.round(totalMarketValue * 100) / 100,
-      cash_balance: Math.round(cashBalance * 100) / 100,
-      portfolio_value: Math.round(portfolioValue * 100) / 100,
-      unrealized_pnl: Math.round(unrealizedPnl * 100) / 100,
-      realized_pnl: Math.round(realizedWithFee * 100) / 100,
-      dividend_income: Math.round(dividendIncome * 100) / 100,
-      total_pnl: Math.round(totalPnl * 100) / 100,
-      return_rate: Math.round(returnRate * 100) / 100,
-      cumulative_buy_fees: Math.round(buyFees * 100) / 100,
-      cumulative_sell_fees: Math.round(sellFees * 100) / 100,
-      cumulative_withholding_tax: Math.round(withholdingTax * 100) / 100,
-      cumulative_total_fees: Math.round((buyFees + sellFees + withholdingTax) * 100) / 100,
-      price_updated_at: priceUpdatedAtRow?.price_updated_at ?? null,
-    },
-  });
+  return {
+    total_investment: Math.round(totalInvestment * 100) / 100,
+    securities_value: Math.round(totalMarketValue * 100) / 100,
+    cash_balance: Math.round(cashBalance * 100) / 100,
+    portfolio_value: Math.round(portfolioValue * 100) / 100,
+    unrealized_pnl: Math.round(unrealizedPnl * 100) / 100,
+    realized_pnl: Math.round(realizedWithFee * 100) / 100,
+    dividend_income: Math.round(dividendIncome * 100) / 100,
+    total_pnl: Math.round(totalPnl * 100) / 100,
+    return_rate: Math.round(returnRate * 100) / 100,
+    cumulative_buy_fees: Math.round(buyFees * 100) / 100,
+    cumulative_sell_fees: Math.round(sellFees * 100) / 100,
+    cumulative_withholding_tax: Math.round(withholdingTax * 100) / 100,
+    cumulative_total_fees: Math.round((buyFees + sellFees + withholdingTax) * 100) / 100,
+    price_updated_at: priceUpdatedAtRow?.price_updated_at ?? null,
+  };
+}
+
+portfolios.get("/:id/summary", async (c) => {
+  const user = c.get("user");
+  const portfolioId = parseInt(c.req.param("id") ?? "", 10);
+  if (isNaN(portfolioId)) return c.json({ error: "Invalid portfolio ID" }, 400);
+
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+  )
+    .bind(portfolioId, user.id)
+    .first<{ id: number }>();
+  if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
+
+  const summary = await getPortfolioSummary(c.env.DB, portfolioId);
+  return c.json({ data: summary });
 });
 
 export default portfolios;

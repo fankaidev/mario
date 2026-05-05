@@ -18,7 +18,7 @@ import { Label } from "../components/ui/label";
 import { Select } from "../components/ui/select";
 import { get, post, del } from "../lib/api";
 import { StackedBarChart, getPortfolioColor } from "../components/StackedBarChart";
-import type { Portfolio } from "../../../shared/types/api";
+import type { AggregatedSummary, Portfolio } from "../../../shared/types/api";
 import type { Snapshot } from "./portfolio/types";
 
 export function PortfolioList() {
@@ -28,6 +28,7 @@ export function PortfolioList() {
   const [manageMode, setManageMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [chartRange, setChartRange] = useState<"1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL">("1Y");
+  const [targetCurrency, setTargetCurrency] = useState<"USD" | "HKD" | "CNY">("USD");
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["portfolios"],
@@ -41,6 +42,12 @@ export function PortfolioList() {
       setSelectedIds(new Set(portfolios.map((p) => p.id)));
     }
   }, [portfolios, selectedIds.size]);
+
+  const { data: aggregatedSummary, isLoading: aggLoading } = useQuery({
+    queryKey: ["summary", targetCurrency],
+    queryFn: () => get<{ data: AggregatedSummary }>(`/summary?currency=${targetCurrency}`),
+    staleTime: 60 * 1000,
+  });
 
   const snapshotQueries = useQueries({
     queries: portfolios
@@ -223,6 +230,62 @@ export function PortfolioList() {
         </div>
       </div>
 
+      {!manageMode && portfolios.length > 0 && !aggLoading && aggregatedSummary?.data && (
+        <div className="mb-6">
+          <Card>
+            <CardContent className="p-4">
+              <h3 className="mb-3 text-sm font-semibold">
+                Total Wealth ({aggregatedSummary.data.target_currency})
+              </h3>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground">Portfolio Value</p>
+                  <p className="text-base font-medium">
+                    {Math.round(aggregatedSummary.data.portfolio_value).toLocaleString()}{" "}
+                    {aggregatedSummary.data.target_currency}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground">Total Investment</p>
+                  <p className="text-base font-medium">
+                    {Math.round(aggregatedSummary.data.total_investment).toLocaleString()}{" "}
+                    {aggregatedSummary.data.target_currency}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground">Total P&amp;L</p>
+                  <p
+                    className={`text-base font-medium ${aggregatedSummary.data.total_pnl >= 0 ? "text-green-700" : "text-red-700"}`}
+                  >
+                    {Math.round(aggregatedSummary.data.total_pnl).toLocaleString()}{" "}
+                    {aggregatedSummary.data.target_currency}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground">Return Rate</p>
+                  <p
+                    className={`text-base font-medium ${aggregatedSummary.data.return_rate >= 0 ? "text-green-700" : "text-red-700"}`}
+                  >
+                    {aggregatedSummary.data.return_rate}%
+                  </p>
+                </div>
+              </div>
+              {aggregatedSummary.data.exchange_rate_updated_at && (
+                <p className="mt-2 text-right text-xs text-muted-foreground">
+                  Exchange rates as of: {aggregatedSummary.data.exchange_rate_updated_at}
+                </p>
+              )}
+              {!aggregatedSummary.data.exchange_rate_updated_at &&
+                aggregatedSummary.data.portfolios.some((p) => p.converted_summary === null) && (
+                  <p className="mt-2 text-right text-xs text-muted-foreground">
+                    Some portfolios excluded: exchange rates not yet available
+                  </p>
+                )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {!manageMode && portfolios.length > 0 && chartData.length > 0 && (
         <div className="mb-6">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -242,6 +305,20 @@ export function PortfolioList() {
                     }}
                   />
                   {p.name}
+                </Button>
+              ))}
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="mr-1 text-xs text-muted-foreground">Currency:</span>
+              {(["USD", "HKD", "CNY"] as const).map((c) => (
+                <Button
+                  key={c}
+                  size="sm"
+                  variant={targetCurrency === c ? "default" : "outline"}
+                  className="h-6 px-2 text-xs"
+                  onClick={() => setTargetCurrency(c)}
+                >
+                  {c}
                 </Button>
               ))}
             </div>
@@ -308,7 +385,32 @@ export function PortfolioList() {
                   <CardDescription>{p.currency}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-xs text-muted-foreground">
+                  {aggregatedSummary?.data &&
+                    (() => {
+                      const ps = aggregatedSummary.data.portfolios.find(
+                        (ap) => ap.portfolio_id === p.id,
+                      );
+                      if (!ps?.native_summary) return null;
+                      const nativeValue = ps.native_summary.portfolio_value;
+                      const convertedValue = ps.converted_summary?.portfolio_value;
+                      const showConverted =
+                        convertedValue !== undefined &&
+                        convertedValue !== null &&
+                        p.currency !== targetCurrency;
+                      return (
+                        <div>
+                          <p className="text-sm font-semibold">
+                            {Math.round(nativeValue).toLocaleString()} {p.currency}
+                          </p>
+                          {showConverted && (
+                            <p className="text-xs text-muted-foreground">
+                              ≈ {Math.round(convertedValue).toLocaleString()} {targetCurrency}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Created {new Date(p.created_at).toLocaleDateString()}
                   </p>
                 </CardContent>
