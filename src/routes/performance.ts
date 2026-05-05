@@ -46,8 +46,8 @@ export async function computePortfolioPerformance(
   const cashFlows = await getCashFlowsInRange(db, portfolioId, startDate, endDate);
   const netCashFlow = cashFlows.reduce((sum, cf) => sum + cf.amount, 0);
 
-  // Compute P&L
-  const pnl = endValue - startValue - netCashFlow;
+  // Compute P&L (netCashFlow uses IRR convention: deposits are negative)
+  const pnl = endValue - startValue + netCashFlow;
 
   // Compute range-scoped IRR
   let returnRate: number;
@@ -177,7 +177,8 @@ aggregatedPerformanceRouter.get("/", async (c) => {
       );
 
       if (startRate === null || endRate === null) {
-        // Skip portfolio if rates are missing
+        // Include portfolio without converted values when rates are missing
+        portfolioResults.push(nativePerf);
         continue;
       }
 
@@ -196,10 +197,16 @@ aggregatedPerformanceRouter.get("/", async (c) => {
         }
       }
 
+      const convPnl = Math.round((convEnd - convStart + convNetCashFlow) * 100) / 100;
+
       aggStartValue += convStart;
       aggEndValue += convEnd;
       aggNetCashFlow += Math.round(convNetCashFlow * 100) / 100;
-      aggPnl += Math.round((convEnd - convStart - convNetCashFlow) * 100) / 100;
+      aggPnl += convPnl;
+
+      nativePerf.converted_currency = targetCurrency;
+      nativePerf.converted_end_value = convEnd;
+      nativePerf.converted_pnl = convPnl;
 
       // Track oldest rate date
       const rateRow = await c.env.DB.prepare(
@@ -219,9 +226,11 @@ aggregatedPerformanceRouter.get("/", async (c) => {
 
   // Compute aggregated IRR from combined converted cash flows
   let aggReturnRate: number;
-  if (aggStartValue > 0) {
-    const irr = computeRangeIRR(aggStartValue, startDate, aggCashFlows, aggEndValue, endDate);
-    aggReturnRate = irr !== null ? irr * 100 : (aggPnl / aggStartValue) * 100;
+  const irr = computeRangeIRR(aggStartValue, startDate, aggCashFlows, aggEndValue, endDate);
+  if (irr !== null) {
+    aggReturnRate = irr * 100;
+  } else if (aggStartValue > 0) {
+    aggReturnRate = (aggPnl / aggStartValue) * 100;
   } else {
     aggReturnRate = 0;
   }

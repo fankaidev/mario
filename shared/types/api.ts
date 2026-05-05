@@ -262,6 +262,9 @@ export interface PortfolioPerformance {
   net_cash_flow: number;
   pnl: number;
   return_rate: number;
+  converted_currency?: string;
+  converted_end_value?: number;
+  converted_pnl?: number;
 }
 
 export interface AggregatedPerformance {
