@@ -396,7 +396,7 @@ export function TransactionsTab({
 
       <div className="space-y-1">
         <div
-          className={`grid items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground ${manageMode ? "grid-cols-[90px_1fr_70px_80px_80px_80px_100px_100px_32px]" : "grid-cols-[90px_1fr_70px_80px_80px_80px_100px_100px]"}`}
+          className={`grid items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground ${manageMode ? "grid-cols-[90px_1fr_70px_80px_80px_80px_100px_32px]" : "grid-cols-[90px_1fr_70px_80px_80px_80px_100px]"}`}
         >
           <span>Date</span>
           <span>Symbol</span>
@@ -405,7 +405,6 @@ export function TransactionsTab({
           <span className="text-right">Price</span>
           <span className="text-right">Fee</span>
           <span className="text-right">Proceeds</span>
-          <span className="text-right">Cash</span>
           {manageMode && <span />}
         </div>
         {filteredTransactions.map((tx) => {
@@ -416,7 +415,7 @@ export function TransactionsTab({
           return (
             <div
               key={tx.id}
-              className={`grid items-center gap-2 border-b py-2 text-sm ${manageMode ? "grid-cols-[90px_1fr_70px_80px_80px_80px_100px_100px_32px]" : "grid-cols-[90px_1fr_70px_80px_80px_80px_100px_100px]"}`}
+              className={`grid items-center gap-2 border-b py-2 text-sm ${manageMode ? "grid-cols-[90px_1fr_70px_80px_80px_80px_100px_32px]" : "grid-cols-[90px_1fr_70px_80px_80px_80px_100px]"}`}
             >
               <span className="text-muted-foreground">{tx.date}</span>
               <div className="min-w-0">
@@ -430,9 +429,6 @@ export function TransactionsTab({
               <span className={`text-right ${proceeds >= 0 ? "text-green-600" : "text-red-600"}`}>
                 {proceeds >= 0 ? "+" : ""}
                 {proceeds.toLocaleString()}
-              </span>
-              <span className="text-right text-muted-foreground">
-                {tx.cash_balance !== undefined ? tx.cash_balance.toLocaleString() : ""}
               </span>
               {manageMode && (
                 <Button

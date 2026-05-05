@@ -17,7 +17,7 @@ cashMovements.get("/", async (c) => {
     .first();
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
 
-  const [txRows, transferRows] = await Promise.all([
+  const [txRows, transferRows, snapshotRows] = await Promise.all([
     c.env.DB.prepare(
       "SELECT id, symbol, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ?",
     )
@@ -45,17 +45,30 @@ cashMovements.get("/", async (c) => {
         note: string | null;
         created_at: string;
       }>(),
+    c.env.DB.prepare(
+      "SELECT id, date, cash_balance, note FROM portfolio_snapshots WHERE portfolio_id = ?",
+    )
+      .bind(portfolioId)
+      .all<{
+        id: number;
+        date: string;
+        cash_balance: number;
+        note: string | null;
+      }>(),
   ]);
+
+  const KIND_ORDER = { transfer: 0, transaction: 0, snapshot: 1 } as const;
 
   type CashEvent = {
     date: string;
     created_at: string;
     cash_delta: number;
-    kind: "transfer" | "transaction";
+    kind: "transfer" | "transaction" | "snapshot";
     id: number;
     type: CashMovementType;
     symbol: string | null;
     note: string | null;
+    snapshotBalance?: number;
   };
 
   const events: CashEvent[] = [];
@@ -94,22 +107,42 @@ cashMovements.get("/", async (c) => {
     });
   }
 
+  for (const s of snapshotRows.results) {
+    events.push({
+      date: s.date,
+      created_at: s.date + "T23:59:59Z",
+      cash_delta: 0,
+      kind: "snapshot",
+      id: s.id,
+      type: "snapshot",
+      symbol: null,
+      note: s.note,
+      snapshotBalance: s.cash_balance,
+    });
+  }
+
   events.sort((a, b) => {
     if (a.date !== b.date) return a.date.localeCompare(b.date);
+    const kindOrder = KIND_ORDER[a.kind] - KIND_ORDER[b.kind];
+    if (kindOrder !== 0) return kindOrder;
     return a.created_at.localeCompare(b.created_at);
   });
 
   const movements: CashMovement[] = [];
   let runningBalance = 0;
   for (const ev of events) {
-    runningBalance += ev.cash_delta;
+    if (ev.snapshotBalance !== undefined) {
+      runningBalance = ev.snapshotBalance;
+    } else {
+      runningBalance += ev.cash_delta;
+    }
     movements.push({
       id: ev.id,
       date: ev.date,
       type: ev.type,
       symbol: ev.symbol,
       note: ev.note,
-      amount: Math.round(ev.cash_delta * 100) / 100,
+      amount: ev.snapshotBalance !== undefined ? 0 : Math.round(ev.cash_delta * 100) / 100,
       cash_balance: Math.round(runningBalance * 100) / 100,
     });
   }

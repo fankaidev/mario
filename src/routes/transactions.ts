@@ -153,80 +153,15 @@ transactions.get("/", async (c) => {
   const startDate = c.req.query("startDate")?.trim();
   const endDate = c.req.query("endDate")?.trim();
 
-  // Fetch ALL transactions (unfiltered) and transfers to calculate running cash balance
-  const [allTxRows, transferRows] = await Promise.all([
-    c.env.DB.prepare(
-      "SELECT t.id, t.portfolio_id, t.symbol, t.type, t.quantity, t.price, t.fee, t.date, t.created_at, COALESCE(s.name, t.symbol) AS name FROM transactions t LEFT JOIN stocks s ON t.symbol = s.symbol WHERE t.portfolio_id = ? ORDER BY date, created_at",
-    )
-      .bind(portfolioId)
-      .all<Transaction>(),
-    c.env.DB.prepare(
-      "SELECT id, type, amount, fee, date, created_at FROM cash_movements WHERE portfolio_id = ? ORDER BY date, created_at",
-    )
-      .bind(portfolioId)
-      .all<{
-        id: number;
-        type: string;
-        amount: number;
-        fee: number;
-        date: string;
-        created_at: string;
-      }>(),
-  ]);
-
-  // Create events for sorting: transfers and transactions
-  type CashEvent = {
-    date: string;
-    created_at: string;
-    kind: "transfer" | "transaction";
-    cash_delta: number;
-    tx_id?: number;
-  };
-
-  const events: CashEvent[] = [];
-
-  for (const tr of transferRows.results) {
-    const delta = tr.type === "withdrawal" ? -(tr.amount + tr.fee) : tr.amount - tr.fee;
-    events.push({ date: tr.date, created_at: tr.created_at, kind: "transfer", cash_delta: delta });
-  }
-
-  for (const tx of allTxRows.results) {
-    let delta: number;
-    if (tx.type === "buy" || tx.type === "initial") {
-      delta = -(tx.quantity * tx.price + tx.fee);
-    } else if (tx.type === "sell") {
-      delta = tx.quantity * tx.price - tx.fee;
-    } else {
-      // dividend
-      delta = tx.quantity * tx.price - tx.fee;
-    }
-    events.push({
-      date: tx.date,
-      created_at: tx.created_at,
-      kind: "transaction",
-      cash_delta: delta,
-      tx_id: tx.id,
-    });
-  }
-
-  // Sort by date, then created_at
-  events.sort((a, b) => {
-    if (a.date !== b.date) return a.date.localeCompare(b.date);
-    return a.created_at.localeCompare(b.created_at);
-  });
-
-  // Calculate running balance and map to transaction IDs
-  const balanceByTxId = new Map<number, number>();
-  let runningBalance = 0;
-  for (const ev of events) {
-    runningBalance += ev.cash_delta;
-    if (ev.kind === "transaction" && ev.tx_id !== undefined) {
-      balanceByTxId.set(ev.tx_id, Math.round(runningBalance * 100) / 100);
-    }
-  }
+  // Fetch transactions for this portfolio
+  const txRows = await c.env.DB.prepare(
+    "SELECT t.id, t.portfolio_id, t.symbol, t.type, t.quantity, t.price, t.fee, t.date, t.created_at, COALESCE(s.name, t.symbol) AS name FROM transactions t LEFT JOIN stocks s ON t.symbol = s.symbol WHERE t.portfolio_id = ? ORDER BY date DESC, created_at DESC",
+  )
+    .bind(portfolioId)
+    .all<Transaction>();
 
   // Filter transactions by date range
-  let filteredTx = allTxRows.results;
+  let filteredTx = txRows.results;
   if (startDate) {
     filteredTx = filteredTx.filter((tx) => tx.date >= startDate);
   }
@@ -234,15 +169,7 @@ transactions.get("/", async (c) => {
     filteredTx = filteredTx.filter((tx) => tx.date <= endDate);
   }
 
-  // Add cash_balance to each transaction and reverse to DESC order
-  const result = filteredTx
-    .map((tx) => ({
-      ...tx,
-      cash_balance: balanceByTxId.get(tx.id),
-    }))
-    .reverse();
-
-  return c.json({ data: result });
+  return c.json({ data: filteredTx });
 });
 
 transactions.delete("/:txId", async (c) => {

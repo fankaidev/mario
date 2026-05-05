@@ -249,22 +249,10 @@ describe("Cash Transactions", () => {
     });
     expect(w1.status).toBe(201);
 
-    const res = await ctx.request(`/api/portfolios/${portfolioId}/cash-transfers`, {
-      headers: authHeaders(),
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      data: { id: number; type: string; cash_balance: number }[];
-    };
-
-    // Results in DESC order: withdrawal first, then deposit
-    const withdrawal = body.data.find((t) => t.type === "withdrawal")!;
-    const deposit = body.data.find((t) => t.type === "deposit")!;
-
-    // deposit cash_balance: after deposit only = 10000
-    expect(deposit.cash_balance).toBe(10000);
-    // withdrawal cash_balance: after deposit (10000) + buy (-1500) + withdrawal (-2000) = 6500
-    expect(withdrawal.cash_balance).toBe(6500);
+    // Verify cash balance is correct via summary (not cash-transfers list)
+    const cashBalance = await getCashBalance();
+    // deposit 10000 + buy AAPL 10@150 (-1500) + withdrawal 2000 (-2000) = 6500
+    expect(cashBalance).toBe(6500);
   });
 
   it("[UC-PORTFOLIO-006-S13] recalculate cash from all cash movements and transactions", async () => {

@@ -182,7 +182,7 @@ export function CashTransfersTab({ id, currency }: { id: string; currency: strin
 
       <div className="space-y-1">
         <div
-          className={`grid items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground ${manageMode ? "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_100px_100px_32px]" : "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_100px_100px]"}`}
+          className={`grid items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground ${manageMode ? "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_100px_32px]" : "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_100px]"}`}
         >
           <span>Date</span>
           <span>Type</span>
@@ -192,7 +192,6 @@ export function CashTransfersTab({ id, currency }: { id: string; currency: strin
           <span className="text-right">Fee</span>
           <span className="text-right">Net</span>
           <span className="text-right">Investment</span>
-          <span className="text-right">Cash</span>
           {manageMode && <span />}
         </div>
         {transfersWithRunningTotal.map((t) => {
@@ -200,7 +199,7 @@ export function CashTransfersTab({ id, currency }: { id: string; currency: strin
           return (
             <div
               key={t.id}
-              className={`grid items-center gap-2 border-b py-2 text-sm ${manageMode ? "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_100px_100px_32px]" : "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_100px_100px]"}`}
+              className={`grid items-center gap-2 border-b py-2 text-sm ${manageMode ? "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_100px_32px]" : "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_100px]"}`}
             >
               <span className="text-muted-foreground">{t.date}</span>
               <Badge
@@ -223,9 +222,6 @@ export function CashTransfersTab({ id, currency }: { id: string; currency: strin
               </span>
               <span className="text-right font-medium">
                 {Math.round(t.runningTotal).toLocaleString()}
-              </span>
-              <span className="text-right text-muted-foreground">
-                {t.cash_balance !== undefined ? t.cash_balance.toLocaleString() : ""}
               </span>
               {manageMode && (
                 <Button
