@@ -413,11 +413,13 @@ export function PortfolioList() {
           </div>
           <Card>
             <CardContent className="p-4">
-              <h3 className="mb-3 text-sm font-semibold">Portfolio Value Over Time</h3>
+              <h3 className="mb-3 text-sm font-semibold">
+                Portfolio Value Over Time ({targetCurrency})
+              </h3>
               <StackedBarChart
                 data={chartData}
                 height={250}
-                formatValue={(v) => `${Math.round(v).toLocaleString()} ${targetCurrency}`}
+                formatValue={(v) => Math.round(v).toLocaleString()}
               />
             </CardContent>
           </Card>
