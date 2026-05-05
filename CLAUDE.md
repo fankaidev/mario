@@ -2,6 +2,9 @@
 
 A personal portfolio tracker for US, HK, and China A-share markets. Deployed on Cloudflare Workers with D1 database.
 
+- **Website**: https://mario.fankai.site
+- **API Access**: When processing data via command/script, always use the REST API instead of direct database operations. Expect `MARIO_API_KEY` environment variable for authentication.
+
 ## Mario Workflow
 
 **Always use `pnpm` instead of `npm` for dependency management and script execution.**
