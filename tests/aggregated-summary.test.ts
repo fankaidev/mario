@@ -114,7 +114,7 @@ describe("Aggregated Summary", () => {
       .run();
     await db
       .prepare(
-        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('HKD', 'USD', '2024-03-01', 0.128)",
+        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('USD', 'HKD', '2024-03-01', 7.8125)",
       )
       .run();
 
@@ -147,7 +147,7 @@ describe("Aggregated Summary", () => {
       .run();
     await db
       .prepare(
-        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('HKD', 'USD', '2024-03-01', 0.128), ('CNY', 'USD', '2024-03-01', 0.14)",
+        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('USD', 'HKD', '2024-03-01', 7.8125), ('USD', 'CNY', '2024-03-01', 7.1429)",
       )
       .run();
 
@@ -219,7 +219,7 @@ describe("Aggregated Summary", () => {
 
     await db
       .prepare(
-        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('HKD', 'USD', '2024-01-15', 0.128), ('CNY', 'USD', '2024-02-20', 0.14)",
+        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('USD', 'HKD', '2024-01-15', 7.8125), ('USD', 'CNY', '2024-02-20', 7.1429)",
       )
       .run();
 

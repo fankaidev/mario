@@ -74,12 +74,19 @@ summary.get("/", async (c) => {
       if (rate !== null) {
         convertedSummary = convertSummary(nativeSummary, rate);
 
-        // Track oldest rate date
-        const rateDateRow = await c.env.DB.prepare(
+        // Track oldest rate date (try both directions since rates may be stored either way)
+        let rateDateRow = await c.env.DB.prepare(
           "SELECT date FROM exchange_rates WHERE from_currency = ? AND to_currency = ? ORDER BY date DESC LIMIT 1",
         )
           .bind(portfolio.currency, targetCurrency)
           .first<{ date: string }>();
+        if (!rateDateRow) {
+          rateDateRow = await c.env.DB.prepare(
+            "SELECT date FROM exchange_rates WHERE from_currency = ? AND to_currency = ? ORDER BY date DESC LIMIT 1",
+          )
+            .bind(targetCurrency, portfolio.currency)
+            .first<{ date: string }>();
+        }
         if (rateDateRow) {
           if (!oldestRateDate || rateDateRow.date < oldestRateDate) {
             oldestRateDate = rateDateRow.date;
