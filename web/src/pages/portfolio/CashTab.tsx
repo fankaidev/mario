@@ -198,11 +198,13 @@ export function CashTab({ id, currency }: { id: string; currency: string }) {
                       : "Withdrawal")}
             </span>
             <span>{currency}</span>
-            <span className={`text-right ${m.amount >= 0 ? "text-green-600" : "text-red-600"}`}>
+            <span
+              className={`text-right tabular-nums ${m.amount >= 0 ? "text-green-600" : "text-red-600"}`}
+            >
               {m.amount >= 0 ? "+" : ""}
               {m.amount.toLocaleString()}
             </span>
-            <span className="text-right font-medium">
+            <span className="text-right tabular-nums font-medium">
               {m.cash_balance.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,

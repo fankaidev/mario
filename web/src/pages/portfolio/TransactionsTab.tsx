@@ -423,10 +423,14 @@ export function TransactionsTab({
                 <div className="truncate text-xs text-muted-foreground">{tx.name}</div>
               </div>
               <TransactionTypeBadge type={tx.type} />
-              <span className="text-right">{tx.quantity}</span>
-              <span className="text-right">{tx.price.toFixed(3)}</span>
-              <span className="text-right text-muted-foreground">{tx.fee > 0 ? tx.fee : ""}</span>
-              <span className={`text-right ${proceeds >= 0 ? "text-green-600" : "text-red-600"}`}>
+              <span className="text-right tabular-nums">{tx.quantity}</span>
+              <span className="text-right tabular-nums">{tx.price.toFixed(3)}</span>
+              <span className="text-right tabular-nums text-muted-foreground">
+                {tx.fee > 0 ? tx.fee : ""}
+              </span>
+              <span
+                className={`text-right tabular-nums ${proceeds >= 0 ? "text-green-600" : "text-red-600"}`}
+              >
                 {proceeds >= 0 ? "+" : ""}
                 {proceeds.toLocaleString()}
               </span>

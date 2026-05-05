@@ -294,14 +294,14 @@ export function PortfolioList() {
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <div className="text-center">
                   <p className="text-xs text-muted-foreground">Portfolio Value</p>
-                  <p className="text-base font-medium">
+                  <p className="tabular-nums text-base font-medium">
                     {Math.round(aggregatedSummary.data.portfolio_value).toLocaleString()}{" "}
                     {aggregatedSummary.data.target_currency}
                   </p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-muted-foreground">Total Investment</p>
-                  <p className="text-base font-medium">
+                  <p className="tabular-nums text-base font-medium">
                     {Math.round(aggregatedSummary.data.total_investment).toLocaleString()}{" "}
                     {aggregatedSummary.data.target_currency}
                   </p>
@@ -309,7 +309,7 @@ export function PortfolioList() {
                 <div className="text-center">
                   <p className="text-xs text-muted-foreground">Total P&amp;L</p>
                   <p
-                    className={`text-base font-medium ${aggregatedSummary.data.total_pnl >= 0 ? "text-green-700" : "text-red-700"}`}
+                    className={`tabular-nums text-base font-medium ${aggregatedSummary.data.total_pnl >= 0 ? "text-green-700" : "text-red-700"}`}
                   >
                     {Math.round(aggregatedSummary.data.total_pnl).toLocaleString()}{" "}
                     {aggregatedSummary.data.target_currency}
@@ -318,7 +318,7 @@ export function PortfolioList() {
                 <div className="text-center">
                   <p className="text-xs text-muted-foreground">Return Rate</p>
                   <p
-                    className={`text-base font-medium ${aggregatedSummary.data.return_rate >= 0 ? "text-green-700" : "text-red-700"}`}
+                    className={`tabular-nums text-base font-medium ${aggregatedSummary.data.return_rate >= 0 ? "text-green-700" : "text-red-700"}`}
                   >
                     {aggregatedSummary.data.return_rate}%
                   </p>
@@ -477,11 +477,11 @@ export function PortfolioList() {
                         p.currency !== targetCurrency;
                       return (
                         <div>
-                          <p className="text-sm font-semibold">
+                          <p className="tabular-nums text-sm font-semibold">
                             {Math.round(nativeValue).toLocaleString()} {p.currency}
                           </p>
                           {showConverted && (
-                            <p className="text-xs text-muted-foreground">
+                            <p className="tabular-nums text-xs text-muted-foreground">
                               ≈ {Math.round(convertedValue).toLocaleString()} {targetCurrency}
                             </p>
                           )}
