@@ -57,7 +57,7 @@ export default {
         });
         if (res.ok) {
           const body = (await res.json()) as { c: number };
-          if (typeof body.c === "number" && body.c > 0) return body.c;
+          if (typeof body.c === "number" && body.c >= 0) return body.c;
         }
         return null;
       },

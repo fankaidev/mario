@@ -28,7 +28,7 @@ export class EastmoneyFetcher implements PriceFetcher {
         data?: { f43?: number };
       };
       const price = body.data?.f43;
-      if (typeof price === "number" && price > 0) {
+      if (typeof price === "number" && price >= 0) {
         // HK stocks are in cents, divide by 100
         return symbol.endsWith(".HK") ? price / 100 : price;
       }
@@ -52,7 +52,7 @@ export class EastmoneyFetcher implements PriceFetcher {
     const nav = body.Data?.LSJZList?.[0]?.DWJZ;
     if (typeof nav === "string") {
       const price = parseFloat(nav);
-      if (!isNaN(price) && price > 0) return price;
+      if (!isNaN(price) && price >= 0) return price;
     }
     return null;
   }
@@ -131,7 +131,7 @@ export class EastmoneyFetcher implements PriceFetcher {
         const closeStr = parts[2];
         if (!date || !closeStr) continue;
         const close = parseFloat(closeStr);
-        if (isNaN(close) || close <= 0) continue;
+        if (isNaN(close) || close < 0) continue;
         history.push({ date, close });
       }
 
@@ -168,7 +168,7 @@ export class EastmoneyFetcher implements PriceFetcher {
         if (!item.FSRQ || !item.DWJZ) continue;
         const date = item.FSRQ;
         const close = parseFloat(item.DWJZ);
-        if (isNaN(close) || close <= 0) continue;
+        if (isNaN(close) || close < 0) continue;
 
         const itemDate = new Date(date);
         if (itemDate < start) return history; // Data is sorted DESC by date
