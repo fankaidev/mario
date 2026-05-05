@@ -19,6 +19,7 @@
 | R11 | Calculated snapshot returns 409 if a snapshot already exists for that date |
 | R12 | If a previous snapshot exists, calculated snapshot uses it as baseline: total_investment = prev + period transfers, cash_balance = prev + period transfers + period transactions. This allows manual corrections to "calibrate" values |
 | R13 | Interest transfers are excluded from total_investment calculation but included in cash_balance |
+| R14 | Calculated snapshots include return_rate computed as annualized IRR from transfer cash flows up to snapshot date |
 
 ## Scenarios
 
@@ -40,6 +41,7 @@
 | UC-PORTFOLIO-008-S12 | P1 | ❌ | Given portfolio belongs to another user, When creating calculated snapshot, Then return 404 | |
 | UC-PORTFOLIO-008-S13 | P0 | ✅ | Given previous snapshot exists with calibrated cash_balance, When creating calculated snapshot for later date, Then new cash_balance = prev cash_balance + period changes | R12 |
 | UC-PORTFOLIO-008-S14 | P1 | ✅ | Given previous snapshot exists, When adding interest transfer and creating calculated snapshot, Then interest is included in cash_balance but excluded from total_investment | R12, R13 |
+| UC-PORTFOLIO-008-S15 | P1 | ❌ | Given transfers and holdings up to a date, When creating calculated snapshot, Then return_rate is the annualized IRR from inception to snapshot date | R14 |
 
 ### ai-e2e
 (none)
