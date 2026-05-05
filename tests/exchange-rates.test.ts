@@ -141,6 +141,34 @@ describe("GET /api/exchange-rates", () => {
     expect(body.data[0]!.from_currency).toBe("USD");
   });
 
+  it("[UC-PORTFOLIO-011-S06] returns all records when more than 100 exist", async () => {
+    // Insert 150 records spanning two currency pairs using individual inserts
+    for (let i = 0; i < 75; i++) {
+      const date = new Date(2024, 0, 1);
+      date.setDate(date.getDate() + i);
+      const dateStr = date.toISOString().split("T")[0]!;
+      await db
+        .prepare(
+          "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('USD', 'CNY', ?, 7.0)",
+        )
+        .bind(dateStr)
+        .run();
+      await db
+        .prepare(
+          "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('USD', 'HKD', ?, 7.8)",
+        )
+        .bind(dateStr)
+        .run();
+    }
+
+    const res = await ctx.request("/api/exchange-rates", {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: ExchangeRateRecord[] };
+    expect(body.data.length).toBe(150);
+  });
+
   it("requires authentication", async () => {
     const res = await ctx.request("/api/exchange-rates");
     expect(res.status).toBe(401);

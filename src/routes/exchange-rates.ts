@@ -117,7 +117,7 @@ exchangeRates.get("/", async (c) => {
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  const sql = `SELECT id, from_currency, to_currency, date, rate, created_at FROM exchange_rates ${where} ORDER BY date DESC, from_currency, to_currency LIMIT 100`;
+  const sql = `SELECT id, from_currency, to_currency, date, rate, created_at FROM exchange_rates ${where} ORDER BY date DESC, from_currency, to_currency`;
 
   let stmt = c.env.DB.prepare(sql);
   if (params.length > 0) {
