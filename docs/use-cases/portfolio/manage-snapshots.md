@@ -20,6 +20,8 @@
 | R12 | If a previous snapshot exists, calculated snapshot uses it as baseline: total_investment = prev + period transfers, cash_balance = prev + period transfers + period transactions. This allows manual corrections to "calibrate" values |
 | R13 | Interest transfers are excluded from total_investment calculation but included in cash_balance |
 | R14 | Calculated snapshots include return_rate computed as annualized IRR from transfer cash flows up to snapshot date |
+| R15 | Chart series endpoint returns snapshots with dynamically derived return rates (IRR-based) rather than stored values |
+| R16 | Chart series return rates are computed using cash flows up to each snapshot date, with portfolio value (market_value + cash_balance) as terminal value |
 
 ## Scenarios
 
@@ -42,6 +44,10 @@
 | UC-PORTFOLIO-008-S13 | P0 | ✅ | Given previous snapshot exists with calibrated cash_balance, When creating calculated snapshot for later date, Then new cash_balance = prev cash_balance + period changes | R12 |
 | UC-PORTFOLIO-008-S14 | P1 | ✅ | Given previous snapshot exists, When adding interest transfer and creating calculated snapshot, Then interest is included in cash_balance but excluded from total_investment | R12, R13 |
 | UC-PORTFOLIO-008-S15 | P1 | ❌ | Given transfers and holdings up to a date, When creating calculated snapshot, Then return_rate is the annualized IRR from inception to snapshot date | R14 |
+| UC-PORTFOLIO-008-S16 | P0 | ✅ | Given portfolio with snapshots and cash flow history, When fetching chart-series, Then return snapshots sorted by date ASC with dynamically derived return rates | R15, R16 |
+| UC-PORTFOLIO-008-S17 | P1 | ✅ | Given multiple deposits at different dates before a snapshot, When fetching chart-series, Then return_rate is computed using IRR from all cash flows up to snapshot date | R15, R16 |
+| UC-PORTFOLIO-008-S18 | P1 | ✅ | Given portfolio belongs to another user, When fetching chart-series, Then return 404 not found | |
+| UC-PORTFOLIO-008-S19 | P1 | ✅ | Given portfolio with no snapshots, When fetching chart-series, Then return empty array | R15 |
 
 ### ai-e2e
 (none)

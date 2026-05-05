@@ -27,6 +27,8 @@ export interface Snapshot {
   note: string | null;
 }
 
+export type SnapshotChartPoint = import("../../../../shared/types/api").SnapshotChartPoint;
+
 export interface CashTransfer {
   id: number;
   type: "deposit" | "withdrawal" | "initial" | "interest";

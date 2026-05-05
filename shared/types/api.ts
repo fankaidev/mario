@@ -239,3 +239,11 @@ export interface AggregatedSummary {
   exchange_rate_updated_at: string | null;
   portfolios: AggregatedPortfolioSummary[];
 }
+
+export interface SnapshotChartPoint {
+  date: string;
+  total_investment: number;
+  market_value: number;
+  cash_balance: number;
+  return_rate: number;
+}

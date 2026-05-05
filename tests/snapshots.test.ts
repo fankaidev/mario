@@ -399,3 +399,112 @@ describe("Calculated Snapshots", () => {
     expect(result.cash_balance).toBe(10100);
   });
 });
+
+describe("Chart Series", () => {
+  async function makeDeposit(amount: number, date = "2024-01-01") {
+    await ctx.request(`/api/portfolios/${portfolioId}/cash-transfers`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "deposit", amount, fee: 0, date }),
+    });
+  }
+
+  async function createSnapshot(
+    date: string,
+    totalInvestment: number,
+    marketValue: number,
+    cashBalance: number,
+  ) {
+    await ctx.request(`/api/portfolios/${portfolioId}/snapshots`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        date,
+        total_investment: totalInvestment,
+        market_value: marketValue,
+        cash_balance: cashBalance,
+      }),
+    });
+  }
+
+  it("[UC-PORTFOLIO-008-S16] chart-series returns snapshots with derived return rates", async () => {
+    await makeDeposit(10000, "2024-01-01");
+    await createSnapshot("2024-03-01", 10000, 10500, 0);
+    await createSnapshot("2024-06-01", 10000, 11000, 0);
+
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/snapshots/chart-series`, {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Array<{
+        date: string;
+        total_investment: number;
+        market_value: number;
+        cash_balance: number;
+        return_rate: number;
+      }>;
+    };
+
+    expect(body.data).toHaveLength(2);
+    expect(body.data[0].date).toBe("2024-03-01");
+    expect(body.data[0].total_investment).toBe(10000);
+    expect(body.data[0].market_value).toBe(10500);
+    expect(body.data[0].return_rate).toBeGreaterThan(0);
+
+    expect(body.data[1].date).toBe("2024-06-01");
+    expect(body.data[1].total_investment).toBe(10000);
+    expect(body.data[1].market_value).toBe(11000);
+    expect(body.data[1].return_rate).toBeGreaterThan(0);
+  });
+
+  it("[UC-PORTFOLIO-008-S17] chart-series derives IRR-based return rate from cash flows", async () => {
+    await makeDeposit(10000, "2024-01-01");
+    await makeDeposit(5000, "2024-06-01");
+    await createSnapshot("2024-12-31", 15000, 16000, 0);
+
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/snapshots/chart-series`, {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Array<{
+        date: string;
+        return_rate: number;
+      }>;
+    };
+
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].return_rate).toBeGreaterThan(0);
+    expect(body.data[0].return_rate).toBeLessThan(20);
+  });
+
+  it("[UC-PORTFOLIO-008-S18] chart-series returns 404 for other user's portfolio", async () => {
+    const otherUserResult = await db
+      .prepare("INSERT INTO users (email) VALUES (?) RETURNING id")
+      .bind("chart-other@example.com")
+      .first<{ id: number }>();
+
+    const otherPortfolioResult = await db
+      .prepare("INSERT INTO portfolios (user_id, name, currency) VALUES (?, ?, ?) RETURNING id")
+      .bind(otherUserResult!.id, "Other Portfolio Chart", "USD")
+      .first<{ id: number }>();
+
+    const res = await ctx.request(
+      `/api/portfolios/${otherPortfolioResult!.id}/snapshots/chart-series`,
+      {
+        headers: authHeaders(),
+      },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("[UC-PORTFOLIO-008-S19] chart-series returns empty array when no snapshots", async () => {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/snapshots/chart-series`, {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: unknown[] };
+    expect(body.data).toHaveLength(0);
+  });
+});

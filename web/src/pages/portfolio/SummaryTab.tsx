@@ -15,7 +15,7 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { LineChart } from "../../components/LineChart";
 import { get, post, del } from "../../lib/api";
-import type { Snapshot, Summary } from "./types";
+import type { Snapshot, SnapshotChartPoint, Summary } from "./types";
 import { ConfirmModal } from "./ConfirmModal";
 
 function AddSnapshotModal({
@@ -160,22 +160,29 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
     queryFn: () => get<{ data: Snapshot[] }>(`/portfolios/${id}/snapshots`),
   });
 
+  const { data: chartSeriesData, isLoading: chartSeriesLoading } = useQuery({
+    queryKey: ["snapshots-chart-series", id],
+    queryFn: () => get<{ data: SnapshotChartPoint[] }>(`/portfolios/${id}/snapshots/chart-series`),
+  });
+
   const deleteSnapshotMutation = useMutation({
     mutationFn: (snapshotId: number) =>
       del<{ data: null }>(`/portfolios/${id}/snapshots/${snapshotId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
+      queryClient.invalidateQueries({ queryKey: ["snapshots-chart-series", id] });
       setDeleteSnapshotId(null);
     },
   });
 
-  if (summaryLoading || snapshotsLoading)
+  if (summaryLoading || snapshotsLoading || chartSeriesLoading)
     return <p className="text-sm text-muted-foreground">Loading...</p>;
 
   const s = summaryData?.data;
   if (!s) return null;
 
   const snapshots = snapshotsData?.data ?? [];
+  const chartSeries = chartSeriesData?.data ?? [];
   const currentSummary = s;
 
   interface ChartPoint {
@@ -185,20 +192,14 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
     returnRate: number;
   }
 
-  const points: ChartPoint[] = snapshots
-    .map((snap) => ({
-      date: snap.date,
-      marketValue: snap.market_value,
-      investment: snap.total_investment,
-      returnRate:
-        snap.return_rate != null
-          ? snap.return_rate
-          : snap.total_investment > 0
-            ? ((snap.market_value - snap.total_investment) / snap.total_investment) * 100
-            : 0,
+  const points: ChartPoint[] = chartSeries
+    .map((point) => ({
+      date: point.date,
+      marketValue: point.market_value,
+      investment: point.total_investment,
+      returnRate: point.return_rate,
     }))
-    .filter((p) => !chartCutoff || p.date >= chartCutoff)
-    .reverse();
+    .filter((p) => !chartCutoff || p.date >= chartCutoff);
 
   if (currentSummary) {
     const today = new Date().toISOString().split("T")[0] ?? "";
@@ -383,6 +384,7 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
           onClose={() => setShowAddSnapshot(false)}
           onCreated={() => {
             queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
+            queryClient.invalidateQueries({ queryKey: ["snapshots-chart-series", id] });
             setShowAddSnapshot(false);
           }}
         />
