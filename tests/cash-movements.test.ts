@@ -72,7 +72,7 @@ async function createTransfer(
   date: string,
   note?: string,
 ) {
-  const res = await ctx.request(`/api/portfolios/${portfolioId}/transfers`, {
+  const res = await ctx.request(`/api/portfolios/${portfolioId}/cash-transfers`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ type, amount, fee, date, note }),
@@ -197,7 +197,7 @@ describe("GET /api/portfolios/:id/cash-movements", () => {
     expect(res.status).toBe(404);
   });
 
-  it("includes symbol for transactions and note for transfers", async () => {
+  it("includes symbol for transactions and note for cash transfers", async () => {
     await createTransfer("deposit", 5000, 0, "2024-01-01", "Initial funding");
     await createTransaction("AAPL", "buy", 5, 100, 0, "2024-01-15");
 

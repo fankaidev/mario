@@ -177,7 +177,7 @@ describe("Portfolio Snapshots", () => {
 
 describe("Calculated Snapshots", () => {
   async function makeDeposit(amount: number, date = "2024-01-01") {
-    const res = await ctx.request(`/api/portfolios/${portfolioId}/transfers`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/cash-transfers`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ type: "deposit", amount, fee: 0, date }),
@@ -339,7 +339,7 @@ describe("Calculated Snapshots", () => {
     });
 
     // Add transactions after the snapshot
-    await ctx.request(`/api/portfolios/${portfolioId}/transfers`, {
+    await ctx.request(`/api/portfolios/${portfolioId}/cash-transfers`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ type: "deposit", amount: 5000, fee: 0, date: "2024-02-15" }),
@@ -385,7 +385,7 @@ describe("Calculated Snapshots", () => {
     });
 
     // Add interest after snapshot
-    await ctx.request(`/api/portfolios/${portfolioId}/transfers`, {
+    await ctx.request(`/api/portfolios/${portfolioId}/cash-transfers`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ type: "interest", amount: 100, fee: 0, date: "2024-02-15" }),

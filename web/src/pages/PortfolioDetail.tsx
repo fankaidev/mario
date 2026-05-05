@@ -8,7 +8,7 @@ import type { Portfolio, TabName } from "./portfolio/types";
 import { SummaryCard } from "./portfolio/SummaryCard";
 import { HoldingsTab } from "./portfolio/HoldingsTab";
 import { TransactionsTab } from "./portfolio/TransactionsTab";
-import { TransfersTab } from "./portfolio/TransfersTab";
+import { CashTransfersTab } from "./portfolio/CashTransfersTab";
 import { CashTab } from "./portfolio/CashTab";
 import { SummaryTab } from "./portfolio/SummaryTab";
 import { TagsTab } from "./portfolio/TagsTab";
@@ -56,7 +56,7 @@ export function PortfolioDetail() {
               [
                 ["holdings", "Holdings"],
                 ["transactions", "Transactions"],
-                ["transfers", "Transfers"],
+                ["cash_transfers", "Cash Transfers"],
                 ["cash_balance", "Cash Balance"],
                 ["corporate_actions", "Corporate Actions"],
                 ["tags", "Tags"],
@@ -85,7 +85,9 @@ export function PortfolioDetail() {
               onSelectedSymbolsChange={setSelectedSymbols}
             />
           )}
-          {tab === "transfers" && <TransfersTab id={id!} currency={portfolio?.currency ?? ""} />}
+          {tab === "cash_transfers" && (
+            <CashTransfersTab id={id!} currency={portfolio?.currency ?? ""} />
+          )}
           {tab === "cash_balance" && <CashTab id={id!} currency={portfolio?.currency ?? ""} />}
           {tab === "corporate_actions" && <CorporateActionsTab id={id!} />}
           {tab === "tags" && <TagsTab id={id!} />}

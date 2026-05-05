@@ -15,7 +15,7 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Select } from "../../components/ui/select";
 import { get, post, del } from "../../lib/api";
-import type { Transfer } from "./types";
+import type { CashTransfer } from "./types";
 import { ConfirmModal } from "./ConfirmModal";
 
 function AddTransferModal({
@@ -34,7 +34,7 @@ function AddTransferModal({
   const [note, setNote] = useState("");
 
   const mutation = useMutation({
-    mutationFn: (body: unknown) => post(`/portfolios/${portfolioId}/transfers`, body),
+    mutationFn: (body: unknown) => post(`/portfolios/${portfolioId}/cash-transfers`, body),
     onSuccess: onCreated,
   });
 
@@ -126,22 +126,22 @@ function AddTransferModal({
   );
 }
 
-export function TransfersTab({ id, currency }: { id: string; currency: string }) {
+export function CashTransfersTab({ id, currency }: { id: string; currency: string }) {
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [manageMode, setManageMode] = useState(false);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["transfers", id],
-    queryFn: () => get<{ data: Transfer[] }>(`/portfolios/${id}/transfers`),
+    queryKey: ["cash-transfers", id],
+    queryFn: () => get<{ data: CashTransfer[] }>(`/portfolios/${id}/cash-transfers`),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (transferId: number) =>
-      del<{ data: null }>(`/portfolios/${id}/transfers/${transferId}`),
+      del<{ data: null }>(`/portfolios/${id}/cash-transfers/${transferId}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["transfers", id] });
+      queryClient.invalidateQueries({ queryKey: ["cash-transfers", id] });
       queryClient.invalidateQueries({ queryKey: ["summary", id] });
       setDeleteId(null);
     },
@@ -247,7 +247,7 @@ export function TransfersTab({ id, currency }: { id: string; currency: string })
           portfolioId={id}
           onClose={() => setShowAdd(false)}
           onCreated={() => {
-            queryClient.invalidateQueries({ queryKey: ["transfers", id] });
+            queryClient.invalidateQueries({ queryKey: ["cash-transfers", id] });
             queryClient.invalidateQueries({ queryKey: ["summary", id] });
             setShowAdd(false);
           }}

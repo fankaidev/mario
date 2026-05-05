@@ -42,7 +42,7 @@ async function createPortfolio(name: string, currency: string): Promise<number> 
 }
 
 async function addDeposit(portfolioId: number, amount: number, date = "2024-01-01") {
-  await ctx.request(`/api/portfolios/${portfolioId}/transfers`, {
+  await ctx.request(`/api/portfolios/${portfolioId}/cash-transfers`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ type: "deposit", amount, fee: 0, date }),

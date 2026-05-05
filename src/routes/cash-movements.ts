@@ -33,7 +33,7 @@ cashMovements.get("/", async (c) => {
         created_at: string;
       }>(),
     c.env.DB.prepare(
-      "SELECT id, type, amount, fee, date, note, created_at FROM transfers WHERE portfolio_id = ?",
+      "SELECT id, type, amount, fee, date, note, created_at FROM cash_movements WHERE portfolio_id = ?",
     )
       .bind(portfolioId)
       .all<{
