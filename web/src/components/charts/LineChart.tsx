@@ -6,7 +6,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
-  ReferenceLine,
 } from "recharts";
 
 interface DataPoint {
@@ -69,6 +68,49 @@ function CustomTooltip({
   );
 }
 
+interface DotProps {
+  cx?: number;
+  cy?: number;
+  index?: number;
+  payload?: { markerLabel?: string; markerColor?: string };
+}
+
+function CustomDot({ cx, cy, payload }: DotProps) {
+  if (!cx || !cy || !payload?.markerLabel) return null;
+  const badgeH = 14;
+  const badgeW = 16;
+  const lineLen = 12;
+  const gap = 4;
+  const badgeY = cy - lineLen - badgeH - gap;
+  const color = payload.markerColor ?? "#000";
+
+  return (
+    <g>
+      <line
+        x1={cx}
+        y1={badgeY + badgeH + gap}
+        x2={cx}
+        y2={cy - 3}
+        stroke={color}
+        strokeWidth={1.5}
+        strokeDasharray="4 2"
+        opacity={0.8}
+      />
+      <rect x={cx - badgeW / 2} y={badgeY} width={badgeW} height={badgeH} rx={3} fill={color} />
+      <text
+        x={cx}
+        y={badgeY + badgeH - 4}
+        textAnchor="middle"
+        fontSize={10}
+        fill="#fff"
+        fontWeight="bold"
+      >
+        {payload.markerLabel}
+      </text>
+    </g>
+  );
+}
+
 export function LineChart({ data, height = 200, formatValue, minValue, markers }: LineChartProps) {
   if (data.length === 0) return null;
 
@@ -82,13 +124,27 @@ export function LineChart({ data, height = 200, formatValue, minValue, markers }
     }
   }
 
+  const markerByIndex = new Map<number, ChartMarker>();
+  markers?.forEach((m) => markerByIndex.set(m.index, m));
+
   const chartData = data.map((point, index) => {
-    const obj: { label: string; index: number; [key: string]: number | string } = {
+    const obj: {
+      label: string;
+      index: number;
+      markerLabel?: string;
+      markerColor?: string;
+      [key: string]: number | string | undefined;
+    } = {
       label: point.label,
       index,
     };
     for (const v of point.values) {
       obj[v.key] = v.value;
+    }
+    const marker = markerByIndex.get(index);
+    if (marker) {
+      obj.markerLabel = marker.label;
+      obj.markerColor = marker.color;
     }
     return obj;
   });
@@ -110,10 +166,15 @@ export function LineChart({ data, height = 200, formatValue, minValue, markers }
     computedMax = max + pad;
   }
 
+  const hasMarkers = markers && markers.length > 0;
+
   return (
     <div className="w-full" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-        <RechartsLineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
+        <RechartsLineChart
+          data={chartData}
+          margin={{ top: hasMarkers ? 45 : 10, right: 10, left: 0, bottom: 5 }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis
             dataKey="label"
@@ -139,35 +200,16 @@ export function LineChart({ data, height = 200, formatValue, minValue, markers }
               dataKey={key}
               stroke={colorMap.get(key) ?? "#000"}
               strokeWidth={2}
-              dot={data.length <= 30 ? { r: 2.5 } : false}
+              dot={
+                hasMarkers
+                  ? (props: DotProps) => <CustomDot key={props.index} {...props} />
+                  : data.length <= 30
+                    ? { r: 2.5 }
+                    : false
+              }
               activeDot={{ r: 4 }}
             />
           ))}
-          {markers?.map((m, i) => {
-            const point = chartData[m.index];
-            if (!point) return null;
-            return (
-              <ReferenceLine
-                key={`marker-${i}`}
-                x={point.label}
-                stroke={m.color}
-                strokeDasharray="4 3"
-                strokeWidth={1}
-                label={{
-                  value: m.label,
-                  position: "top",
-                  fill: "#fff",
-                  fontSize: 9,
-                  fontWeight: "bold",
-                  style: {
-                    backgroundColor: m.color,
-                    padding: "2px 4px",
-                    borderRadius: "2px",
-                  },
-                }}
-              />
-            );
-          })}
         </RechartsLineChart>
       </ResponsiveContainer>
     </div>
