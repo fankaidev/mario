@@ -67,7 +67,18 @@ export function StackedBarChart({ data, height = 250, formatValue }: StackedBarC
   const maxLabels = 8;
   const labelStep = Math.max(1, Math.ceil(data.length / maxLabels));
 
-  const allLabels = [...new Set(data.flatMap((p) => p.segments.map((s) => s.label)))];
+  // Collect labels sorted by first appearance date in the data
+  const labelFirstSeen = new Map<string, number>();
+  data.forEach((point, i) => {
+    point.segments.forEach((s) => {
+      if (!labelFirstSeen.has(s.label)) {
+        labelFirstSeen.set(s.label, i);
+      }
+    });
+  });
+  const allLabels = [...labelFirstSeen.entries()]
+    .sort((a, b) => a[1] - b[1])
+    .map(([label]) => label);
   const labelColorMap = new Map<string, string>();
   data.forEach((point) => {
     point.segments.forEach((s) => {
