@@ -108,7 +108,7 @@ export default {
       }
 
       await env.DB.prepare(
-        "INSERT INTO portfolio_snapshots (portfolio_id, date, total_investment, market_value, cash_balance) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO portfolio_snapshots (portfolio_id, date, total_investment, market_value, cash_balance, return_rate) VALUES (?, ?, ?, ?, ?, ?)",
       )
         .bind(
           portfolioId,
@@ -116,6 +116,7 @@ export default {
           calculated.total_investment,
           calculated.market_value,
           calculated.cash_balance,
+          calculated.return_rate,
         )
         .run();
       snapshotCount++;

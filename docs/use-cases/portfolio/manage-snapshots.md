@@ -19,6 +19,7 @@
 | R11 | Calculated snapshot returns 409 if a snapshot already exists for that date |
 | R12 | If a previous snapshot exists, calculated snapshot uses it as baseline: total_investment = prev + period transfers, cash_balance = prev + period transfers + period transactions. This allows manual corrections to "calibrate" values |
 | R13 | Interest transfers are excluded from total_investment calculation but included in cash_balance |
+| R14 | Calculated snapshots include return_rate computed as annualized IRR from transfer cash flows up to snapshot date |
 
 ## Scenarios
 

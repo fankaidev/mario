@@ -3,6 +3,8 @@ import type { AuthVariables } from "../middleware/auth";
 import type { Bindings } from "../types";
 import type { PortfolioSnapshot, Transaction } from "../../shared/types/api";
 import { replayFIFO, type CorporateAction } from "../lib/fifo";
+import { calculateXIRR } from "../lib/finance";
+import { getIRRCashFlows } from "./portfolios";
 
 const snapshots = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
@@ -14,6 +16,7 @@ export async function calculateSnapshot(
   total_investment: number;
   market_value: number;
   cash_balance: number;
+  return_rate: number | null;
   missing_prices: string[];
 }> {
   // Find the most recent snapshot before target date to use as baseline
@@ -136,10 +139,19 @@ export async function calculateSnapshot(
     }
   }
 
+  // Compute IRR from inception to this snapshot date
+  const portfolioValue = marketValue + cashBalance;
+  const irrCashFlows = await getIRRCashFlows(db, portfolioId, date);
+  if (portfolioValue > 0 || irrCashFlows.length > 0) {
+    irrCashFlows.push({ date, amount: portfolioValue });
+  }
+  const irr = calculateXIRR(irrCashFlows);
+
   return {
     total_investment: Math.round(totalInvestment * 100) / 100,
     market_value: Math.round(marketValue * 100) / 100,
     cash_balance: Math.round(cashBalance * 100) / 100,
+    return_rate: irr !== null ? Math.round(irr * 10000) / 100 : null,
     missing_prices: missingPrices,
   };
 }
@@ -180,7 +192,7 @@ snapshots.post("/", async (c) => {
   if (existing) return c.json({ error: "Snapshot already exists for this date" }, 409);
 
   const result = await c.env.DB.prepare(
-    "INSERT INTO portfolio_snapshots (portfolio_id, date, total_investment, market_value, cash_balance, note) VALUES (?, ?, ?, ?, ?, ?)",
+    "INSERT INTO portfolio_snapshots (portfolio_id, date, total_investment, market_value, cash_balance, note, return_rate) VALUES (?, ?, ?, ?, ?, ?, ?)",
   )
     .bind(
       portfolioId,
@@ -189,11 +201,12 @@ snapshots.post("/", async (c) => {
       body.market_value,
       body.cash_balance,
       body.note ?? null,
+      null,
     )
     .run();
 
   const snapshot = await c.env.DB.prepare(
-    "SELECT id, portfolio_id, date, total_investment, market_value, cash_balance, note, created_at FROM portfolio_snapshots WHERE id = ?",
+    "SELECT id, portfolio_id, date, total_investment, market_value, cash_balance, return_rate, note, created_at FROM portfolio_snapshots WHERE id = ?",
   )
     .bind(result.meta.last_row_id)
     .first<PortfolioSnapshot>();
@@ -239,7 +252,7 @@ snapshots.post("/calculate", async (c) => {
   }
 
   const result = await c.env.DB.prepare(
-    "INSERT INTO portfolio_snapshots (portfolio_id, date, total_investment, market_value, cash_balance) VALUES (?, ?, ?, ?, ?)",
+    "INSERT INTO portfolio_snapshots (portfolio_id, date, total_investment, market_value, cash_balance, return_rate) VALUES (?, ?, ?, ?, ?, ?)",
   )
     .bind(
       portfolioId,
@@ -247,11 +260,12 @@ snapshots.post("/calculate", async (c) => {
       calculated.total_investment,
       calculated.market_value,
       calculated.cash_balance,
+      calculated.return_rate,
     )
     .run();
 
   const snapshot = await c.env.DB.prepare(
-    "SELECT id, portfolio_id, date, total_investment, market_value, cash_balance, note, created_at FROM portfolio_snapshots WHERE id = ?",
+    "SELECT id, portfolio_id, date, total_investment, market_value, cash_balance, return_rate, note, created_at FROM portfolio_snapshots WHERE id = ?",
   )
     .bind(result.meta.last_row_id)
     .first<PortfolioSnapshot>();
@@ -272,7 +286,7 @@ snapshots.get("/", async (c) => {
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
 
   const rows = await c.env.DB.prepare(
-    "SELECT id, portfolio_id, date, total_investment, market_value, cash_balance, note, created_at FROM portfolio_snapshots WHERE portfolio_id = ? ORDER BY date DESC",
+    "SELECT id, portfolio_id, date, total_investment, market_value, cash_balance, return_rate, note, created_at FROM portfolio_snapshots WHERE portfolio_id = ? ORDER BY date DESC",
   )
     .bind(portfolioId)
     .all<PortfolioSnapshot>();

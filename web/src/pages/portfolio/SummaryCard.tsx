@@ -49,7 +49,7 @@ export function SummaryCard({ id, currency }: { id: string; currency: string }) 
           <MetricBox label="Cash Balance" value={s.cash_balance} currency={currency} />
           <MetricBox label="Total Investment" value={s.total_investment} currency={currency} />
           <MetricBox label="Dividend Income" value={s.dividend_income} currency={currency} />
-          <MetricBox label="Return Rate" value={`${s.return_rate}%`} />
+          <MetricBox label="Return Rate (IRR)" value={`${s.return_rate}%`} />
           <MetricBox label="Total P&L" value={s.total_pnl} currency={currency} highlight />
           <MetricBox label="Unrealized P&L" value={s.unrealized_pnl} currency={currency} />
           <MetricBox label="Realized P&L" value={s.realized_pnl} currency={currency} />

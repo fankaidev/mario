@@ -177,24 +177,22 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
       marketValue: snap.market_value,
       investment: snap.total_investment,
       returnRate:
-        snap.total_investment > 0
-          ? ((snap.market_value - snap.total_investment) / snap.total_investment) * 100
-          : 0,
+        snap.return_rate != null
+          ? snap.return_rate
+          : snap.total_investment > 0
+            ? ((snap.market_value - snap.total_investment) / snap.total_investment) * 100
+            : 0,
     }))
     .filter((p) => !chartCutoff || p.date >= chartCutoff)
     .reverse();
 
   if (currentSummary) {
     const today = new Date().toISOString().split("T")[0] ?? "";
-    const rate =
-      currentSummary.total_investment > 0
-        ? (currentSummary.total_pnl / currentSummary.total_investment) * 100
-        : 0;
     points.push({
       date: today,
       marketValue: Math.round(currentSummary.securities_value * 100) / 100,
       investment: currentSummary.total_investment,
-      returnRate: Math.round(rate * 100) / 100,
+      returnRate: currentSummary.return_rate,
     });
   }
 
@@ -322,7 +320,12 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
         </div>
         {snapshots.map((snap) => {
           const pnl = snap.market_value - snap.total_investment;
-          const rate = snap.total_investment > 0 ? (pnl / snap.total_investment) * 100 : 0;
+          const rate =
+            snap.return_rate != null
+              ? snap.return_rate
+              : snap.total_investment > 0
+                ? (pnl / snap.total_investment) * 100
+                : 0;
           return (
             <div
               key={snap.id}
