@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Plus, Trash2, RotateCcw, Wrench } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -28,7 +29,10 @@ export function PortfolioList() {
   const [manageMode, setManageMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [chartRange, setChartRange] = useState<"1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL">("1Y");
-  const [targetCurrency, setTargetCurrency] = useState<"USD" | "HKD" | "CNY">("USD");
+  const [targetCurrency, setTargetCurrency] = useLocalStorage<"USD" | "HKD" | "CNY">(
+    "portfolio-currency",
+    "USD",
+  );
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["portfolios"],
