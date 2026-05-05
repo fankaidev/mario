@@ -64,6 +64,33 @@ export async function getIRRCashFlows(
  * This is the single source of truth for portfolio cash balance.
  */
 export async function calculateCashBalance(db: D1Database, portfolioId: number): Promise<number> {
+  // Try incremental calculation from last snapshot baseline
+  const lastSnapshot = await db
+    .prepare(
+      "SELECT date, cash_balance FROM portfolio_snapshots WHERE portfolio_id = ? ORDER BY date DESC LIMIT 1",
+    )
+    .bind(portfolioId)
+    .first<{ date: string; cash_balance: number }>();
+
+  if (lastSnapshot) {
+    const transferDelta = await db
+      .prepare(
+        "SELECT COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN -(amount + fee) ELSE amount - fee END), 0) AS total FROM cash_movements WHERE portfolio_id = ? AND date > ?",
+      )
+      .bind(portfolioId, lastSnapshot.date)
+      .first<{ total: number }>();
+
+    const txDelta = await db
+      .prepare(
+        "SELECT COALESCE(SUM(CASE WHEN type IN ('buy', 'initial') THEN -(quantity * price + fee) WHEN type = 'sell' THEN quantity * price - fee WHEN type = 'dividend' THEN quantity * price - fee END), 0) AS total FROM transactions WHERE portfolio_id = ? AND date > ?",
+      )
+      .bind(portfolioId, lastSnapshot.date)
+      .first<{ total: number }>();
+
+    return lastSnapshot.cash_balance + (transferDelta?.total ?? 0) + (txDelta?.total ?? 0);
+  }
+
+  // Fall back to full calculation from beginning
   const result = await db
     .prepare(
       `

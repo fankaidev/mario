@@ -38,7 +38,6 @@ export interface Transaction {
   date: string;
   created_at: string;
   name: string | null;
-  cash_balance?: number;
 }
 
 export type CashTransferType = "deposit" | "withdrawal" | "initial" | "interest";
@@ -52,7 +51,6 @@ export interface CashTransfer {
   date: string;
   note: string | null;
   created_at: string;
-  cash_balance?: number;
 }
 
 export interface CreateCashTransferRequest {
@@ -178,7 +176,8 @@ export type CashMovementType =
   | "sell"
   | "dividend"
   | "initial"
-  | "interest";
+  | "interest"
+  | "snapshot";
 
 export interface CashMovement {
   id: number;

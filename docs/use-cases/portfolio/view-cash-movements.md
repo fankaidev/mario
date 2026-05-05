@@ -12,6 +12,8 @@
 | R4 | Events are sorted by date, then created_at for same-date events |
 | R5 | Cash movements are returned in reverse chronological order (newest first) |
 | R6 | Cash movements can be filtered by type on the frontend; when no types are selected, all types are shown |
+| R7 | Cash balance is calculated incrementally from the most recent snapshot baseline; if no snapshot exists, falls back to full calculation from beginning |
+| R8 | Portfolio snapshots appear in the cash movements timeline as "snapshot" type rows; on the same date, snapshots sort after transfers and transactions |
 
 ## Scenarios
 
@@ -31,3 +33,4 @@
 | ID | Priority | Status | Scenario | Rules |
 |----|----------|--------|----------|-------|
 | UC-PORTFOLIO-014-S07 | P2 | ❌ | Given movements of multiple types, When filtering by type (e.g. "buy"), Then only movements matching the selected types are shown | R6 |
+| UC-PORTFOLIO-014-S08 | P1 | ❌ | Given a portfolio with a snapshot and same-date transactions, When fetching cash movements, Then snapshot appears after transactions on that date with type="snapshot" and cash_balance matching the snapshot value | R8 |

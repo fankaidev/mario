@@ -9,11 +9,13 @@ import type { CashMovement, CashMovementType } from "../../../../shared/types/ap
 
 function CashMovementTypeBadge({ type }: { type: string }) {
   const className =
-    type === "deposit" || type === "sell" || type === "dividend" || type === "interest"
-      ? "bg-green-100 text-green-700"
-      : type === "withdrawal" || type === "buy" || type === "initial"
-        ? "bg-red-100 text-red-700"
-        : "bg-blue-100 text-blue-700";
+    type === "snapshot"
+      ? "bg-gray-100 text-gray-600"
+      : type === "deposit" || type === "sell" || type === "dividend" || type === "interest"
+        ? "bg-green-100 text-green-700"
+        : type === "withdrawal" || type === "buy" || type === "initial"
+          ? "bg-red-100 text-red-700"
+          : "bg-blue-100 text-blue-700";
 
   return (
     <Badge variant="secondary" className={`w-fit border-transparent ${className}`}>
@@ -38,6 +40,7 @@ export function CashTab({ id, currency }: { id: string; currency: string }) {
     "dividend",
     "initial",
     "interest",
+    "snapshot",
   ];
 
   const toggleType = (type: CashMovementType) => {
