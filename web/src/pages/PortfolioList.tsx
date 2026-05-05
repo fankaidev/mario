@@ -398,7 +398,7 @@ export function PortfolioList() {
               <StackedBarChart
                 data={chartData}
                 height={250}
-                formatValue={(v) => Math.round(v).toLocaleString()}
+                formatValue={(v) => `${Math.round(v / 1000).toLocaleString()} K`}
               />
             </CardContent>
           </Card>
