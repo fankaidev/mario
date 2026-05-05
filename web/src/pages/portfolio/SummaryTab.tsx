@@ -13,6 +13,14 @@ import {
 import { EmptyState } from "../../components/EmptyState";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../components/ui/table";
 import { LineChart } from "../../components/charts";
 import { get, post, del } from "../../lib/api";
 import type { Snapshot, SnapshotChartPoint, Summary } from "./types";
@@ -312,58 +320,114 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
         </div>
       </div>
       {snapshots.length === 0 && <EmptyState message="No snapshots yet." />}
-      <div className="space-y-1">
-        <div className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_1fr_32px] items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground">
-          <span>Date</span>
-          <span className="text-right">Investment</span>
-          <span className="text-right">Securities</span>
-          <span className="text-right">Cash</span>
-          <span className="text-right">Total</span>
-          <span className="text-right">P&L</span>
-          <span className="text-right">Return Rate</span>
-          <span />
-        </div>
-        {snapshots.map((snap) => {
-          const totalValue = snap.market_value + snap.cash_balance;
-          const pnl = totalValue - snap.total_investment;
-          const chartPoint = chartSeries.find((p) => p.date === snap.date);
-          const rate = chartPoint?.return_rate ?? 0;
-          return (
-            <div
-              key={snap.id}
-              className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_1fr_32px] items-center gap-2 border-b py-2 text-sm"
-            >
-              <span className="font-medium">{snap.date}</span>
-              <span className="text-right tabular-nums">{fmtNum(snap.total_investment)}</span>
-              <span className="text-right tabular-nums">{fmtNum(snap.market_value)}</span>
-              <span className="text-right tabular-nums">{fmtNum(snap.cash_balance)}</span>
-              <span className="text-right tabular-nums font-medium">{fmtNum(totalValue)}</span>
-              <span
-                className={`text-right tabular-nums ${pnl >= 0 ? "text-green-600" : "text-red-600"}`}
-              >
-                {pnl >= 0 ? "+" : ""}
-                {fmtNum(pnl)}
-              </span>
-              <span
-                className={`text-right tabular-nums ${rate >= 0 ? "text-green-600" : "text-red-600"}`}
-              >
-                {rate >= 0 ? "+" : ""}
-                {fmtNum(rate)}%
-              </span>
-              {manageMode && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                  onClick={() => setDeleteSnapshotId(snap.id)}
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              )}
-            </div>
-          );
-        })}
-      </div>
+
+      {snapshots.length > 0 && (
+        <>
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Investment</TableHead>
+                  <TableHead className="text-right">Securities</TableHead>
+                  <TableHead className="text-right">Cash</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">P&amp;L</TableHead>
+                  <TableHead className="text-right">Return Rate</TableHead>
+                  {manageMode && <TableHead />}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {snapshots.map((snap) => {
+                  const totalValue = snap.market_value + snap.cash_balance;
+                  const pnl = totalValue - snap.total_investment;
+                  const chartPoint = chartSeries.find((p) => p.date === snap.date);
+                  const rate = chartPoint?.return_rate ?? 0;
+                  return (
+                    <TableRow key={snap.id}>
+                      <TableCell className="font-medium">{snap.date}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {fmtNum(snap.total_investment)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {fmtNum(snap.market_value)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {fmtNum(snap.cash_balance)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-medium">
+                        {fmtNum(totalValue)}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right tabular-nums ${pnl >= 0 ? "text-green-600" : "text-red-600"}`}
+                      >
+                        {pnl >= 0 ? "+" : ""}
+                        {fmtNum(pnl)}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right tabular-nums ${rate >= 0 ? "text-green-600" : "text-red-600"}`}
+                      >
+                        {rate >= 0 ? "+" : ""}
+                        {fmtNum(rate)}%
+                      </TableCell>
+                      {manageMode && (
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                            onClick={() => setDeleteSnapshotId(snap.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="space-y-2 md:hidden">
+            {snapshots.map((snap) => {
+              const totalValue = snap.market_value + snap.cash_balance;
+              const pnl = totalValue - snap.total_investment;
+              const chartPoint = chartSeries.find((p) => p.date === snap.date);
+              const rate = chartPoint?.return_rate ?? 0;
+              return (
+                <Card key={snap.id}>
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{snap.date}</span>
+                      <span className="tabular-nums font-medium">{fmtNum(totalValue)}</span>
+                    </div>
+                    <div className="mt-1 grid grid-cols-3 gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                      <span>Inv: {fmtNum(snap.total_investment)}</span>
+                      <span>Sec: {fmtNum(snap.market_value)}</span>
+                      <span>Cash: {fmtNum(snap.cash_balance)}</span>
+                    </div>
+                    <div className="mt-1 flex justify-between text-xs">
+                      <span
+                        className={`tabular-nums ${pnl >= 0 ? "text-green-600" : "text-red-600"}`}
+                      >
+                        P&amp;L: {pnl >= 0 ? "+" : ""}
+                        {fmtNum(pnl)}
+                      </span>
+                      <span
+                        className={`tabular-nums ${rate >= 0 ? "text-green-600" : "text-red-600"}`}
+                      >
+                        {rate >= 0 ? "+" : ""}
+                        {fmtNum(rate)}%
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {showAddSnapshot && (
         <AddSnapshotModal

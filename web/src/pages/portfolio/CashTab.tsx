@@ -2,8 +2,17 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
+import { Card, CardContent } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { EmptyState } from "../../components/EmptyState";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../components/ui/table";
 import { get } from "../../lib/api";
 import type { CashMovement, CashMovementType } from "../../../../shared/types/api";
 
@@ -170,52 +179,110 @@ export function CashTab({ id, currency }: { id: string; currency: string }) {
 
       {data?.data.length === 0 && <EmptyState message="No cash movements yet." />}
 
-      <div className="space-y-1">
-        <div className="grid items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground grid-cols-[90px_90px_1fr_60px_100px_100px]">
-          <span>Date</span>
-          <span>Type</span>
-          <span>Description</span>
-          <span>Currency</span>
-          <span className="text-right">Amount</span>
-          <span className="text-right">Balance</span>
-        </div>
-        {filteredMovements.map((m) => (
-          <div
-            key={`${m.type}-${m.id}`}
-            className="grid items-center gap-2 border-b py-2 text-sm grid-cols-[90px_90px_1fr_60px_100px_100px]"
-          >
-            <span className="text-muted-foreground">{m.date}</span>
-            <CashMovementTypeBadge type={m.type} />
-            <span className="truncate">
-              {m.symbol ??
-                m.note ??
-                (m.type === "deposit"
-                  ? "Deposit"
-                  : m.type === "initial"
-                    ? "Initial"
-                    : m.type === "interest"
-                      ? "Interest"
-                      : "Withdrawal")}
-            </span>
-            <span>{currency}</span>
-            <span
-              className={`text-right tabular-nums ${m.amount >= 0 ? "text-green-600" : "text-red-600"}`}
-            >
-              {m.amount >= 0 ? "+" : ""}
-              {m.amount.toLocaleString()}
-            </span>
-            <span className="text-right tabular-nums font-medium">
-              {m.cash_balance.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </span>
+      {filteredMovements.length > 0 && (
+        <>
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Currency</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right">Balance</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredMovements.map((m) => (
+                  <TableRow key={`${m.type}-${m.id}`}>
+                    <TableCell className="text-muted-foreground">{m.date}</TableCell>
+                    <TableCell>
+                      <CashMovementTypeBadge type={m.type} />
+                    </TableCell>
+                    <TableCell className="truncate">
+                      {m.symbol ??
+                        m.note ??
+                        (m.type === "deposit"
+                          ? "Deposit"
+                          : m.type === "initial"
+                            ? "Initial"
+                            : m.type === "interest"
+                              ? "Interest"
+                              : "Withdrawal")}
+                    </TableCell>
+                    <TableCell>{currency}</TableCell>
+                    <TableCell
+                      className={`text-right tabular-nums ${m.amount >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
+                      {m.amount >= 0 ? "+" : ""}
+                      {m.amount.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">
+                      {m.cash_balance.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
-        ))}
-        {filteredMovements.length === 0 && data?.data.length !== 0 && (
-          <EmptyState message="No movements match the current filters." />
-        )}
-      </div>
+
+          <div className="space-y-2 md:hidden">
+            {filteredMovements.map((m) => (
+              <Card key={`${m.type}-${m.id}`}>
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CashMovementTypeBadge type={m.type} />
+                      <span className="text-xs text-muted-foreground">{m.date}</span>
+                    </div>
+                    <span
+                      className={`tabular-nums font-medium ${m.amount >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
+                      {m.amount >= 0 ? "+" : ""}
+                      {m.amount.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}{" "}
+                      {currency}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex justify-between text-xs text-muted-foreground">
+                    <span className="truncate">
+                      {m.symbol ??
+                        m.note ??
+                        (m.type === "deposit"
+                          ? "Deposit"
+                          : m.type === "initial"
+                            ? "Initial"
+                            : m.type === "interest"
+                              ? "Interest"
+                              : "Withdrawal")}
+                    </span>
+                    <span className="tabular-nums">
+                      Balance:{" "}
+                      {m.cash_balance.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+
+      {filteredMovements.length === 0 && data?.data.length !== 0 && (
+        <EmptyState message="No movements match the current filters." />
+      )}
     </div>
   );
 }

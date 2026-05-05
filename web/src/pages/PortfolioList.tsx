@@ -27,6 +27,7 @@ import { Label } from "../components/ui/label";
 import { Select } from "../components/ui/select";
 import { get, post, del } from "../lib/api";
 import { StackedBarChart, getPortfolioColor } from "../components/charts";
+import { SortableTh, type SortState } from "../components/SortableTh";
 import type {
   AggregatedChartPoint,
   AggregatedPerformance,
@@ -35,44 +36,6 @@ import type {
 } from "../../../shared/types/api";
 
 type SortField = "name" | "value" | "pnl" | "return" | "created";
-type SortDirection = "asc" | "desc";
-interface SortState {
-  field: SortField;
-  direction: SortDirection;
-}
-
-function Th({
-  label,
-  field,
-  sort,
-  onSort,
-  align,
-}: {
-  label: string;
-  field: SortField;
-  sort: SortState;
-  onSort: (s: SortState) => void;
-  align?: "left" | "right";
-}) {
-  const isActive = sort.field === field;
-  const arrow = isActive ? (sort.direction === "asc" ? " ↑" : " ↓") : "";
-
-  return (
-    <TableHead
-      className={`cursor-pointer select-none ${align === "right" ? "text-right" : ""}`}
-      aria-sort={isActive ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}
-      onClick={() =>
-        onSort({
-          field,
-          direction: isActive && sort.direction === "asc" ? "desc" : "asc",
-        })
-      }
-    >
-      {label}
-      {arrow}
-    </TableHead>
-  );
-}
 
 export function PortfolioList() {
   const queryClient = useQueryClient();
@@ -87,7 +50,7 @@ export function PortfolioList() {
     "portfolio-currency",
     "USD",
   );
-  const [sort, setSort] = useState<SortState>({ field: "name", direction: "asc" });
+  const [sort, setSort] = useState<SortState<SortField>>({ field: "name", direction: "asc" });
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["portfolios"],
@@ -400,11 +363,17 @@ export function PortfolioList() {
         <Table>
           <TableHeader>
             <TableRow>
-              <Th label="Name" field="name" sort={sort} onSort={setSort} />
-              <Th label="Value" field="value" sort={sort} onSort={setSort} align="right" />
-              <Th label="P&amp;L" field="pnl" sort={sort} onSort={setSort} align="right" />
-              <Th label="Return" field="return" sort={sort} onSort={setSort} align="right" />
-              <Th label="Created" field="created" sort={sort} onSort={setSort} />
+              <SortableTh label="Name" field="name" sort={sort} onSort={setSort} />
+              <SortableTh label="Value" field="value" sort={sort} onSort={setSort} align="right" />
+              <SortableTh label="P&amp;L" field="pnl" sort={sort} onSort={setSort} align="right" />
+              <SortableTh
+                label="Return"
+                field="return"
+                sort={sort}
+                onSort={setSort}
+                align="right"
+              />
+              <SortableTh label="Created" field="created" sort={sort} onSort={setSort} />
               {manageMode && <TableHead className="w-10" />}
             </TableRow>
           </TableHeader>

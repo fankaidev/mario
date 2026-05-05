@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2, Wrench, Check } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
+import { Card, CardContent } from "../../components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +15,14 @@ import { EmptyState } from "../../components/EmptyState";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Select } from "../../components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../components/ui/table";
 import { get, post, del } from "../../lib/api";
 import type { CashTransfer } from "./types";
 import { ConfirmModal } from "./ConfirmModal";
@@ -180,67 +189,131 @@ export function CashTransfersTab({ id, currency }: { id: string; currency: strin
 
       {data?.data.length === 0 && <EmptyState message="No transfers yet." />}
 
-      <div className="space-y-1">
-        <div
-          className={`grid items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground ${manageMode ? "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_100px_32px]" : "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_100px]"}`}
-        >
-          <span>Date</span>
-          <span>Type</span>
-          <span>Note</span>
-          <span>Currency</span>
-          <span className="text-right">Amount</span>
-          <span className="text-right">Fee</span>
-          <span className="text-right">Net</span>
-          <span className="text-right">Investment</span>
-          {manageMode && <span />}
-        </div>
-        {transfersWithRunningTotal.map((t) => {
-          const netEffect = t.type === "withdrawal" ? -(t.amount + t.fee) : t.amount - t.fee;
-          return (
-            <div
-              key={t.id}
-              className={`grid items-center gap-2 border-b py-2 text-sm ${manageMode ? "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_100px_32px]" : "grid-cols-[90px_90px_1fr_60px_100px_80px_100px_100px]"}`}
-            >
-              <span className="text-muted-foreground">{t.date}</span>
-              <Badge
-                variant="secondary"
-                className={`w-fit border-transparent ${
-                  t.type === "withdrawal"
-                    ? "bg-red-100 text-red-700"
-                    : "bg-green-100 text-green-700"
-                }`}
-              >
-                {t.type}
-              </Badge>
-              <span className="truncate text-muted-foreground">{t.note || ""}</span>
-              <span>{currency}</span>
-              <span className="text-right tabular-nums">{t.amount.toLocaleString()}</span>
-              <span className="text-right tabular-nums text-muted-foreground">
-                {t.fee > 0 ? t.fee : ""}
-              </span>
-              <span
-                className={`text-right tabular-nums ${netEffect >= 0 ? "text-green-600" : "text-red-600"}`}
-              >
-                {netEffect >= 0 ? "+" : ""}
-                {netEffect.toLocaleString()}
-              </span>
-              <span className="text-right tabular-nums font-medium">
-                {Math.round(t.runningTotal).toLocaleString()}
-              </span>
-              {manageMode && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                  onClick={() => setDeleteId(t.id)}
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      {transfersWithRunningTotal.length > 0 && (
+        <>
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Note</TableHead>
+                  <TableHead>Currency</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right">Fee</TableHead>
+                  <TableHead className="text-right">Net</TableHead>
+                  <TableHead className="text-right">Investment</TableHead>
+                  {manageMode && <TableHead />}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {transfersWithRunningTotal.map((t) => {
+                  const netEffect =
+                    t.type === "withdrawal" ? -(t.amount + t.fee) : t.amount - t.fee;
+                  const fmtVal = (v: number) =>
+                    v.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    });
+                  return (
+                    <TableRow key={t.id}>
+                      <TableCell className="text-muted-foreground">{t.date}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="secondary"
+                          className={`w-fit border-transparent ${
+                            t.type === "withdrawal"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-green-100 text-green-700"
+                          }`}
+                        >
+                          {t.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="truncate text-muted-foreground">
+                        {t.note || ""}
+                      </TableCell>
+                      <TableCell>{currency}</TableCell>
+                      <TableCell className="text-right tabular-nums">{fmtVal(t.amount)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {t.fee > 0 ? fmtVal(t.fee) : ""}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right tabular-nums ${netEffect >= 0 ? "text-green-600" : "text-red-600"}`}
+                      >
+                        {netEffect >= 0 ? "+" : ""}
+                        {fmtVal(netEffect)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-medium">
+                        {fmtVal(t.runningTotal)}
+                      </TableCell>
+                      {manageMode && (
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                            onClick={() => setDeleteId(t.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="space-y-2 md:hidden">
+            {transfersWithRunningTotal.map((t) => {
+              const netEffect = t.type === "withdrawal" ? -(t.amount + t.fee) : t.amount - t.fee;
+              const fmtVal = (v: number) =>
+                v.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                });
+              return (
+                <Card key={t.id}>
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant="secondary"
+                          className={`w-fit border-transparent ${
+                            t.type === "withdrawal"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-green-100 text-green-700"
+                          }`}
+                        >
+                          {t.type}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">{t.date}</span>
+                      </div>
+                      <span
+                        className={`tabular-nums font-medium ${netEffect >= 0 ? "text-green-600" : "text-red-600"}`}
+                      >
+                        {netEffect >= 0 ? "+" : ""}
+                        {fmtVal(netEffect)} {currency}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex justify-between text-xs text-muted-foreground">
+                      <span className="truncate">{t.note || ""}</span>
+                      <span className="tabular-nums">Inv: {fmtVal(t.runningTotal)}</span>
+                    </div>
+                    {t.fee > 0 && (
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        Amount: {fmtVal(t.amount)} · Fee: {fmtVal(t.fee)}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {showAdd && (
         <AddTransferModal

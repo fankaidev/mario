@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, Trash2, Wrench, Check } from "lucide-react";
 import { Button } from "../../components/ui/button";
+import { Card, CardContent } from "../../components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +14,14 @@ import { EmptyState } from "../../components/EmptyState";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Select } from "../../components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../components/ui/table";
 import { get, post, del } from "../../lib/api";
 import type { Transaction } from "../../../../shared/types/api";
 import { ConfirmModal } from "./ConfirmModal";
@@ -394,61 +403,124 @@ export function TransactionsTab({
         </div>
       )}
 
-      <div className="space-y-1">
-        <div
-          className={`grid items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground ${manageMode ? "grid-cols-[90px_1fr_70px_80px_80px_80px_100px_32px]" : "grid-cols-[90px_1fr_70px_80px_80px_80px_100px]"}`}
-        >
-          <span>Date</span>
-          <span>Symbol</span>
-          <span>Type</span>
-          <span className="text-right">Qty</span>
-          <span className="text-right">Price</span>
-          <span className="text-right">Fee</span>
-          <span className="text-right">Proceeds</span>
-          {manageMode && <span />}
-        </div>
-        {filteredTransactions.map((tx) => {
-          const proceeds =
-            tx.type === "buy" || tx.type === "initial"
-              ? -(tx.quantity * tx.price + tx.fee)
-              : tx.quantity * tx.price - tx.fee;
-          return (
-            <div
-              key={tx.id}
-              className={`grid items-center gap-2 border-b py-2 text-sm ${manageMode ? "grid-cols-[90px_1fr_70px_80px_80px_80px_100px_32px]" : "grid-cols-[90px_1fr_70px_80px_80px_80px_100px]"}`}
-            >
-              <span className="text-muted-foreground">{tx.date}</span>
-              <div className="min-w-0">
-                <div className="truncate font-medium">{tx.symbol}</div>
-                <div className="truncate text-xs text-muted-foreground">{tx.name}</div>
-              </div>
-              <TransactionTypeBadge type={tx.type} />
-              <span className="text-right tabular-nums">{tx.quantity}</span>
-              <span className="text-right tabular-nums">{tx.price.toFixed(3)}</span>
-              <span className="text-right tabular-nums text-muted-foreground">
-                {tx.fee > 0 ? tx.fee : ""}
-              </span>
-              <span
-                className={`text-right tabular-nums ${proceeds >= 0 ? "text-green-600" : "text-red-600"}`}
-              >
-                {proceeds >= 0 ? "+" : ""}
-                {proceeds.toLocaleString()}
-              </span>
-              {manageMode && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                  onClick={() => setDeleteId(tx.id)}
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              )}
-            </div>
-          );
-        })}
-        {filteredTransactions.length === 0 && <EmptyState message="No transactions yet." />}
-      </div>
+      {filteredTransactions.length > 0 && (
+        <>
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Symbol</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Qty</TableHead>
+                  <TableHead className="text-right">Price</TableHead>
+                  <TableHead className="text-right">Fee</TableHead>
+                  <TableHead className="text-right">Proceeds</TableHead>
+                  {manageMode && <TableHead />}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredTransactions.map((tx) => {
+                  const proceeds =
+                    tx.type === "buy" || tx.type === "initial"
+                      ? -(tx.quantity * tx.price + tx.fee)
+                      : tx.quantity * tx.price - tx.fee;
+                  const fmtVal = (v: number) =>
+                    v.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    });
+                  return (
+                    <TableRow key={tx.id}>
+                      <TableCell className="text-muted-foreground">{tx.date}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{tx.symbol}</p>
+                          <p className="text-xs text-muted-foreground">{tx.name}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <TransactionTypeBadge type={tx.type} />
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{tx.quantity}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {tx.price.toFixed(3)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {tx.fee > 0 ? fmtVal(tx.fee) : ""}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right tabular-nums ${proceeds >= 0 ? "text-green-600" : "text-red-600"}`}
+                      >
+                        {proceeds >= 0 ? "+" : ""}
+                        {fmtVal(proceeds)}
+                      </TableCell>
+                      {manageMode && (
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                            onClick={() => setDeleteId(tx.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="space-y-2 md:hidden">
+            {filteredTransactions.map((tx) => {
+              const proceeds =
+                tx.type === "buy" || tx.type === "initial"
+                  ? -(tx.quantity * tx.price + tx.fee)
+                  : tx.quantity * tx.price - tx.fee;
+              const fmtVal = (v: number) =>
+                v.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                });
+              return (
+                <Card key={tx.id}>
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-medium">{tx.symbol}</span>
+                        <span className="ml-2 text-xs text-muted-foreground">{tx.name}</span>
+                      </div>
+                      <TransactionTypeBadge type={tx.type} />
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">{tx.date}</span>
+                      <span className="tabular-nums">
+                        {tx.quantity} × {tx.price.toFixed(3)}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-sm">
+                      <span className="text-xs text-muted-foreground">
+                        {tx.fee > 0 ? `Fee: ${fmtVal(tx.fee)}` : ""}
+                      </span>
+                      <span
+                        className={`tabular-nums font-medium ${proceeds >= 0 ? "text-green-600" : "text-red-600"}`}
+                      >
+                        {proceeds >= 0 ? "+" : ""}
+                        {fmtVal(proceeds)}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {filteredTransactions.length === 0 && <EmptyState message="No transactions yet." />}
 
       {showAdd && (
         <AddTransactionModal
