@@ -15,7 +15,7 @@
 | R7 | Currency selector (USD/HKD/CNY) allows choosing the display currency for aggregated values, defaults to USD |
 | R8 | Aggregated summary card shows total portfolio value, total investment, total P&L, and return rate in the selected currency |
 | R9 | Aggregated summary card is hidden when no portfolios exist |
-| R10 | Each portfolio card shows its native portfolio value, and the converted value in the selected currency when different |
+| R10 | Each portfolio row shows its native portfolio value, and the converted value in the selected currency when different |
 | R11 | When exchange rates are not yet available for a portfolio's currency, a note indicates rates are being synced |
 | R12 | Chart snapshot values are converted to the selected display currency using the exchange rate at or before the snapshot date |
 | R13 | Chart X-axis labels show year-prefixed dates (YY-MM-DD) without forcing the last label |
