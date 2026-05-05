@@ -707,4 +707,57 @@ describe("New symbol price backfill", () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it("[UC-PORTFOLIO-005-S14b] backfills price history for new symbol on initial", async () => {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("finnhub") && url.includes("profile2")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ name: "NVIDIA Corp" }),
+        });
+      }
+      if (url.includes("yahoo")) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              chart: {
+                result: [
+                  {
+                    timestamp: [new Date("2024-01-15").getTime() / 1000],
+                    indicators: { quote: [{ close: [130] }] },
+                  },
+                ],
+              },
+            }),
+        });
+      }
+      return Promise.resolve({ ok: false, json: () => Promise.resolve({}) });
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    try {
+      const res = await ctx2.request(`/api/portfolios/${portfolioId2}/transactions`, {
+        method: "POST",
+        headers: { ...authHeaders2(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: "NVDA",
+          type: "initial",
+          quantity: 100,
+          price: 130,
+          fee: 0,
+          date: "2024-01-15",
+        }),
+      });
+      expect(res.status).toBe(201);
+
+      // Verify price history was backfilled
+      const priceRows = await db2
+        .prepare("SELECT * FROM price_history WHERE symbol = 'NVDA'")
+        .all();
+      expect(priceRows.results.length).toBeGreaterThan(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

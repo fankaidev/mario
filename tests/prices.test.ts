@@ -200,7 +200,7 @@ describe("Price Sync", () => {
   });
 
   it("[UC-PORTFOLIO-005-S13] re-fetches recent data with lookbackDays", async () => {
-    // Seed existing price data
+    // Seed existing price data from long ago, so nextDay is well before (today - 7)
     await db
       .prepare("INSERT INTO price_history (symbol, date, close) VALUES ('AAPL', '2024-01-15', 150)")
       .run();
@@ -208,17 +208,19 @@ describe("Price Sync", () => {
     const finnhub = new FakePriceFetcher();
     const yahoo = new FakePriceFetcher();
     const eastmoney = new FakePriceFetcher();
-    yahoo.setHistory("AAPL", [{ date: "2024-01-20", close: 160 }]);
+    // Set history data including today so we get records back
+    yahoo.setHistory("AAPL", [
+      { date: "2024-01-20", close: 160 },
+      { date: new Date().toISOString().split("T")[0]!, close: 200 },
+    ]);
 
     const router = new FetcherRouter(finnhub, yahoo, eastmoney);
-    // With lookbackDays=7, should fetch from (today - 7) even though latest date is 2024-01-15
-    // Since 2024-01-15 + 1 = 2024-01-16 which is before (today - 7),
-    // it should start from (today - 7) instead
-    await syncPriceHistory(db, router, "AAPL", "2024-01-01", 7);
+    // With lookbackDays=7, fetchStart should be (today - 7) since that's more recent than nextDay (2024-01-16)
+    const records = await syncPriceHistory(db, router, "AAPL", "2024-01-01", 7);
 
-    // The fetcher should have been asked for data starting from (today - 7)
-    const accessed = yahoo.getAccessedSymbols();
-    expect(accessed).toContain("AAPL");
+    // Should have fetched at least today's record
+    expect(records).toBeGreaterThanOrEqual(1);
+    expect(yahoo.getAccessedSymbols()).toContain("AAPL");
   });
 
   it("[UC-PORTFOLIO-005-S12] stores and retrieves zero price for expired warrants", async () => {

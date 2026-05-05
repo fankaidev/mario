@@ -249,7 +249,11 @@ async function handleBuy(
         },
       };
       const fetcher = new FetcherRouter(finnhub);
-      await syncPriceHistory(c.env.DB, fetcher, body.symbol, "2024-01-01");
+      try {
+        await syncPriceHistory(c.env.DB, fetcher, body.symbol, "2024-01-01");
+      } catch {
+        // Backfill is best-effort; don't block the transaction
+      }
     }
   }
 
