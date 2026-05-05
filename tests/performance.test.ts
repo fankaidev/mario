@@ -90,13 +90,13 @@ describe("GET /api/portfolios/:id/performance", () => {
   });
 
   it("[UC-PORTFOLIO-013-S06] P&L matches end_value - start_value - net_cash_flow", async () => {
-    // Deposit at the beginning of last year, so 1Y range covers it
+    // Use a date two years ago, which is before the 1Y range start
     const today = new Date();
-    const dateStr = `${today.getFullYear() - 1}-06-01`;
+    const dateStr = `${today.getFullYear() - 2}-06-01`;
 
     await makeDeposit(50000, dateStr);
 
-    // Create a snapshot with the deposit
+    // Create a snapshot at the same date (before the range start)
     await db
       .prepare(
         "INSERT INTO portfolio_snapshots (portfolio_id, date, total_investment, market_value, cash_balance) VALUES (?, ?, 50000, 0, 50000)",
@@ -108,13 +108,11 @@ describe("GET /api/portfolios/:id/performance", () => {
       headers: authHeaders(),
     });
 
-    // If the snapshot date is within 1Y, should succeed
-    if (res.status === 200) {
-      const body = (await res.json()) as { data: PortfolioPerformance };
-      expect(body.data.pnl).toBe(
-        body.data.end_value - body.data.start_value - body.data.net_cash_flow,
-      );
-    }
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: PortfolioPerformance };
+    expect(body.data.pnl).toBe(
+      body.data.end_value - body.data.start_value - body.data.net_cash_flow,
+    );
   });
 });
 
