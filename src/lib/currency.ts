@@ -24,13 +24,21 @@ export async function getExchangeRate(
   if (inverseRate !== null) return 1 / inverseRate;
 
   // Try cross-rate via USD for HKD↔CNY
-  // Only attempt when both rates are stored as X→USD
+  // Try both directions since rates may be stored as USD→X or X→USD
   if (
     (fromCurrency === "HKD" || fromCurrency === "CNY") &&
     (toCurrency === "HKD" || toCurrency === "CNY")
   ) {
-    const fromToUsd = await lookupRate(db, fromCurrency, "USD", date);
-    const toToUsd = await lookupRate(db, toCurrency, "USD", date);
+    let fromToUsd = await lookupRate(db, fromCurrency, "USD", date);
+    if (fromToUsd === null) {
+      const inv = await lookupRate(db, "USD", fromCurrency, date);
+      fromToUsd = inv !== null ? 1 / inv : null;
+    }
+    let toToUsd = await lookupRate(db, toCurrency, "USD", date);
+    if (toToUsd === null) {
+      const inv = await lookupRate(db, "USD", toCurrency, date);
+      toToUsd = inv !== null ? 1 / inv : null;
+    }
     if (fromToUsd !== null && toToUsd !== null) {
       return fromToUsd / toToUsd;
     }

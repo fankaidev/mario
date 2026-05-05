@@ -34,23 +34,23 @@ describe("getExchangeRate", () => {
   it("[UC-PORTFOLIO-011-S01] returns exact date match", async () => {
     await db
       .prepare(
-        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('CNY', 'USD', '2024-03-01', 0.14)",
+        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('USD', 'CNY', '2024-03-01', 10)",
       )
       .run();
 
     const rate = await getExchangeRate(db, "CNY", "USD", "2024-03-01");
-    expect(rate).toBe(0.14);
+    expect(rate).toBe(0.1);
   });
 
   it("[UC-PORTFOLIO-011-S02] falls back to nearest earlier date", async () => {
     await db
       .prepare(
-        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('CNY', 'USD', '2024-03-01', 0.14)",
+        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('USD', 'CNY', '2024-03-01', 10)",
       )
       .run();
 
     const rate = await getExchangeRate(db, "CNY", "USD", "2024-03-05");
-    expect(rate).toBe(0.14);
+    expect(rate).toBe(0.1);
   });
 
   it("[UC-PORTFOLIO-011-S03] returns 1 when from and to are the same currency", async () => {
@@ -66,41 +66,37 @@ describe("getExchangeRate", () => {
   it("[UC-PORTFOLIO-011-S04b] uses inverse rate when direct rate not stored", async () => {
     await db
       .prepare(
-        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('HKD', 'USD', '2024-03-01', 0.128)",
+        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('USD', 'HKD', '2024-03-01', 8)",
       )
       .run();
 
-    // USD→HKD via inverse: 1 / 0.128 ≈ 7.8125
+    // USD→HKD direct: 8
     const rate = await getExchangeRate(db, "USD", "HKD", "2024-03-01");
-    expect(rate).toBeCloseTo(1 / 0.128, 4);
+    expect(rate).toBe(8);
   });
 
   it("[UC-PORTFOLIO-011-S04c] computes cross-rate via USD for HKD→CNY", async () => {
     await db
       .prepare(
-        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('HKD', 'USD', '2024-03-01', 0.128), ('CNY', 'USD', '2024-03-01', 0.14)",
+        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('USD', 'HKD', '2024-03-01', 8), ('USD', 'CNY', '2024-03-01', 10)",
       )
       .run();
 
-    // HKD→CNY: HKD→USD / CNY→USD = 0.128 / 0.14 ≈ 0.9143
+    // HKD→CNY: (1/8) / (1/10) = 10/8 = 1.25
     const rate = await getExchangeRate(db, "HKD", "CNY", "2024-03-01");
-    expect(rate).toBeCloseTo(0.128 / 0.14, 4);
+    expect(rate).toBe(1.25);
   });
 
   it("[UC-PORTFOLIO-011-S02b] returns latest rate when no date provided", async () => {
     await db
       .prepare(
-        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('CNY', 'USD', '2024-01-01', 0.13)",
-      )
-      .run();
-    await db
-      .prepare(
-        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('CNY', 'USD', '2024-03-01', 0.14)",
+        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('USD', 'CNY', '2024-01-01', 7.69), ('USD', 'CNY', '2024-03-01', 10)",
       )
       .run();
 
+    // CNY→USD via inverse of latest USD→CNY: 1/10 = 0.1
     const rate = await getExchangeRate(db, "CNY", "USD");
-    expect(rate).toBe(0.14);
+    expect(rate).toBe(0.1);
   });
 });
 
@@ -108,12 +104,12 @@ describe("GET /api/exchange-rates", () => {
   it("lists exchange rates with optional filters", async () => {
     await db
       .prepare(
-        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('CNY', 'USD', '2024-03-01', 0.14)",
+        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('USD', 'CNY', '2024-03-01', 10)",
       )
       .run();
     await db
       .prepare(
-        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('HKD', 'USD', '2024-03-01', 0.128)",
+        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('USD', 'HKD', '2024-03-01', 8)",
       )
       .run();
 
@@ -128,21 +124,21 @@ describe("GET /api/exchange-rates", () => {
   it("filters by from_currency", async () => {
     await db
       .prepare(
-        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('CNY', 'USD', '2024-03-01', 0.14)",
+        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('USD', 'CNY', '2024-03-01', 10)",
       )
       .run();
     await db
       .prepare(
-        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('HKD', 'USD', '2024-03-01', 0.128)",
+        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('USD', 'HKD', '2024-03-01', 8)",
       )
       .run();
 
-    const res = await ctx.request("/api/exchange-rates?from=CNY", {
+    const res = await ctx.request("/api/exchange-rates?from=USD", {
       headers: authHeaders(),
     });
     const body = (await res.json()) as { data: ExchangeRateRecord[] };
-    expect(body.data.length).toBe(1);
-    expect(body.data[0]!.from_currency).toBe("CNY");
+    expect(body.data.length).toBe(2);
+    expect(body.data[0]!.from_currency).toBe("USD");
   });
 
   it("requires authentication", async () => {
@@ -157,10 +153,14 @@ describe("POST /api/exchange-rates/sync", () => {
       ok: true,
       json: () =>
         Promise.resolve({
-          amount: 1,
-          base: "CNY",
-          date: "2024-06-15",
-          rates: { USD: 0.14 },
+          chart: {
+            result: [
+              {
+                timestamp: [new Date("2024-06-15").getTime() / 1000],
+                indicators: { quote: [{ close: [10] }] },
+              },
+            ],
+          },
         }),
     });
     vi.stubGlobal("fetch", mockFetch);
@@ -177,7 +177,7 @@ describe("POST /api/exchange-rates/sync", () => {
       };
       expect(body1.data.records_synced).toBeGreaterThanOrEqual(1);
 
-      // Verify records exist in the list endpoint
+      // Verify records exist
       const listRes = await ctx.request("/api/exchange-rates", {
         headers: authHeaders(),
       });

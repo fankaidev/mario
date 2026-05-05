@@ -4,56 +4,84 @@ import type { Bindings } from "../types";
 import type { ExchangeRateRecord } from "../../shared/types/api";
 
 const PAIRS: Array<{ from: string; to: string }> = [
-  { from: "CNY", to: "USD" },
-  { from: "HKD", to: "USD" },
+  { from: "USD", to: "CNY" },
+  { from: "USD", to: "HKD" },
 ];
 
-async function fetchRate(
+async function fetchHistory(
   from: string,
   to: string,
-  date?: string,
-): Promise<{ date: string; rate: number } | null> {
-  const baseUrl = "https://api.frankfurter.app";
-  const url = date
-    ? `${baseUrl}/${date}?from=${from}&to=${to}`
-    : `${baseUrl}/latest?from=${from}&to=${to}`;
+  startDate: string,
+  endDate: string,
+): Promise<Array<{ date: string; rate: number }>> {
+  const period1 = Math.floor(new Date(startDate).getTime() / 1000);
+  const period2 = Math.floor(new Date(endDate).getTime() / 1000);
+  const symbol = `${from}${to}=X`;
 
   try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
+    const res = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&period1=${period1}&period2=${period2}`,
+      {
+        headers: { "User-Agent": "Mozilla/5.0" },
+      },
+    );
+    if (!res.ok) return [];
+
     const body = (await res.json()) as {
-      date: string;
-      rates: Record<string, number>;
+      chart?: {
+        result?: Array<{
+          timestamp?: number[];
+          indicators?: {
+            quote?: Array<{ close?: number[] }>;
+          };
+        }>;
+      };
     };
-    const rate = body.rates[to];
-    if (typeof rate !== "number" || rate <= 0) return null;
-    return { date: body.date, rate };
+
+    const result = body.chart?.result?.[0];
+    if (!result?.timestamp || !result?.indicators?.quote?.[0]?.close) return [];
+
+    const closes = result.indicators.quote[0].close;
+    const history: Array<{ date: string; rate: number }> = [];
+
+    for (let i = 0; i < result.timestamp.length; i++) {
+      const close = closes[i];
+      const ts = result.timestamp[i];
+      if (typeof close === "number" && close > 0 && ts !== undefined) {
+        const date = new Date(ts * 1000).toISOString().split("T")[0]!;
+        history.push({ date, rate: close });
+      }
+    }
+
+    return history;
   } catch {
-    return null;
+    return [];
   }
 }
 
 /**
  * Sync exchange rates for all currency pairs.
  * Called by cron and by POST /sync route.
- * Returns the number of new records inserted.
+ * Fetches the last 30 days of exchange rate data to catch any missing dates.
  */
 export async function syncExchangeRates(db: D1Database): Promise<number> {
+  const today = new Date().toISOString().split("T")[0]!;
+  const past = new Date();
+  past.setDate(past.getDate() - 30);
+  const startDate = past.toISOString().split("T")[0]!;
+
   let count = 0;
 
   for (const { from, to } of PAIRS) {
-    const result = await fetchRate(from, to);
-    if (!result) continue;
-
-    const insert = await db
-      .prepare(
-        "INSERT OR IGNORE INTO exchange_rates (from_currency, to_currency, date, rate) VALUES (?, ?, ?, ?)",
-      )
-      .bind(from, to, result.date, Math.round(result.rate * 1000000) / 1000000)
-      .run();
-
-    if (insert.meta.changes > 0) {
-      count++;
+    const history = await fetchHistory(from, to, startDate, today);
+    for (const { date, rate } of history) {
+      const insert = await db
+        .prepare(
+          "INSERT OR IGNORE INTO exchange_rates (from_currency, to_currency, date, rate) VALUES (?, ?, ?, ?)",
+        )
+        .bind(from, to, date, Math.round(rate * 1000000) / 1000000)
+        .run();
+      if (insert.meta.changes > 0) count++;
     }
   }
 
@@ -109,27 +137,18 @@ exchangeRates.post("/sync", async (c) => {
 
   if (body.start_date && body.end_date) {
     let count = 0;
-    const start = new Date(body.start_date);
-    const end = new Date(body.end_date);
-
     for (const { from, to } of PAIRS) {
-      const current = new Date(start);
-      while (current <= end) {
-        const dateStr = current.toISOString().split("T")[0]!;
-        const result = await fetchRate(from, to, dateStr);
-        if (result) {
-          const insert = await db
-            .prepare(
-              "INSERT OR IGNORE INTO exchange_rates (from_currency, to_currency, date, rate) VALUES (?, ?, ?, ?)",
-            )
-            .bind(from, to, result.date, Math.round(result.rate * 1000000) / 1000000)
-            .run();
-          if (insert.meta.changes > 0) count++;
-        }
-        current.setDate(current.getDate() + 1);
+      const history = await fetchHistory(from, to, body.start_date, body.end_date);
+      for (const { date, rate } of history) {
+        const insert = await db
+          .prepare(
+            "INSERT OR IGNORE INTO exchange_rates (from_currency, to_currency, date, rate) VALUES (?, ?, ?, ?)",
+          )
+          .bind(from, to, date, Math.round(rate * 1000000) / 1000000)
+          .run();
+        if (insert.meta.changes > 0) count++;
       }
     }
-
     return c.json({ data: { records_synced: count } });
   }
 

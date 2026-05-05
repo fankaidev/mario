@@ -86,9 +86,18 @@ export function PortfolioList() {
     if (inverse !== null) return 1 / inverse;
 
     // Try cross-rate via USD for HKD↔CNY
+    // Try both directions since rates may be stored as USD→X or X→USD
     if (from !== "USD" && to !== "USD") {
-      const fromToUsd = findNearestRate(rateLookup.get(`${from}->USD`), date);
-      const toToUsd = findNearestRate(rateLookup.get(`${to}->USD`), date);
+      let fromToUsd = findNearestRate(rateLookup.get(`${from}->USD`), date);
+      if (fromToUsd === null) {
+        const inv = findNearestRate(rateLookup.get(`USD->${from}`), date);
+        fromToUsd = inv !== null ? 1 / inv : null;
+      }
+      let toToUsd = findNearestRate(rateLookup.get(`${to}->USD`), date);
+      if (toToUsd === null) {
+        const inv = findNearestRate(rateLookup.get(`USD->${to}`), date);
+        toToUsd = inv !== null ? 1 / inv : null;
+      }
       if (fromToUsd !== null && toToUsd !== null) return fromToUsd / toToUsd;
     }
 
