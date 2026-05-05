@@ -279,33 +279,12 @@ export function PortfolioList() {
 
   return (
     <div className="mx-auto max-w-5xl p-4 md:p-6">
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-normal">Portfolios</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Track assets by market and currency.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setManageMode(!manageMode)}>
-            {manageMode ? (
-              <>
-                <Check className="h-4 w-4" />
-                Done
-              </>
-            ) : (
-              <>
-                <Wrench className="h-4 w-4" />
-                Manage
-              </>
-            )}
-          </Button>
-          <Button onClick={() => setShowCreate(true)}>
-            <Plus className="h-4 w-4" />
-            New Portfolio
-          </Button>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-normal">Portfolios</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Track assets by market and currency.</p>
       </div>
 
-      {!manageMode && portfolios.length > 0 && !aggLoading && aggregatedSummary?.data && (
+      {portfolios.length > 0 && !aggLoading && aggregatedSummary?.data && (
         <div className="mb-6">
           <Card>
             <CardContent className="p-4">
@@ -361,7 +340,7 @@ export function PortfolioList() {
         </div>
       )}
 
-      {!manageMode && portfolios.length > 0 && chartData.length > 0 && (
+      {portfolios.length > 0 && chartData.length > 0 && (
         <div className="mb-6">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1">
@@ -426,8 +405,30 @@ export function PortfolioList() {
         </div>
       )}
 
-      {data?.data.length === 0 && !manageMode && (
+      {data?.data.length === 0 && (
         <EmptyState message="No portfolios yet. Create one to get started." />
+      )}
+
+      {data?.data.length !== 0 && (
+        <div className="mb-4 flex items-center justify-end gap-2">
+          <Button variant="outline" onClick={() => setManageMode(!manageMode)}>
+            {manageMode ? (
+              <>
+                <Check className="h-4 w-4" />
+                Done
+              </>
+            ) : (
+              <>
+                <Wrench className="h-4 w-4" />
+                Manage
+              </>
+            )}
+          </Button>
+          <Button onClick={() => setShowCreate(true)}>
+            <Plus className="h-4 w-4" />
+            New Portfolio
+          </Button>
+        </div>
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
