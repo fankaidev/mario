@@ -247,6 +247,7 @@ aggregatedPerformanceRouter.get("/chart", async (c) => {
   const user = c.get("user");
   const range = c.req.query("range");
   const targetCurrency = c.req.query("currency") ?? "USD";
+  const portfolioIdsStr = c.req.query("portfolio_ids");
 
   if (!range || !VALID_RANGES.includes(range as RangeType)) {
     return c.json({ error: "Valid range parameter is required (1M, 3M, 6M, YTD, 1Y, ALL)" }, 400);
@@ -255,12 +256,26 @@ aggregatedPerformanceRouter.get("/chart", async (c) => {
     return c.json({ error: "Currency must be USD, HKD, or CNY" }, 400);
   }
 
+  let portfolioFilter = " AND deleted_at IS NULL";
+  const params: unknown[] = [user.id];
+
+  if (portfolioIdsStr) {
+    const ids = portfolioIdsStr
+      .split(",")
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => !isNaN(n));
+    if (ids.length > 0) {
+      portfolioFilter = " AND id IN (" + ids.map(() => "?").join(",") + ")";
+      params.push(...ids);
+    }
+  }
+
   const { startDate } = getRangeDates(range as RangeType);
 
   const portfolios = await c.env.DB.prepare(
-    "SELECT id, name, currency FROM portfolios WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at",
+    `SELECT id, name, currency FROM portfolios WHERE user_id = ?${portfolioFilter} ORDER BY created_at`,
   )
-    .bind(user.id)
+    .bind(...params)
     .all<{ id: number; name: string; currency: string }>();
 
   // For each portfolio, get all snapshots from the range start

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocalStorage } from "../hooks/useLocalStorage";
-import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Plus, Trash2, RotateCcw, Wrench } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/ui/button";
@@ -19,8 +19,11 @@ import { Label } from "../components/ui/label";
 import { Select } from "../components/ui/select";
 import { get, post, del } from "../lib/api";
 import { StackedBarChart, getPortfolioColor } from "../components/charts";
-import type { AggregatedSummary, ExchangeRateRecord, Portfolio } from "../../../shared/types/api";
-import type { Snapshot } from "./portfolio/types";
+import type {
+  AggregatedChartPoint,
+  AggregatedPerformance,
+  Portfolio,
+} from "../../../shared/types/api";
 
 export function PortfolioList() {
   const queryClient = useQueryClient();
@@ -47,190 +50,33 @@ export function PortfolioList() {
     }
   }, [portfolios, selectedIds.size]);
 
-  const { data: aggregatedSummary, isLoading: aggLoading } = useQuery({
-    queryKey: ["summary", targetCurrency],
-    queryFn: () => get<{ data: AggregatedSummary }>(`/summary?currency=${targetCurrency}`),
+  const { data: performanceData, isLoading: perfLoading } = useQuery({
+    queryKey: ["performance", chartRange, targetCurrency],
+    queryFn: () =>
+      get<{ data: AggregatedPerformance }>(
+        `/performance?range=${chartRange}&currency=${targetCurrency}`,
+      ),
     staleTime: 60 * 1000,
   });
 
-  const { data: exchangeRatesData } = useQuery({
-    queryKey: ["exchangeRates"],
-    queryFn: () => get<{ data: ExchangeRateRecord[] }>("/exchange-rates"),
+  const selectedIdsStr = [...selectedIds].join(",");
+
+  const { data: chartDataResponse } = useQuery({
+    queryKey: ["performance-chart", chartRange, targetCurrency, selectedIdsStr],
+    queryFn: () =>
+      get<{ data: AggregatedChartPoint[] }>(
+        `/performance/chart?range=${chartRange}&currency=${targetCurrency}&portfolio_ids=${selectedIdsStr}`,
+      ),
     staleTime: 5 * 60 * 1000,
   });
 
-  const rateLookup = useMemo(() => {
-    const rates = exchangeRatesData?.data ?? [];
-    // Build map: fromCurrency -> toCurrency -> sorted array of { date, rate }
-    const map = new Map<string, Array<{ date: string; rate: number }>>();
-    for (const r of rates) {
-      const key = `${r.from_currency}->${r.to_currency}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push({ date: r.date, rate: r.rate });
-    }
-    for (const arr of map.values()) {
-      arr.sort((a, b) => a.date.localeCompare(b.date));
-    }
-    return map;
-  }, [exchangeRatesData]);
-
-  function findRate(from: string, to: string, date: string): number | null {
-    if (from === to) return 1;
-
-    // Try direct rate at or before the snapshot date
-    const directKey = `${from}->${to}`;
-    const directRates = rateLookup.get(directKey);
-    const direct = findNearestRate(directRates, date);
-    if (direct !== null) return direct;
-
-    // Try inverse rate
-    const inverseKey = `${to}->${from}`;
-    const inverseRates = rateLookup.get(inverseKey);
-    const inverse = findNearestRate(inverseRates, date);
-    if (inverse !== null) return 1 / inverse;
-
-    // Try cross-rate via USD for HKD↔CNY
-    // Try both directions since rates may be stored as USD→X or X→USD
-    if (from !== "USD" && to !== "USD") {
-      let fromToUsd = findNearestRate(rateLookup.get(`${from}->USD`), date);
-      if (fromToUsd === null) {
-        const inv = findNearestRate(rateLookup.get(`USD->${from}`), date);
-        fromToUsd = inv !== null ? 1 / inv : null;
-      }
-      let toToUsd = findNearestRate(rateLookup.get(`${to}->USD`), date);
-      if (toToUsd === null) {
-        const inv = findNearestRate(rateLookup.get(`USD->${to}`), date);
-        toToUsd = inv !== null ? 1 / inv : null;
-      }
-      if (fromToUsd !== null && toToUsd !== null) return fromToUsd / toToUsd;
-    }
-
-    return null;
-  }
-
-  function findNearestRate(
-    rates: Array<{ date: string; rate: number }> | undefined,
-    targetDate: string,
-  ): number | null {
-    if (!rates || rates.length === 0) return null;
-    // Find the last rate on or before the target date
-    let best: { date: string; rate: number } | null = null;
-    for (const r of rates) {
-      if (r.date <= targetDate) {
-        best = r;
-      } else {
-        break;
-      }
-    }
-    return best?.rate ?? null;
-  }
-
-  const snapshotQueries = useQueries({
-    queries: portfolios
-      .filter((p) => selectedIds.has(p.id))
-      .map((p) => ({
-        queryKey: ["snapshots", p.id] as const,
-        queryFn: () => get<{ data: Snapshot[] }>(`/portfolios/${p.id}/snapshots`),
-        staleTime: 5 * 60 * 1000,
-      })),
-  });
-
-  const selectedPortfolios = portfolios.filter((p) => selectedIds.has(p.id));
-
-  const allSnapshotData: Array<Snapshot & { portfolio_id: number }> = snapshotQueries
-    .map((q, i) => {
-      const pId = selectedPortfolios[i]?.id;
-      if (!pId || !q.data?.data) return [];
-      return q.data.data.map((s) => ({ ...s, portfolio_id: pId }));
-    })
-    .flat();
-
-  const chartCutoff = useMemo(() => {
-    const today = new Date();
-    let start: Date;
-    switch (chartRange) {
-      case "1M":
-        start = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
-        break;
-      case "3M":
-        start = new Date(today.getFullYear(), today.getMonth() - 3, today.getDate());
-        break;
-      case "6M":
-        start = new Date(today.getFullYear(), today.getMonth() - 6, today.getDate());
-        break;
-      case "YTD":
-        start = new Date(today.getFullYear(), 0, 1);
-        break;
-      case "1Y":
-        start = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
-        break;
-      case "ALL":
-        return undefined;
-    }
-    return start.toISOString().split("T")[0];
-  }, [chartRange]);
-
   const chartData = useMemo(() => {
-    if (allSnapshotData.length === 0) return [];
-    const portfoliosById = new Map(portfolios.map((p) => [p.id, p]));
-
-    // Build a map of portfolio_id -> sorted snapshots
-    const snapshotsByPortfolio = new Map<number, Array<Snapshot & { portfolio_id: number }>>();
-    for (const snap of allSnapshotData) {
-      if (!snapshotsByPortfolio.has(snap.portfolio_id)) {
-        snapshotsByPortfolio.set(snap.portfolio_id, []);
-      }
-      snapshotsByPortfolio.get(snap.portfolio_id)!.push(snap);
-    }
-    // Sort each portfolio's snapshots by date
-    for (const [_, snaps] of snapshotsByPortfolio) {
-      snaps.sort((a, b) => a.date.localeCompare(b.date));
-    }
-
-    // Collect all unique dates across all portfolios (filter by cutoff)
-    const allDates = new Set<string>();
-    for (const snap of allSnapshotData) {
-      if (!chartCutoff || snap.date >= chartCutoff) {
-        allDates.add(snap.date);
-      }
-    }
-    const sortedDates = [...allDates].sort();
-
-    // For each date, get value for each portfolio (forward-fill if missing)
-    return sortedDates.map((date) => {
-      const segments: Array<{ label: string; value: number; color: string }> = [];
-      for (const [portfolioId, snaps] of snapshotsByPortfolio) {
-        const p = portfoliosById.get(portfolioId);
-        if (!p) continue;
-
-        // Find the last snapshot on or before this date
-        let lastSnap: (Snapshot & { portfolio_id: number }) | undefined;
-        for (const snap of snaps) {
-          if (snap.date <= date) {
-            lastSnap = snap;
-          } else {
-            break;
-          }
-        }
-
-        if (lastSnap) {
-          const rate = findRate(p.currency, targetCurrency, date);
-          if (rate !== null) {
-            const idx = portfolios.findIndex((pf) => pf.id === p.id);
-            segments.push({
-              label: p.name,
-              value: (lastSnap.market_value + lastSnap.cash_balance) * rate,
-              color: getPortfolioColor(idx),
-            });
-          }
-        }
-      }
-      return {
-        label: date,
-        segments,
-      };
-    });
-  }, [allSnapshotData, portfolios, chartCutoff, targetCurrency, rateLookup]);
+    const points = chartDataResponse?.data ?? [];
+    return points.map((p) => ({
+      label: p.date,
+      segments: [{ label: "Total", value: p.total_value, color: "#2563eb" }],
+    }));
+  }, [chartDataResponse]);
 
   const togglePortfolio = (id: number) => {
     setSelectedIds((prev) => {
@@ -288,57 +134,56 @@ export function PortfolioList() {
         <p className="mt-1 text-sm text-muted-foreground">Track assets by market and currency.</p>
       </div>
 
-      {portfolios.length > 0 && !aggLoading && aggregatedSummary?.data && (
+      {portfolios.length > 0 && !perfLoading && performanceData?.data && (
         <div className="mb-6">
           <Card>
             <CardContent className="p-4">
               <h3 className="mb-3 text-sm font-semibold">
-                Total Wealth ({aggregatedSummary.data.target_currency})
+                Total Wealth ({performanceData.data.target_currency})
+                {chartRange !== "ALL" && (
+                  <span className="ml-1 text-xs text-muted-foreground">— {chartRange} range</span>
+                )}
               </h3>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <div className="text-center">
                   <p className="text-xs text-muted-foreground">Portfolio Value</p>
                   <p className="tabular-nums text-base font-medium">
-                    {Math.round(aggregatedSummary.data.portfolio_value).toLocaleString()}{" "}
-                    {aggregatedSummary.data.target_currency}
+                    {Math.round(performanceData.data.end_value).toLocaleString()}{" "}
+                    {performanceData.data.target_currency}
                   </p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xs text-muted-foreground">Total Investment</p>
+                  <p className="text-xs text-muted-foreground">Net Investment</p>
                   <p className="tabular-nums text-base font-medium">
-                    {Math.round(aggregatedSummary.data.total_investment).toLocaleString()}{" "}
-                    {aggregatedSummary.data.target_currency}
+                    {Math.round(
+                      performanceData.data.start_value + performanceData.data.net_cash_flow,
+                    ).toLocaleString()}{" "}
+                    {performanceData.data.target_currency}
                   </p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xs text-muted-foreground">Total P&amp;L</p>
+                  <p className="text-xs text-muted-foreground">P&amp;L</p>
                   <p
-                    className={`tabular-nums text-base font-medium ${aggregatedSummary.data.total_pnl >= 0 ? "text-green-700" : "text-red-700"}`}
+                    className={`tabular-nums text-base font-medium ${performanceData.data.pnl >= 0 ? "text-green-700" : "text-red-700"}`}
                   >
-                    {Math.round(aggregatedSummary.data.total_pnl).toLocaleString()}{" "}
-                    {aggregatedSummary.data.target_currency}
+                    {Math.round(performanceData.data.pnl).toLocaleString()}{" "}
+                    {performanceData.data.target_currency}
                   </p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-muted-foreground">Return Rate</p>
                   <p
-                    className={`tabular-nums text-base font-medium ${aggregatedSummary.data.return_rate >= 0 ? "text-green-700" : "text-red-700"}`}
+                    className={`tabular-nums text-base font-medium ${performanceData.data.return_rate >= 0 ? "text-green-700" : "text-red-700"}`}
                   >
-                    {aggregatedSummary.data.return_rate}%
+                    {performanceData.data.return_rate}%
                   </p>
                 </div>
               </div>
-              {aggregatedSummary.data.exchange_rate_updated_at && (
+              {performanceData.data.exchange_rate_updated_at && (
                 <p className="mt-2 text-right text-xs text-muted-foreground">
-                  Exchange rates as of: {aggregatedSummary.data.exchange_rate_updated_at}
+                  Exchange rates as of: {performanceData.data.exchange_rate_updated_at}
                 </p>
               )}
-              {!aggregatedSummary.data.exchange_rate_updated_at &&
-                aggregatedSummary.data.portfolios.some((p) => p.converted_summary === null) && (
-                  <p className="mt-2 text-right text-xs text-muted-foreground">
-                    Some portfolios excluded: exchange rates not yet available
-                  </p>
-                )}
             </CardContent>
           </Card>
         </div>
@@ -467,26 +312,21 @@ export function PortfolioList() {
                   <CardDescription>{p.currency}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {aggregatedSummary?.data &&
+                  {performanceData?.data &&
                     (() => {
-                      const ps = aggregatedSummary.data.portfolios.find(
+                      const pp = performanceData.data.portfolios.find(
                         (ap) => ap.portfolio_id === p.id,
                       );
-                      if (!ps?.native_summary) return null;
-                      const nativeValue = ps.native_summary.portfolio_value;
-                      const convertedValue = ps.converted_summary?.portfolio_value;
-                      const showConverted =
-                        convertedValue !== undefined &&
-                        convertedValue !== null &&
-                        p.currency !== targetCurrency;
+                      if (!pp) return null;
+                      const nativeEndValue = pp.end_value;
                       return (
                         <div>
                           <p className="tabular-nums text-sm font-semibold">
-                            {Math.round(nativeValue).toLocaleString()} {p.currency}
+                            {Math.round(nativeEndValue).toLocaleString()} {pp.native_currency}
                           </p>
-                          {showConverted && (
+                          {pp.native_currency !== targetCurrency && (
                             <p className="tabular-nums text-xs text-muted-foreground">
-                              ≈ {Math.round(convertedValue).toLocaleString()} {targetCurrency}
+                              ≈ {targetCurrency}
                             </p>
                           )}
                         </div>
