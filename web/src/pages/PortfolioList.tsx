@@ -200,36 +200,6 @@ export function PortfolioList() {
       {portfolios.length > 0 && (
         <div className="mb-6">
           <div className="mb-3 space-y-2">
-            <div className="flex flex-wrap items-start gap-1.5">
-              <Button
-                size="sm"
-                variant="outline"
-                className={`h-7 gap-1.5 rounded-md px-2.5 text-xs ${allMode ? "border-foreground bg-background text-foreground shadow-sm" : "border-border bg-background text-muted-foreground hover:text-foreground"}`}
-                onClick={toggleAllPortfolios}
-              >
-                {allMode && <Check className="h-3 w-3" />}
-                All
-              </Button>
-              {portfolios.map((p, i) => {
-                const selected = selectedIds.has(p.id);
-                return (
-                  <Button
-                    key={p.id}
-                    size="sm"
-                    variant="outline"
-                    className={`h-7 gap-1.5 rounded-md px-2.5 text-xs ${selected ? "border-foreground bg-background text-foreground shadow-sm" : "border-border bg-background text-muted-foreground hover:text-foreground"}`}
-                    onClick={() => togglePortfolio(p.id)}
-                  >
-                    <span
-                      className="inline-block h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: getPortfolioColor(i) }}
-                    />
-                    {selected && <Check className="h-3 w-3" />}
-                    {p.name}
-                  </Button>
-                );
-              })}
-            </div>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="inline-flex rounded-md border border-input bg-background p-0.5">
                 {(["1M", "3M", "6M", "YTD", "1Y", "ALL"] as const).map((r) => (
@@ -259,6 +229,36 @@ export function PortfolioList() {
                   ))}
                 </div>
               </div>
+            </div>
+            <div className="flex flex-wrap items-start gap-1.5">
+              <Button
+                size="sm"
+                variant="outline"
+                className={`h-7 gap-1.5 rounded-md px-2.5 text-xs ${allMode ? "border-foreground bg-background text-foreground shadow-sm" : "border-border bg-background text-muted-foreground hover:text-foreground"}`}
+                onClick={toggleAllPortfolios}
+              >
+                {allMode && <Check className="h-3 w-3" />}
+                All
+              </Button>
+              {portfolios.map((p, i) => {
+                const selected = selectedIds.has(p.id);
+                return (
+                  <Button
+                    key={p.id}
+                    size="sm"
+                    variant="outline"
+                    className={`h-7 gap-1.5 rounded-md px-2.5 text-xs ${selected ? "border-foreground bg-background text-foreground shadow-sm" : "border-border bg-background text-muted-foreground hover:text-foreground"}`}
+                    onClick={() => togglePortfolio(p.id)}
+                  >
+                    <span
+                      className="inline-block h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: getPortfolioColor(i) }}
+                    />
+                    {selected && <Check className="h-3 w-3" />}
+                    {p.name}
+                  </Button>
+                );
+              })}
             </div>
           </div>
           {chartData.length > 0 && (
