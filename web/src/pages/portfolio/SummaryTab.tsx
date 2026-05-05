@@ -211,6 +211,9 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
     });
   }
 
+  const fmtNum = (n: number) =>
+    n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   return (
     <div>
       <h4 className="mb-2 font-semibold">Fees</h4>
@@ -352,17 +355,17 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
               className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_1fr_32px] items-center gap-2 border-b py-2 text-sm"
             >
               <span className="font-medium">{snap.date}</span>
-              <span className="text-right">{snap.total_investment.toFixed(2)}</span>
-              <span className="text-right">{snap.market_value.toFixed(2)}</span>
-              <span className="text-right">{snap.cash_balance.toFixed(2)}</span>
-              <span className="text-right font-medium">{totalValue.toFixed(2)}</span>
+              <span className="text-right">{fmtNum(snap.total_investment)}</span>
+              <span className="text-right">{fmtNum(snap.market_value)}</span>
+              <span className="text-right">{fmtNum(snap.cash_balance)}</span>
+              <span className="text-right font-medium">{fmtNum(totalValue)}</span>
               <span className={`text-right ${pnl >= 0 ? "text-green-600" : "text-red-600"}`}>
                 {pnl >= 0 ? "+" : ""}
-                {pnl.toFixed(2)}
+                {fmtNum(pnl)}
               </span>
               <span className={`text-right ${rate >= 0 ? "text-green-600" : "text-red-600"}`}>
                 {rate >= 0 ? "+" : ""}
-                {rate.toFixed(2)}%
+                {fmtNum(rate)}%
               </span>
               {manageMode && (
                 <Button
