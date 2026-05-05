@@ -26,7 +26,9 @@
 | UC-PORTFOLIO-010-S04 | P1 | ✅ | Given portfolio has AAPL lot with 400 shares, When processing a 1:4 reverse split (merge ratio 4), Then lot quantity becomes 100, cost basis unchanged | R2, R4 |
 | UC-PORTFOLIO-010-S05 | P0 | ✅ | Given portfolio with corporate actions, When listing corporate actions, Then return list with symbol, type, ratio, effective_date, created_at ordered by effective_date desc | R7 |
 | UC-PORTFOLIO-010-S06 | P1 | ✅ | Given portfolio with no corporate actions, When listing corporate actions, Then return empty list | R7 |
-| UC-PORTFOLIO-010-S07 | P1 | ❌ | Given a create form, When submitting valid symbol, type, ratio, and effective_date, Then a corporate action is created and appears in the list | R1, R5 |
 
 ### ai-e2e
-(none)
+
+| ID | Priority | Status | Scenario | Rules |
+|----|----------|--------|----------|-------|
+| UC-PORTFOLIO-010-S07 | P1 | ❌ | Given a create form, When submitting valid symbol, type, ratio, and effective_date, Then a corporate action is created and appears in the list | R1, R5 |
