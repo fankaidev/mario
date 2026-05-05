@@ -28,7 +28,7 @@ export function PortfolioList() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [manageMode, setManageMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [chartRange, setChartRange] = useState<"1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL">("1Y");
+  const [chartRange, setChartRange] = useState<"1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL">("ALL");
   const [targetCurrency, setTargetCurrency] = useLocalStorage<"USD" | "HKD" | "CNY">(
     "portfolio-currency",
     "USD",
