@@ -19,7 +19,7 @@ export class YahooFinanceFetcher implements PriceFetcher {
     };
 
     const price = body.chart?.result?.[0]?.meta?.regularMarketPrice;
-    if (typeof price === "number" && price > 0) return price;
+    if (typeof price === "number" && price >= 0) return price;
     return null;
   }
 
@@ -65,7 +65,7 @@ export class YahooFinanceFetcher implements PriceFetcher {
     for (let i = 0; i < result.timestamp.length; i++) {
       const close = closes[i];
       const ts = result.timestamp[i];
-      if (typeof close === "number" && close > 0 && ts !== undefined) {
+      if (typeof close === "number" && close >= 0 && ts !== undefined) {
         const date = new Date(ts * 1000).toISOString().split("T")[0]!;
         history.push({ date, close });
       }

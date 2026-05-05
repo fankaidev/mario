@@ -198,6 +198,23 @@ describe("Price Sync", () => {
     expect(finnhub.getAccessedSymbols()).toEqual([]);
     expect(eastmoney.getAccessedSymbols()).toEqual(["0700.HK", "000979"]);
   });
+
+  it("[UC-PORTFOLIO-005-S12] stores and retrieves zero price for expired warrants", async () => {
+    await makeBuy("EXPW.HK");
+
+    const finnhub = new FakePriceFetcher();
+    const yahoo = new FakePriceFetcher();
+    const eastmoney = new FakePriceFetcher();
+    eastmoney.setHistory("EXPW.HK", [{ date: "2024-01-15", close: 0 }]);
+
+    const router = new FetcherRouter(finnhub, yahoo, eastmoney);
+    const records = await syncPriceHistory(db, router, "EXPW.HK", "2024-01-01");
+
+    expect(records).toBe(1);
+
+    const price = await getLatestPrice(db, "EXPW.HK");
+    expect(price).toBe(0);
+  });
 });
 
 describe("Price History", () => {

@@ -15,6 +15,7 @@
 | R7 | Symbols ending in `.HK`, `.SS`, `.SZ` use Eastmoney; 6-digit codes without suffix use Eastmoney; all others use Finnhub |
 | R8 | Historical price sync fetches daily close prices from fetcher's fetchHistory method; US stocks use Yahoo Finance for history (Finnhub has no history API); CN/HK stocks use Eastmoney for history |
 | R9 | Historical sync skips dates already present in price_history by fetching from last known date + 1 |
+| R10 | Zero is a valid price (e.g., expired warrants, CBBC) and must be stored and displayed, not treated as null/missing |
 
 ## Scenarios
 
@@ -33,6 +34,7 @@
 | UC-PORTFOLIO-005-S09 | P0 | ✅ | Given portfolio holds mutual funds 000979 and 000217, When syncing price history, Then Eastmoney fetchHistory is called for both, NAVs are written to price_history table | R1, R7 |
 | UC-PORTFOLIO-005-S10 | P0 | ✅ | Given portfolio holds AAPL, 0700.HK, and 000979, When syncing price history, Then Yahoo is called for AAPL, Eastmoney for 0700.HK and 000979, all prices are updated | R7, R8 |
 | UC-PORTFOLIO-005-S11 | P1 | ❌ | Given price_history already has AAPL data up to 2024-01-15, When syncing, Then fetchHistory is called starting from 2024-01-16, existing records are not re-fetched | R9 |
+| UC-PORTFOLIO-005-S12 | P0 | ✅ | Given portfolio holds an expired warrant, When syncing price history with close=0, Then price is stored as 0 (not null), and getLatestPrice returns 0 | R10 |
 
 ### ai-e2e
 (none)
