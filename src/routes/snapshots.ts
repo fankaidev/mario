@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { AuthVariables } from "../middleware/auth";
 import type { Bindings } from "../types";
-import type { PortfolioSnapshot, Transaction } from "../../shared/types/api";
+import type { PortfolioSnapshot, SnapshotChartPoint, Transaction } from "../../shared/types/api";
 import { replayFIFO, type CorporateAction } from "../lib/fifo";
 import { calculateXIRR } from "../lib/finance";
 import { getIRRCashFlows } from "./portfolios";
@@ -292,6 +292,60 @@ snapshots.get("/", async (c) => {
     .all<PortfolioSnapshot>();
 
   return c.json({ data: rows.results });
+});
+
+snapshots.get("/chart-series", async (c) => {
+  const user = c.get("user");
+  const portfolioId = parseInt(c.req.param("portfolioId") ?? "", 10);
+  if (isNaN(portfolioId)) return c.json({ error: "Invalid portfolio ID" }, 400);
+
+  const portfolio = await c.env.DB.prepare(
+    "SELECT id FROM portfolios WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+  )
+    .bind(portfolioId, user.id)
+    .first();
+  if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
+
+  const rows = await c.env.DB.prepare(
+    "SELECT id, portfolio_id, date, total_investment, market_value, cash_balance FROM portfolio_snapshots WHERE portfolio_id = ? ORDER BY date ASC",
+  )
+    .bind(portfolioId)
+    .all<{
+      id: number;
+      portfolio_id: number;
+      date: string;
+      total_investment: number;
+      market_value: number;
+      cash_balance: number;
+    }>();
+
+  const points: SnapshotChartPoint[] = [];
+  for (const snap of rows.results) {
+    const portfolioValue = snap.market_value + snap.cash_balance;
+    const irrCashFlows = await getIRRCashFlows(c.env.DB, portfolioId, snap.date);
+    if (portfolioValue > 0 || irrCashFlows.length > 0) {
+      irrCashFlows.push({ date: snap.date, amount: portfolioValue });
+    }
+    const irr = calculateXIRR(irrCashFlows);
+    const returnRate =
+      irr !== null
+        ? irr * 100
+        : snap.total_investment > 0
+          ? ((snap.market_value + snap.cash_balance - snap.total_investment) /
+              snap.total_investment) *
+            100
+          : 0;
+
+    points.push({
+      date: snap.date,
+      total_investment: Math.round(snap.total_investment * 100) / 100,
+      market_value: Math.round(snap.market_value * 100) / 100,
+      cash_balance: Math.round(snap.cash_balance * 100) / 100,
+      return_rate: Math.round(returnRate * 100) / 100,
+    });
+  }
+
+  return c.json({ data: points });
 });
 
 snapshots.delete("/:snapshotId", async (c) => {
