@@ -211,6 +211,9 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
     });
   }
 
+  const fmtNum = (n: number) =>
+    n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   return (
     <div>
       <h4 className="mb-2 font-semibold">Fees</h4>
@@ -331,13 +334,14 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
       </div>
       {snapshots.length === 0 && <EmptyState message="No snapshots yet." />}
       <div className="space-y-1">
-        <div className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_32px] items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground">
+        <div className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_1fr_32px] items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground">
           <span>Date</span>
           <span className="text-right">Investment</span>
           <span className="text-right">Securities</span>
           <span className="text-right">Cash</span>
           <span className="text-right">Total</span>
           <span className="text-right">P&L</span>
+          <span className="text-right">Return Rate</span>
           <span />
         </div>
         {snapshots.map((snap) => {
@@ -348,22 +352,24 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
           return (
             <div
               key={snap.id}
-              className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_32px] items-center gap-2 border-b py-2 text-sm"
+              className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_1fr_32px] items-center gap-2 border-b py-2 text-sm"
             >
               <span className="font-medium">{snap.date}</span>
-              <span className="text-right tabular-nums">
-                {snap.total_investment.toLocaleString()}
-              </span>
-              <span className="text-right tabular-nums">{snap.market_value.toLocaleString()}</span>
-              <span className="text-right tabular-nums">{snap.cash_balance.toLocaleString()}</span>
-              <span className="text-right tabular-nums font-medium">
-                {totalValue.toLocaleString()}
-              </span>
+              <span className="text-right tabular-nums">{fmtNum(snap.total_investment)}</span>
+              <span className="text-right tabular-nums">{fmtNum(snap.market_value)}</span>
+              <span className="text-right tabular-nums">{fmtNum(snap.cash_balance)}</span>
+              <span className="text-right tabular-nums font-medium">{fmtNum(totalValue)}</span>
               <span
                 className={`text-right tabular-nums ${pnl >= 0 ? "text-green-600" : "text-red-600"}`}
               >
-                {pnl.toLocaleString()} ({rate >= 0 ? "+" : ""}
-                {rate.toFixed(1)}%)
+                {pnl >= 0 ? "+" : ""}
+                {fmtNum(pnl)}
+              </span>
+              <span
+                className={`text-right tabular-nums ${rate >= 0 ? "text-green-600" : "text-red-600"}`}
+              >
+                {rate >= 0 ? "+" : ""}
+                {fmtNum(rate)}%
               </span>
               {manageMode && (
                 <Button
