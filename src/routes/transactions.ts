@@ -32,8 +32,7 @@ function parseBody(body: unknown): CreateTransactionRequest {
 
   const parsedFee = ((): number => {
     if (fee === undefined || fee === null) return 0;
-    if (typeof fee !== "number" || fee < 0)
-      throw { status: 400, message: "Fee must be 0 or greater" };
+    if (typeof fee !== "number") throw { status: 400, message: "Fee must be a number" };
     return fee;
   })();
 
