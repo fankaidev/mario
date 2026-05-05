@@ -60,6 +60,7 @@ function Th({
   return (
     <TableHead
       className={`cursor-pointer select-none ${align === "right" ? "text-right" : ""}`}
+      aria-sort={isActive ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}
       onClick={() =>
         onSort({
           field,
@@ -413,7 +414,7 @@ export function PortfolioList() {
               return (
                 <TableRow
                   key={p.id}
-                  className={manageMode ? "" : "cursor-pointer"}
+                  className={manageMode ? "" : "cursor-pointer hover:bg-muted"}
                   onClick={() => {
                     if (!manageMode) navigate(`/portfolios/${p.id}`);
                   }}
