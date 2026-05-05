@@ -176,7 +176,7 @@ describe("Cash Transactions", () => {
     expect(await getCashBalance()).toBe(10000);
   });
 
-  it("[UC-PORTFOLIO-006-S09] deleting deposit fails if would cause negative balance from withdrawals", async () => {
+  it("[UC-PORTFOLIO-006-S09] deleting deposit allowed even if causes negative balance", async () => {
     const depositResult = await createTransfer("deposit", 10000, 0);
     expect(depositResult.status).toBe(201);
 
@@ -185,9 +185,9 @@ describe("Cash Transactions", () => {
     expect(await getCashBalance()).toBe(4000);
 
     const res = await deleteTransfer(depositResult.data!.id);
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
 
-    expect(await getCashBalance()).toBe(4000);
+    expect(await getCashBalance()).toBe(-6000);
   });
 
   it("[UC-PORTFOLIO-006-S10] buy with insufficient cash allowed (negative balance)", async () => {
