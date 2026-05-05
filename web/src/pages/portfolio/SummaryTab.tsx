@@ -333,8 +333,8 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
         <div
           className={`grid items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground ${
             manageMode
-              ? "grid-cols-[100px_100px_100px_100px_100px_140px_32px]"
-              : "grid-cols-[100px_100px_100px_100px_100px_140px]"
+              ? "grid-cols-[100px_100px_100px_100px_100px_1fr_32px]"
+              : "grid-cols-[100px_100px_100px_100px_100px_1fr]"
           }`}
         >
           <span>Date</span>
@@ -359,8 +359,8 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
               key={snap.id}
               className={`grid items-center gap-2 border-b py-2 text-sm ${
                 manageMode
-                  ? "grid-cols-[100px_100px_100px_100px_100px_140px_32px]"
-                  : "grid-cols-[100px_100px_100px_100px_100px_140px]"
+                  ? "grid-cols-[100px_100px_100px_100px_100px_1fr_32px]"
+                  : "grid-cols-[100px_100px_100px_100px_100px_1fr]"
               }`}
             >
               <span className="font-medium">{snap.date}</span>
