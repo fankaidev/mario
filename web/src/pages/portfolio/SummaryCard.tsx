@@ -22,7 +22,7 @@ function MetricBox({
     <div className="text-center">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p
-        className={`text-base md:text-lg font-medium ${highlight ? "font-bold" : ""} ${typeof value === "number" && value >= 0 ? "text-green-700" : typeof value === "number" ? "text-red-700" : ""}`}
+        className={`tabular-nums text-base md:text-lg font-medium ${highlight ? "font-bold" : ""} ${typeof value === "number" && value >= 0 ? "text-green-700" : typeof value === "number" ? "text-red-700" : ""}`}
       >
         {formatted}
       </p>

@@ -96,25 +96,29 @@ function LotDetailsRow({
             </div>
           )}
         </TableCell>
-        <TableCell className="text-right">{holding.quantity}</TableCell>
-        <TableCell className="text-right">{(holding.cost / holding.quantity).toFixed(3)}</TableCell>
-        <TableCell className="text-right">{holding.price?.toFixed(3) ?? "-"}</TableCell>
-        <TableCell className="text-right">
+        <TableCell className="text-right tabular-nums">{holding.quantity}</TableCell>
+        <TableCell className="text-right tabular-nums">
+          {(holding.cost / holding.quantity).toFixed(3)}
+        </TableCell>
+        <TableCell className="text-right tabular-nums">
+          {holding.price?.toFixed(3) ?? "-"}
+        </TableCell>
+        <TableCell className="text-right tabular-nums">
           {holding.market_value != null ? Math.round(holding.market_value).toLocaleString() : "-"}
         </TableCell>
         <TableCell
-          className={`text-right ${(holding.unrealized_pnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}
+          className={`text-right tabular-nums ${(holding.unrealized_pnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}
         >
           {holding.unrealized_pnl != null
             ? Math.round(holding.unrealized_pnl).toLocaleString()
             : "-"}
         </TableCell>
         <TableCell
-          className={`text-right ${(holding.unrealized_pnl_rate ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}
+          className={`text-right tabular-nums ${(holding.unrealized_pnl_rate ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}
         >
           {holding.unrealized_pnl_rate != null ? `${holding.unrealized_pnl_rate.toFixed(1)}%` : "-"}
         </TableCell>
-        <TableCell className="text-right text-muted-foreground">
+        <TableCell className="text-right tabular-nums text-muted-foreground">
           {totalMarketValue > 0
             ? `${(((holding.market_value ?? 0) / totalMarketValue) * 100).toFixed(1)}%`
             : "-"}

@@ -218,25 +218,25 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
         <CardContent className="grid grid-cols-4 gap-4 p-4 text-sm">
           <div className="text-center">
             <p className="text-xs text-muted-foreground">Buy</p>
-            <p className="font-medium">
+            <p className="tabular-nums font-medium">
               {s.cumulative_buy_fees.toLocaleString()} {currency}
             </p>
           </div>
           <div className="text-center">
             <p className="text-xs text-muted-foreground">Sell</p>
-            <p className="font-medium">
+            <p className="tabular-nums font-medium">
               {s.cumulative_sell_fees.toLocaleString()} {currency}
             </p>
           </div>
           <div className="text-center">
             <p className="text-xs text-muted-foreground">Withholding Tax</p>
-            <p className="font-medium">
+            <p className="tabular-nums font-medium">
               {s.cumulative_withholding_tax.toLocaleString()} {currency}
             </p>
           </div>
           <div className="text-center">
             <p className="text-xs text-muted-foreground">Total</p>
-            <p className="font-semibold">
+            <p className="tabular-nums font-semibold">
               {s.cumulative_total_fees.toLocaleString()} {currency}
             </p>
           </div>
@@ -351,11 +351,17 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
               className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_32px] items-center gap-2 border-b py-2 text-sm"
             >
               <span className="font-medium">{snap.date}</span>
-              <span className="text-right">{snap.total_investment.toLocaleString()}</span>
-              <span className="text-right">{snap.market_value.toLocaleString()}</span>
-              <span className="text-right">{snap.cash_balance.toLocaleString()}</span>
-              <span className="text-right font-medium">{totalValue.toLocaleString()}</span>
-              <span className={`text-right ${pnl >= 0 ? "text-green-600" : "text-red-600"}`}>
+              <span className="text-right tabular-nums">
+                {snap.total_investment.toLocaleString()}
+              </span>
+              <span className="text-right tabular-nums">{snap.market_value.toLocaleString()}</span>
+              <span className="text-right tabular-nums">{snap.cash_balance.toLocaleString()}</span>
+              <span className="text-right tabular-nums font-medium">
+                {totalValue.toLocaleString()}
+              </span>
+              <span
+                className={`text-right tabular-nums ${pnl >= 0 ? "text-green-600" : "text-red-600"}`}
+              >
                 {pnl.toLocaleString()} ({rate >= 0 ? "+" : ""}
                 {rate.toFixed(1)}%)
               </span>
