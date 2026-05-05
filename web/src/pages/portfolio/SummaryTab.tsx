@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Wrench, Check, Trash2 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import {
@@ -121,6 +122,7 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
   const queryClient = useQueryClient();
   const [showAddSnapshot, setShowAddSnapshot] = useState(false);
   const [deleteSnapshotId, setDeleteSnapshotId] = useState<number | null>(null);
+  const [manageMode, setManageMode] = useState(false);
   const [chartRange, setChartRange] = useState<"1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL">("1Y");
 
   const chartCutoff = useMemo(() => {
@@ -316,20 +318,32 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
 
       <div className="mb-4 mt-6 flex justify-between">
         <h3 className="font-semibold">Snapshots</h3>
-        <Button size="sm" onClick={() => setShowAddSnapshot(true)}>
-          Add Snapshot
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setManageMode(!manageMode)}>
+            {manageMode ? <Check className="h-4 w-4" /> : <Wrench className="h-4 w-4" />}
+            {manageMode ? "Done" : "Manage"}
+          </Button>
+          <Button size="sm" onClick={() => setShowAddSnapshot(true)}>
+            Add Snapshot
+          </Button>
+        </div>
       </div>
       {snapshots.length === 0 && <EmptyState message="No snapshots yet." />}
       <div className="space-y-1">
-        <div className="grid grid-cols-[100px_100px_100px_100px_100px_140px_60px] items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground">
+        <div
+          className={`grid items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground ${
+            manageMode
+              ? "grid-cols-[100px_100px_100px_100px_100px_140px_32px]"
+              : "grid-cols-[100px_100px_100px_100px_100px_140px]"
+          }`}
+        >
           <span>Date</span>
           <span className="text-right">Investment</span>
           <span className="text-right">Securities</span>
           <span className="text-right">Cash</span>
           <span className="text-right">Total</span>
           <span className="text-right">P&L</span>
-          <span />
+          {manageMode && <span />}
         </div>
         {snapshots.map((snap) => {
           const totalValue = snap.market_value + snap.cash_balance;
@@ -343,7 +357,11 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
           return (
             <div
               key={snap.id}
-              className="grid grid-cols-[100px_100px_100px_100px_100px_140px_60px] items-center gap-2 border-b py-2 text-sm"
+              className={`grid items-center gap-2 border-b py-2 text-sm ${
+                manageMode
+                  ? "grid-cols-[100px_100px_100px_100px_100px_140px_32px]"
+                  : "grid-cols-[100px_100px_100px_100px_100px_140px]"
+              }`}
             >
               <span className="font-medium">{snap.date}</span>
               <span className="text-right">{snap.total_investment.toLocaleString()}</span>
@@ -354,13 +372,16 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
                 {pnl.toLocaleString()} ({rate >= 0 ? "+" : ""}
                 {rate.toFixed(1)}%)
               </span>
-              <Button
-                variant="link"
-                className="h-auto p-0 text-xs text-destructive"
-                onClick={() => setDeleteSnapshotId(snap.id)}
-              >
-                Delete
-              </Button>
+              {manageMode && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                  onClick={() => setDeleteSnapshotId(snap.id)}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              )}
             </div>
           );
         })}
