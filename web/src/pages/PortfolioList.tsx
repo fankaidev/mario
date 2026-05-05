@@ -318,17 +318,11 @@ export function PortfolioList() {
                         (ap) => ap.portfolio_id === p.id,
                       );
                       if (!pp) return null;
-                      const nativeEndValue = pp.end_value;
                       return (
                         <div>
                           <p className="tabular-nums text-sm font-semibold">
-                            {Math.round(nativeEndValue).toLocaleString()} {pp.native_currency}
+                            {Math.round(pp.end_value).toLocaleString()} {pp.native_currency}
                           </p>
-                          {pp.native_currency !== targetCurrency && (
-                            <p className="tabular-nums text-xs text-muted-foreground">
-                              ≈ {targetCurrency}
-                            </p>
-                          )}
                         </div>
                       );
                     })()}
