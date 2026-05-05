@@ -2,9 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Plus, Trash2, RotateCcw, Wrench } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Card, CardContent } from "../components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../components/ui/table";
 import { EmptyState } from "../components/EmptyState";
 import {
   Dialog,
@@ -23,10 +31,51 @@ import type {
   AggregatedChartPoint,
   AggregatedPerformance,
   Portfolio,
+  PortfolioPerformance,
 } from "../../../shared/types/api";
+
+type SortField = "name" | "value" | "pnl" | "return" | "created";
+type SortDirection = "asc" | "desc";
+interface SortState {
+  field: SortField;
+  direction: SortDirection;
+}
+
+function Th({
+  label,
+  field,
+  sort,
+  onSort,
+  align,
+}: {
+  label: string;
+  field: SortField;
+  sort: SortState;
+  onSort: (s: SortState) => void;
+  align?: "left" | "right";
+}) {
+  const isActive = sort.field === field;
+  const arrow = isActive ? (sort.direction === "asc" ? " ↑" : " ↓") : "";
+
+  return (
+    <TableHead
+      className={`cursor-pointer select-none ${align === "right" ? "text-right" : ""}`}
+      onClick={() =>
+        onSort({
+          field,
+          direction: isActive && sort.direction === "asc" ? "desc" : "asc",
+        })
+      }
+    >
+      {label}
+      {arrow}
+    </TableHead>
+  );
+}
 
 export function PortfolioList() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [showCreate, setShowCreate] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [manageMode, setManageMode] = useState(false);
@@ -37,6 +86,7 @@ export function PortfolioList() {
     "portfolio-currency",
     "USD",
   );
+  const [sort, setSort] = useState<SortState>({ field: "name", direction: "asc" });
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["portfolios"],
@@ -105,6 +155,40 @@ export function PortfolioList() {
   });
 
   const deletedPortfolios = (trashData?.data ?? []).filter((p) => p.deleted_at !== null);
+
+  const sortedPortfolios = useMemo(() => {
+    const perfMap = new Map<number, PortfolioPerformance>();
+    if (performanceData?.data) {
+      for (const pp of performanceData.data.portfolios) {
+        perfMap.set(pp.portfolio_id, pp);
+      }
+    }
+    const sorted = [...portfolios];
+    sorted.sort((a, b) => {
+      const pa = perfMap.get(a.id);
+      const pb = perfMap.get(b.id);
+      let cmp = 0;
+      switch (sort.field) {
+        case "name":
+          cmp = a.name.localeCompare(b.name);
+          break;
+        case "value":
+          cmp = (pa?.end_value ?? 0) - (pb?.end_value ?? 0);
+          break;
+        case "pnl":
+          cmp = (pa?.pnl ?? 0) - (pb?.pnl ?? 0);
+          break;
+        case "return":
+          cmp = (pa?.return_rate ?? 0) - (pb?.return_rate ?? 0);
+          break;
+        case "created":
+          cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          break;
+      }
+      return sort.direction === "asc" ? cmp : -cmp;
+    });
+    return sorted;
+  }, [portfolios, performanceData, sort]);
 
   const createMutation = useMutation({
     mutationFn: (body: { name: string; currency: string }) =>
@@ -311,60 +395,88 @@ export function PortfolioList() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {data?.data.map((p) =>
-          manageMode ? (
-            <Card key={p.id} className="h-full">
-              <CardHeader className="flex-row items-start justify-between space-y-0">
-                <div>
-                  <CardTitle>{p.name}</CardTitle>
-                  <CardDescription>{p.currency}</CardDescription>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={() => setDeleteId(p.id)}
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <Th label="Name" field="name" sort={sort} onSort={setSort} />
+              <Th label="Value" field="value" sort={sort} onSort={setSort} align="right" />
+              <Th label="P&amp;L" field="pnl" sort={sort} onSort={setSort} align="right" />
+              <Th label="Return" field="return" sort={sort} onSort={setSort} align="right" />
+              <Th label="Created" field="created" sort={sort} onSort={setSort} />
+              {manageMode && <TableHead className="w-10" />}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sortedPortfolios.map((p) => {
+              const pp = performanceData?.data?.portfolios.find((ap) => ap.portfolio_id === p.id);
+              return (
+                <TableRow
+                  key={p.id}
+                  className={manageMode ? "" : "cursor-pointer"}
+                  onClick={() => {
+                    if (!manageMode) navigate(`/portfolios/${p.id}`);
+                  }}
                 >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground">
-                  Created {new Date(p.created_at).toLocaleDateString()}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Link key={p.id} to={`/portfolios/${p.id}`}>
-              <Card className="h-full cursor-pointer transition-all hover:shadow-md">
-                <CardHeader>
-                  <CardTitle>{p.name}</CardTitle>
-                  <CardDescription>{p.currency}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {performanceData?.data &&
-                    (() => {
-                      const pp = performanceData.data.portfolios.find(
-                        (ap) => ap.portfolio_id === p.id,
-                      );
-                      if (!pp) return null;
-                      return (
-                        <div>
-                          <p className="tabular-nums text-sm font-semibold">
-                            {Math.round(pp.end_value).toLocaleString()} {pp.native_currency}
-                          </p>
-                        </div>
-                      );
-                    })()}
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Created {new Date(p.created_at).toLocaleDateString()}
-                  </p>
-                </CardContent>
-              </Card>
-            </Link>
-          ),
-        )}
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{p.name}</p>
+                      <p className="text-xs text-muted-foreground">{p.currency}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {pp ? (
+                      <span>
+                        {Math.round(pp.end_value).toLocaleString()} {pp.native_currency}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell
+                    className={`text-right tabular-nums ${pp && pp.pnl >= 0 ? "text-green-700" : "text-red-700"}`}
+                  >
+                    {pp ? (
+                      <span>
+                        {pp.pnl >= 0 ? "+" : ""}
+                        {Math.round(pp.pnl).toLocaleString()} {pp.native_currency}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell
+                    className={`text-right tabular-nums ${pp && pp.return_rate >= 0 ? "text-green-700" : "text-red-700"}`}
+                  >
+                    {pp ? (
+                      <span>{pp.return_rate}%</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {new Date(p.created_at).toLocaleDateString()}
+                  </TableCell>
+                  {manageMode && (
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteId(p.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  )}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
 
       {manageMode && (
@@ -373,31 +485,41 @@ export function PortfolioList() {
           {deletedPortfolios.length === 0 ? (
             <EmptyState message="No deleted portfolios." />
           ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {deletedPortfolios.map((p) => (
-                <Card key={p.id} className="h-full opacity-70">
-                  <CardHeader className="flex-row items-start justify-between space-y-0">
-                    <div>
-                      <CardTitle>{p.name}</CardTitle>
-                      <CardDescription>{p.currency}</CardDescription>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-green-600"
-                      onClick={() => restoreMutation.mutate(p.id)}
-                      disabled={restoreMutation.isPending}
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                    </Button>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-xs text-muted-foreground">
-                      Deleted {p.deleted_at ? new Date(p.deleted_at).toLocaleDateString() : ""}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="text-right">Currency</TableHead>
+                    <TableHead>Deleted</TableHead>
+                    <TableHead className="w-10" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {deletedPortfolios.map((p) => (
+                    <TableRow key={p.id} className="opacity-70">
+                      <TableCell>
+                        <p className="font-medium">{p.name}</p>
+                      </TableCell>
+                      <TableCell className="text-right">{p.currency}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {p.deleted_at ? new Date(p.deleted_at).toLocaleDateString() : ""}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-green-600"
+                          onClick={() => restoreMutation.mutate(p.id)}
+                          disabled={restoreMutation.isPending}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           )}
         </div>
