@@ -1,10 +1,21 @@
 import { Hono } from "hono";
 import type { AuthVariables } from "../middleware/auth";
 import type { Bindings } from "../types";
-import type { PortfolioSnapshot, SnapshotChartPoint, Transaction } from "../../shared/types/api";
+import type {
+  PortfolioSnapshot,
+  RangeType,
+  SnapshotChartPoint,
+  Transaction,
+} from "../../shared/types/api";
 import { replayFIFO, type CorporateAction } from "../lib/fifo";
 import { calculateXIRR } from "../lib/finance";
 import { getIRRCashFlows } from "./portfolios";
+import {
+  getRangeDates,
+  getPortfolioValueAtDate,
+  getCashFlowsInRange,
+  computeRangeIRR,
+} from "../lib/performance";
 
 const snapshots = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
@@ -294,10 +305,29 @@ snapshots.get("/chart-series", async (c) => {
     .first();
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
 
-  const rows = await c.env.DB.prepare(
-    "SELECT id, portfolio_id, date, total_investment, market_value, cash_balance FROM portfolio_snapshots WHERE portfolio_id = ? ORDER BY date ASC",
-  )
-    .bind(portfolioId)
+  const range = c.req.query("range") as RangeType | undefined;
+  let rangeStartDate: string | null = null;
+  let rangeStartValue: number | null = null;
+
+  if (range) {
+    const dates = getRangeDates(range);
+    rangeStartDate = dates.startDate;
+    const startVal = await getPortfolioValueAtDate(c.env.DB, portfolioId, rangeStartDate);
+    rangeStartValue = startVal ? startVal.marketValue + startVal.cashBalance : null;
+  }
+
+  let sql =
+    "SELECT id, portfolio_id, date, total_investment, market_value, cash_balance FROM portfolio_snapshots WHERE portfolio_id = ?";
+  if (rangeStartDate) {
+    sql += " AND date >= ?";
+  }
+  sql += " ORDER BY date ASC";
+
+  const params: unknown[] = [portfolioId];
+  if (rangeStartDate) params.push(rangeStartDate);
+
+  const rows = await c.env.DB.prepare(sql)
+    .bind(...params)
     .all<{
       id: number;
       portfolio_id: number;
@@ -310,19 +340,53 @@ snapshots.get("/chart-series", async (c) => {
   const points: SnapshotChartPoint[] = [];
   for (const snap of rows.results) {
     const portfolioValue = snap.market_value + snap.cash_balance;
-    const irrCashFlows = await getIRRCashFlows(c.env.DB, portfolioId, snap.date);
-    if (portfolioValue > 0 || irrCashFlows.length > 0) {
-      irrCashFlows.push({ date: snap.date, amount: portfolioValue });
+
+    let returnRate: number;
+    let pnl: number | undefined;
+
+    if (range && range !== "ALL" && rangeStartDate) {
+      // Range-scoped IRR: start_value as initial investment, cash flows within range, current value as terminal
+      const irrCashFlows = await getCashFlowsInRange(
+        c.env.DB,
+        portfolioId,
+        rangeStartDate,
+        snap.date,
+      );
+      const irr = computeRangeIRR(
+        rangeStartValue ?? 0,
+        rangeStartDate,
+        irrCashFlows,
+        portfolioValue,
+        snap.date,
+      );
+      returnRate =
+        irr !== null
+          ? irr * 100
+          : (rangeStartValue ?? 0) > 0
+            ? ((portfolioValue -
+                (rangeStartValue ?? 0) -
+                irrCashFlows.reduce((s, cf) => s + cf.amount, 0)) /
+                (rangeStartValue ?? 1)) *
+              100
+            : 0;
+
+      // Range-scoped P&L
+      const netCash = irrCashFlows.reduce((s, cf) => s + cf.amount, 0);
+      pnl = portfolioValue - (rangeStartValue ?? 0) - netCash;
+    } else {
+      // Cumulative (all-time) IRR
+      const irrCashFlows = await getIRRCashFlows(c.env.DB, portfolioId, snap.date);
+      if (portfolioValue > 0 || irrCashFlows.length > 0) {
+        irrCashFlows.push({ date: snap.date, amount: portfolioValue });
+      }
+      const irr = calculateXIRR(irrCashFlows);
+      returnRate =
+        irr !== null
+          ? irr * 100
+          : snap.total_investment > 0
+            ? ((portfolioValue - snap.total_investment) / snap.total_investment) * 100
+            : 0;
     }
-    const irr = calculateXIRR(irrCashFlows);
-    const returnRate =
-      irr !== null
-        ? irr * 100
-        : snap.total_investment > 0
-          ? ((snap.market_value + snap.cash_balance - snap.total_investment) /
-              snap.total_investment) *
-            100
-          : 0;
 
     points.push({
       date: snap.date,
@@ -330,6 +394,7 @@ snapshots.get("/chart-series", async (c) => {
       market_value: Math.round(snap.market_value * 100) / 100,
       cash_balance: Math.round(snap.cash_balance * 100) / 100,
       return_rate: Math.round(returnRate * 100) / 100,
+      ...(pnl !== undefined ? { pnl: Math.round(pnl * 100) / 100 } : {}),
     });
   }
 

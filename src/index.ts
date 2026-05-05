@@ -13,6 +13,7 @@ import snapshots, { calculateSnapshot } from "./routes/snapshots";
 import exchangeRates from "./routes/exchange-rates";
 import summaryRoutes from "./routes/summary";
 import importRoutes from "./routes/import";
+import { portfolioPerformanceRouter, aggregatedPerformanceRouter } from "./routes/performance";
 import type { PriceFetcher } from "./clients/price-fetcher";
 import { FetcherRouter } from "./clients/fetcher-router";
 import { syncExchangeRates } from "./routes/exchange-rates";
@@ -40,6 +41,8 @@ app.route("/api/portfolios/:portfolioId/snapshots", snapshots);
 app.route("/api/portfolios/:portfolioId/import", importRoutes);
 app.route("/api/exchange-rates", exchangeRates);
 app.route("/api/summary", summaryRoutes);
+app.route("/api/portfolios/:portfolioId/performance", portfolioPerformanceRouter);
+app.route("/api/performance", aggregatedPerformanceRouter);
 
 export default {
   fetch: app.fetch,

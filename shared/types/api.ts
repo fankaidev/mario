@@ -245,4 +245,40 @@ export interface SnapshotChartPoint {
   market_value: number;
   cash_balance: number;
   return_rate: number;
+  pnl?: number;
+}
+
+export type RangeType = "1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL";
+
+export interface PortfolioPerformance {
+  portfolio_id: number;
+  portfolio_name: string;
+  native_currency: string;
+  range: RangeType;
+  start_date: string;
+  end_date: string;
+  start_value: number;
+  end_value: number;
+  net_cash_flow: number;
+  pnl: number;
+  return_rate: number;
+}
+
+export interface AggregatedPerformance {
+  target_currency: string;
+  range: RangeType;
+  start_date: string;
+  end_date: string;
+  start_value: number;
+  end_value: number;
+  net_cash_flow: number;
+  pnl: number;
+  return_rate: number;
+  exchange_rate_updated_at: string | null;
+  portfolios: PortfolioPerformance[];
+}
+
+export interface AggregatedChartPoint {
+  date: string;
+  total_value: number;
 }
