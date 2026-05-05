@@ -29,6 +29,7 @@ function AddSnapshotModal({
   const [date, setDate] = useState(new Date().toISOString().split("T")[0] ?? "");
   const [investment, setInvestment] = useState("");
   const [marketValue, setMarketValue] = useState("");
+  const [cashBalance, setCashBalance] = useState("");
   const [note, setNote] = useState("");
 
   const mutation = useMutation({
@@ -41,6 +42,7 @@ function AddSnapshotModal({
       date,
       total_investment: parseFloat(investment),
       market_value: parseFloat(marketValue),
+      cash_balance: parseFloat(cashBalance) || 0,
       note: note || undefined,
     });
   };
@@ -73,13 +75,23 @@ function AddSnapshotModal({
             />
           </div>
           <div>
-            <Label htmlFor="snapshot-market-value">Market Value</Label>
+            <Label htmlFor="snapshot-market-value">Securities Value</Label>
             <Input
               id="snapshot-market-value"
               type="number"
               value={marketValue}
               onChange={(e) => setMarketValue(e.target.value)}
               placeholder="120000"
+            />
+          </div>
+          <div>
+            <Label htmlFor="snapshot-cash-balance">Cash Balance</Label>
+            <Input
+              id="snapshot-cash-balance"
+              type="number"
+              value={cashBalance}
+              onChange={(e) => setCashBalance(e.target.value)}
+              placeholder="5000"
             />
           </div>
           <div>
@@ -310,16 +322,18 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
       </div>
       {snapshots.length === 0 && <EmptyState message="No snapshots yet." />}
       <div className="space-y-1">
-        <div className="grid grid-cols-[100px_1fr_100px_120px_140px_60px] items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground">
+        <div className="grid grid-cols-[100px_100px_100px_100px_100px_140px_60px] items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground">
           <span>Date</span>
-          <span>Note</span>
           <span className="text-right">Investment</span>
-          <span className="text-right">Market Value</span>
+          <span className="text-right">Securities</span>
+          <span className="text-right">Cash</span>
+          <span className="text-right">Total</span>
           <span className="text-right">P&L</span>
           <span />
         </div>
         {snapshots.map((snap) => {
-          const pnl = snap.market_value - snap.total_investment;
+          const totalValue = snap.market_value + snap.cash_balance;
+          const pnl = totalValue - snap.total_investment;
           const rate =
             snap.return_rate != null
               ? snap.return_rate
@@ -329,18 +343,15 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
           return (
             <div
               key={snap.id}
-              className="grid grid-cols-[100px_1fr_100px_120px_140px_60px] items-center gap-2 border-b py-2 text-sm"
+              className="grid grid-cols-[100px_100px_100px_100px_100px_140px_60px] items-center gap-2 border-b py-2 text-sm"
             >
               <span className="font-medium">{snap.date}</span>
-              <span className="truncate text-muted-foreground">{snap.note || ""}</span>
-              <span className="text-right">
-                {snap.total_investment.toLocaleString()} {currency}
-              </span>
-              <span className="text-right">
-                {snap.market_value.toLocaleString()} {currency}
-              </span>
+              <span className="text-right">{snap.total_investment.toLocaleString()}</span>
+              <span className="text-right">{snap.market_value.toLocaleString()}</span>
+              <span className="text-right">{snap.cash_balance.toLocaleString()}</span>
+              <span className="text-right font-medium">{totalValue.toLocaleString()}</span>
               <span className={`text-right ${pnl >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {pnl.toLocaleString()} {currency} ({rate >= 0 ? "+" : ""}
+                {pnl.toLocaleString()} ({rate >= 0 ? "+" : ""}
                 {rate.toFixed(1)}%)
               </span>
               <Button
