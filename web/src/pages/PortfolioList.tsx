@@ -411,6 +411,8 @@ export function PortfolioList() {
           <TableBody>
             {sortedPortfolios.map((p) => {
               const pp = performanceData?.data?.portfolios.find((ap) => ap.portfolio_id === p.id);
+              const showConverted =
+                pp?.converted_currency && pp.converted_currency !== pp.native_currency;
               return (
                 <TableRow
                   key={p.id}
@@ -427,21 +429,37 @@ export function PortfolioList() {
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {pp ? (
-                      <span>
-                        {Math.round(pp.end_value).toLocaleString()} {pp.native_currency}
-                      </span>
+                      <div>
+                        <p>
+                          {Math.round(pp.end_value).toLocaleString()} {pp.native_currency}
+                        </p>
+                        {showConverted && (
+                          <p className="text-xs text-muted-foreground">
+                            ≈ {Math.round(pp.converted_end_value!).toLocaleString()}{" "}
+                            {pp.converted_currency}
+                          </p>
+                        )}
+                      </div>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
-                  <TableCell
-                    className={`text-right tabular-nums ${pp && pp.pnl >= 0 ? "text-green-700" : "text-red-700"}`}
-                  >
+                  <TableCell className="text-right tabular-nums">
                     {pp ? (
-                      <span>
-                        {pp.pnl >= 0 ? "+" : ""}
-                        {Math.round(pp.pnl).toLocaleString()} {pp.native_currency}
-                      </span>
+                      <div>
+                        <p className={pp.pnl >= 0 ? "text-green-700" : "text-red-700"}>
+                          {pp.pnl >= 0 ? "+" : ""}
+                          {Math.round(pp.pnl).toLocaleString()} {pp.native_currency}
+                        </p>
+                        {showConverted && (
+                          <p
+                            className={`text-xs ${(pp.converted_pnl ?? 0) >= 0 ? "text-green-700" : "text-red-700"}`}
+                          >
+                            ≈ {(pp.converted_pnl ?? 0) >= 0 ? "+" : ""}
+                            {Math.round(pp.converted_pnl!).toLocaleString()} {pp.converted_currency}
+                          </p>
+                        )}
+                      </div>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}

@@ -5,6 +5,8 @@ A personal portfolio tracker for US, HK, and China A-share markets. Deployed on 
 - **Website**: https://mario.fankai.site
 - **API Access**: When processing data via command/script, always use the REST API instead of direct database operations. Expect `MARIO_API_KEY` environment variable for authentication.
 
+**Never enter plan mode unless the user explicitly requires it.** Design and plan inline instead of using the formal plan mode workflow.
+
 ## Mario Workflow
 
 **Always use `pnpm` instead of `npm` for dependency management and script execution.**
