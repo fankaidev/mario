@@ -27,7 +27,7 @@ function AddTransferModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const [type, setType] = useState<"deposit" | "withdrawal" | "initial">("deposit");
+  const [type, setType] = useState<"deposit" | "withdrawal" | "initial" | "interest">("deposit");
   const [amount, setAmount] = useState("");
   const [fee, setFee] = useState("0");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0] ?? "");
@@ -61,11 +61,14 @@ function AddTransferModal({
             <Select
               id="transfer-type"
               value={type}
-              onChange={(e) => setType(e.target.value as "deposit" | "withdrawal" | "initial")}
+              onChange={(e) =>
+                setType(e.target.value as "deposit" | "withdrawal" | "initial" | "interest")
+              }
             >
               <option value="deposit">Deposit</option>
               <option value="withdrawal">Withdrawal</option>
               <option value="initial">Initial</option>
+              <option value="interest">Interest</option>
             </Select>
           </div>
           <div>
@@ -150,8 +153,7 @@ export function TransfersTab({ id, currency }: { id: string; currency: string })
     const sorted = [...transfers].sort((a, b) => a.date.localeCompare(b.date));
     let runningTotal = 0;
     const withRunningTotal = sorted.map((t) => {
-      const netEffect =
-        t.type === "deposit" || t.type === "initial" ? t.amount - t.fee : -(t.amount + t.fee);
+      const netEffect = t.type === "withdrawal" ? -(t.amount + t.fee) : t.amount - t.fee;
       runningTotal += netEffect;
       return { ...t, runningTotal };
     });
@@ -194,8 +196,7 @@ export function TransfersTab({ id, currency }: { id: string; currency: string })
           {manageMode && <span />}
         </div>
         {transfersWithRunningTotal.map((t) => {
-          const netEffect =
-            t.type === "deposit" || t.type === "initial" ? t.amount - t.fee : -(t.amount + t.fee);
+          const netEffect = t.type === "withdrawal" ? -(t.amount + t.fee) : t.amount - t.fee;
           return (
             <div
               key={t.id}
@@ -205,9 +206,9 @@ export function TransfersTab({ id, currency }: { id: string; currency: string })
               <Badge
                 variant="secondary"
                 className={`w-fit border-transparent ${
-                  t.type === "deposit" || t.type === "initial"
-                    ? "bg-green-100 text-green-700"
-                    : "bg-red-100 text-red-700"
+                  t.type === "withdrawal"
+                    ? "bg-red-100 text-red-700"
+                    : "bg-green-100 text-green-700"
                 }`}
               >
                 {t.type}

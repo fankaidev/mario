@@ -61,8 +61,7 @@ cashMovements.get("/", async (c) => {
   const events: CashEvent[] = [];
 
   for (const tr of transferRows.results) {
-    const delta =
-      tr.type === "deposit" || tr.type === "initial" ? tr.amount - tr.fee : -(tr.amount + tr.fee);
+    const delta = tr.type === "withdrawal" ? -(tr.amount + tr.fee) : tr.amount - tr.fee;
     events.push({
       date: tr.date,
       created_at: tr.created_at,

@@ -26,8 +26,8 @@ transfers.post("/", async (c) => {
     note?: string;
   }>();
 
-  if (body.type !== "deposit" && body.type !== "withdrawal" && body.type !== "initial") {
-    return c.json({ error: "Type must be deposit, withdrawal, or initial" }, 400);
+  if (!["deposit", "withdrawal", "initial", "interest"].includes(body.type ?? "")) {
+    return c.json({ error: "Type must be deposit, withdrawal, initial, or interest" }, 400);
   }
   if (typeof body.amount !== "number" || body.amount <= 0) {
     return c.json({ error: "Amount must be greater than 0" }, 400);
@@ -110,8 +110,7 @@ transfers.get("/", async (c) => {
   const events: CashEvent[] = [];
 
   for (const tr of allTransferRows.results) {
-    const delta =
-      tr.type === "deposit" || tr.type === "initial" ? tr.amount - tr.fee : -(tr.amount + tr.fee);
+    const delta = tr.type === "withdrawal" ? -(tr.amount + tr.fee) : tr.amount - tr.fee;
     events.push({
       date: tr.date,
       created_at: tr.created_at,
@@ -183,8 +182,8 @@ transfers.delete("/:transferId", async (c) => {
     .first<{ id: number; type: string; amount: number; fee: number }>();
   if (!transfer) return c.json({ error: "Transfer not found" }, 404);
 
-  // Check if deleting deposit/initial would cause negative balance
-  if (transfer.type === "deposit" || transfer.type === "initial") {
+  // Check if deleting positive transfer would cause negative balance
+  if (transfer.type !== "withdrawal") {
     const currentBalance = await calculateCashBalance(c.env.DB, portfolioId);
     const cashChange = transfer.amount - transfer.fee;
     if (currentBalance - cashChange < 0) {

@@ -44,8 +44,8 @@ export async function calculateCashBalance(db: D1Database, portfolioId: number):
       `
     SELECT
       COALESCE(SUM(CASE
-        WHEN type IN ('deposit', 'initial') THEN amount - fee
         WHEN type = 'withdrawal' THEN -(amount + fee)
+        ELSE amount - fee
       END), 0) as transfer_cash,
       (SELECT COALESCE(SUM(CASE
         WHEN type IN ('buy', 'initial') THEN -(quantity * price + fee)
