@@ -170,6 +170,7 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
       del<{ data: null }>(`/portfolios/${id}/snapshots/${snapshotId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
+      queryClient.invalidateQueries({ queryKey: ["snapshots-chart-series", id] });
       setDeleteSnapshotId(null);
     },
   });
@@ -383,6 +384,7 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
           onClose={() => setShowAddSnapshot(false)}
           onCreated={() => {
             queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
+            queryClient.invalidateQueries({ queryKey: ["snapshots-chart-series", id] });
             setShowAddSnapshot(false);
           }}
         />
