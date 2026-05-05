@@ -446,7 +446,7 @@ portfolios.get("/:id/summary", async (c) => {
   const cashBalance = await calculateCashBalance(c.env.DB, portfolioId);
   const portfolioValue = totalMarketValue + cashBalance;
   const irrCashFlows = await getIRRCashFlows(c.env.DB, portfolioId);
-  if (portfolioValue !== 0 || irrCashFlows.length > 0) {
+  if (portfolioValue > 0 || irrCashFlows.length > 0) {
     irrCashFlows.push({ date: new Date().toISOString().split("T")[0]!, amount: portfolioValue });
   }
   const irr = calculateXIRR(irrCashFlows);
