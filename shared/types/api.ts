@@ -99,7 +99,6 @@ export interface PortfolioSnapshot {
   total_investment: number;
   market_value: number;
   cash_balance: number;
-  return_rate: number | null;
   note: string | null;
   created_at: string;
 }
