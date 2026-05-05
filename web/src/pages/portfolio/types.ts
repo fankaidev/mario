@@ -28,7 +28,7 @@ export interface Snapshot {
 
 export interface Transfer {
   id: number;
-  type: "deposit" | "withdrawal";
+  type: "deposit" | "withdrawal" | "initial";
   amount: number;
   fee: number;
   date: string;

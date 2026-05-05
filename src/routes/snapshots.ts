@@ -19,7 +19,7 @@ export async function calculateSnapshot(
   // total_investment: net deposits/withdrawals up to date
   const investmentRow = await db
     .prepare(
-      "SELECT COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount - fee ELSE -(amount + fee) END), 0) AS total FROM transfers WHERE portfolio_id = ? AND date <= ?",
+      "SELECT COALESCE(SUM(CASE WHEN type IN ('deposit', 'initial') THEN amount - fee ELSE -(amount + fee) END), 0) AS total FROM transfers WHERE portfolio_id = ? AND date <= ?",
     )
     .bind(portfolioId, date)
     .first<{ total: number }>();
@@ -27,7 +27,7 @@ export async function calculateSnapshot(
   // cash_balance: transfers (deposits - withdrawals) + transactions (-buy costs + sell proceeds + dividends)
   const transferCashRow = await db
     .prepare(
-      "SELECT COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount - fee WHEN type = 'withdrawal' THEN -(amount + fee) END), 0) AS total FROM transfers WHERE portfolio_id = ? AND date <= ?",
+      "SELECT COALESCE(SUM(CASE WHEN type IN ('deposit', 'initial') THEN amount - fee WHEN type = 'withdrawal' THEN -(amount + fee) END), 0) AS total FROM transfers WHERE portfolio_id = ? AND date <= ?",
     )
     .bind(portfolioId, date)
     .first<{ total: number }>();
