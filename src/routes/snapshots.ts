@@ -121,11 +121,11 @@ snapshots.post("/", async (c) => {
   }>();
   if (!body.date || typeof body.date !== "string")
     return c.json({ error: "Date is required" }, 400);
-  if (typeof body.total_investment !== "number" || body.total_investment < 0)
+  if (typeof body.total_investment !== "number")
     return c.json({ error: "Total investment is required" }, 400);
   if (typeof body.market_value !== "number" || body.market_value < 0)
     return c.json({ error: "Market value is required" }, 400);
-  if (typeof body.cash_balance !== "number" || body.cash_balance < 0)
+  if (typeof body.cash_balance !== "number")
     return c.json({ error: "Cash balance is required" }, 400);
 
   const existing = await c.env.DB.prepare(
