@@ -13,7 +13,7 @@ import {
 import { EmptyState } from "../../components/EmptyState";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
-import { LineChart } from "../../components/LineChart";
+import { LineChart } from "../../components/charts";
 import { get, post, del } from "../../lib/api";
 import type { Snapshot, SnapshotChartPoint, Summary } from "./types";
 import { ConfirmModal } from "./ConfirmModal";
