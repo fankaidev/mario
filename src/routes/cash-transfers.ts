@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import type { AuthVariables } from "../middleware/auth";
 import type { Bindings } from "../types";
-import type { Transfer, TransferType } from "../../shared/types/api";
-import { calculateCashBalance } from "./portfolios"; // used in POST for withdrawal validation
+import type { CashTransfer, CashTransferType } from "../../shared/types/api";
+import { calculateCashBalance } from "./portfolios";
 
-const transfers = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
+const cashTransfers = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
-transfers.post("/", async (c) => {
+cashTransfers.post("/", async (c) => {
   const user = c.get("user");
   const portfolioId = parseInt(c.req.param("portfolioId") ?? "", 10);
   if (isNaN(portfolioId)) return c.json({ error: "Invalid portfolio ID" }, 400);
@@ -40,7 +40,7 @@ transfers.post("/", async (c) => {
   }
 
   const fee = typeof body.fee === "number" && body.fee >= 0 ? body.fee : 0;
-  const transferType = body.type as TransferType;
+  const transferType = body.type as CashTransferType;
 
   // withdrawal validation: check if sufficient balance
   if (transferType === "withdrawal") {
@@ -52,21 +52,21 @@ transfers.post("/", async (c) => {
   }
 
   const result = await c.env.DB.prepare(
-    "INSERT INTO transfers (portfolio_id, type, amount, fee, date, note) VALUES (?, ?, ?, ?, ?, ?)",
+    "INSERT INTO cash_movements (portfolio_id, type, amount, fee, date, note) VALUES (?, ?, ?, ?, ?, ?)",
   )
     .bind(portfolioId, transferType, body.amount, fee, body.date, body.note ?? null)
     .run();
 
   const transfer = await c.env.DB.prepare(
-    "SELECT id, portfolio_id, type, amount, fee, date, note, created_at FROM transfers WHERE id = ?",
+    "SELECT id, portfolio_id, type, amount, fee, date, note, created_at FROM cash_movements WHERE id = ?",
   )
     .bind(result.meta.last_row_id)
-    .first<Transfer>();
+    .first<CashTransfer>();
 
   return c.json({ data: transfer }, 201);
 });
 
-transfers.get("/", async (c) => {
+cashTransfers.get("/", async (c) => {
   const user = c.get("user");
   const portfolioId = parseInt(c.req.param("portfolioId") ?? "", 10);
   if (isNaN(portfolioId)) return c.json({ error: "Invalid portfolio ID" }, 400);
@@ -80,10 +80,10 @@ transfers.get("/", async (c) => {
 
   const [allTransferRows, txRows] = await Promise.all([
     c.env.DB.prepare(
-      "SELECT id, portfolio_id, type, amount, fee, date, note, created_at FROM transfers WHERE portfolio_id = ? ORDER BY date, created_at",
+      "SELECT id, portfolio_id, type, amount, fee, date, note, created_at FROM cash_movements WHERE portfolio_id = ? ORDER BY date, created_at",
     )
       .bind(portfolioId)
-      .all<Transfer>(),
+      .all<CashTransfer>(),
     c.env.DB.prepare(
       "SELECT id, type, quantity, price, fee, date, created_at FROM transactions WHERE portfolio_id = ? ORDER BY date, created_at",
     )
@@ -162,7 +162,7 @@ transfers.get("/", async (c) => {
   return c.json({ data: result });
 });
 
-transfers.delete("/:transferId", async (c) => {
+cashTransfers.delete("/:transferId", async (c) => {
   const user = c.get("user");
   const portfolioId = parseInt(c.req.param("portfolioId") ?? "", 10);
   const transferId = parseInt(c.req.param("transferId") ?? "", 10);
@@ -176,15 +176,15 @@ transfers.delete("/:transferId", async (c) => {
   if (!portfolio) return c.json({ error: "Portfolio not found" }, 404);
 
   const transfer = await c.env.DB.prepare(
-    "SELECT id FROM transfers WHERE id = ? AND portfolio_id = ?",
+    "SELECT id FROM cash_movements WHERE id = ? AND portfolio_id = ?",
   )
     .bind(transferId, portfolioId)
     .first<{ id: number }>();
   if (!transfer) return c.json({ error: "Transfer not found" }, 404);
 
-  await c.env.DB.prepare("DELETE FROM transfers WHERE id = ?").bind(transferId).run();
+  await c.env.DB.prepare("DELETE FROM cash_movements WHERE id = ?").bind(transferId).run();
 
   return c.json({ data: null });
 });
 
-export default transfers;
+export default cashTransfers;

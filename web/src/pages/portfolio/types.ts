@@ -27,7 +27,7 @@ export interface Snapshot {
   note: string | null;
 }
 
-export interface Transfer {
+export interface CashTransfer {
   id: number;
   type: "deposit" | "withdrawal" | "initial" | "interest";
   amount: number;
@@ -46,7 +46,7 @@ export interface Portfolio {
 export type TabName =
   | "holdings"
   | "transactions"
-  | "transfers"
+  | "cash_transfers"
   | "cash_balance"
   | "corporate_actions"
   | "summary"

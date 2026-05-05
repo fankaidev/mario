@@ -161,7 +161,7 @@ transactions.get("/", async (c) => {
       .bind(portfolioId)
       .all<Transaction>(),
     c.env.DB.prepare(
-      "SELECT id, type, amount, fee, date, created_at FROM transfers WHERE portfolio_id = ? ORDER BY date, created_at",
+      "SELECT id, type, amount, fee, date, created_at FROM cash_movements WHERE portfolio_id = ? ORDER BY date, created_at",
     )
       .bind(portfolioId)
       .all<{

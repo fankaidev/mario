@@ -164,7 +164,7 @@ describe("IBKR Import", () => {
     expect(holdingsBody.data[0].cost).toBe(15001); // 100 * 150 + 1
   });
 
-  it("[UC-IMPORT-001-S02] imports deposits as transfers", async () => {
+  it("[UC-IMPORT-001-S02] imports deposits as cash movements", async () => {
     const client = new FakeIbkrFlexClient();
     client.setStatement("t|q", {
       trades: [],
@@ -185,7 +185,7 @@ describe("IBKR Import", () => {
     expect(result.transfers_imported).toBe(1);
 
     const transferRow = await db
-      .prepare("SELECT type, amount FROM transfers WHERE portfolio_id = ?")
+      .prepare("SELECT type, amount FROM cash_movements WHERE portfolio_id = ?")
       .bind(portfolioId)
       .first<{ type: string; amount: number }>();
     expect(transferRow!.type).toBe("deposit");

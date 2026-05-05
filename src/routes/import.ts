@@ -203,7 +203,7 @@ export async function importIbkrStatement(
     // Deduplicate
     const existing = await db
       .prepare(
-        "SELECT id FROM transfers WHERE portfolio_id = ? AND type = ? AND amount = ? AND date = ?",
+        "SELECT id FROM cash_movements WHERE portfolio_id = ? AND type = ? AND amount = ? AND date = ?",
       )
       .bind(portfolioId, transfer.type, transfer.amount, transfer.date)
       .first();
@@ -214,7 +214,7 @@ export async function importIbkrStatement(
 
     await db
       .prepare(
-        "INSERT INTO transfers (portfolio_id, type, amount, fee, date) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO cash_movements (portfolio_id, type, amount, fee, date) VALUES (?, ?, ?, ?, ?)",
       )
       .bind(portfolioId, transfer.type, transfer.amount, transfer.fee, transfer.date)
       .run();

@@ -37,7 +37,7 @@ export async function calculateSnapshot(
     // total_investment: previous + period transfers (excludes interest)
     const investmentDelta = await db
       .prepare(
-        "SELECT COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN -(amount + fee) WHEN type = 'interest' THEN 0 ELSE amount - fee END), 0) AS total FROM transfers WHERE portfolio_id = ? AND date > ? AND date <= ?",
+        "SELECT COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN -(amount + fee) WHEN type = 'interest' THEN 0 ELSE amount - fee END), 0) AS total FROM cash_movements WHERE portfolio_id = ? AND date > ? AND date <= ?",
       )
       .bind(portfolioId, startDate, date)
       .first<{ total: number }>();
@@ -45,7 +45,7 @@ export async function calculateSnapshot(
     // cash_balance: previous + period transfers + period transactions
     const transferDelta = await db
       .prepare(
-        "SELECT COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN -(amount + fee) ELSE amount - fee END), 0) AS total FROM transfers WHERE portfolio_id = ? AND date > ? AND date <= ?",
+        "SELECT COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN -(amount + fee) ELSE amount - fee END), 0) AS total FROM cash_movements WHERE portfolio_id = ? AND date > ? AND date <= ?",
       )
       .bind(portfolioId, startDate, date)
       .first<{ total: number }>();
@@ -63,14 +63,14 @@ export async function calculateSnapshot(
     // No previous snapshot, calculate from beginning
     const investmentRow = await db
       .prepare(
-        "SELECT COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN -(amount + fee) WHEN type = 'interest' THEN 0 ELSE amount - fee END), 0) AS total FROM transfers WHERE portfolio_id = ? AND date <= ?",
+        "SELECT COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN -(amount + fee) WHEN type = 'interest' THEN 0 ELSE amount - fee END), 0) AS total FROM cash_movements WHERE portfolio_id = ? AND date <= ?",
       )
       .bind(portfolioId, date)
       .first<{ total: number }>();
 
     const transferCashRow = await db
       .prepare(
-        "SELECT COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN -(amount + fee) ELSE amount - fee END), 0) AS total FROM transfers WHERE portfolio_id = ? AND date <= ?",
+        "SELECT COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN -(amount + fee) ELSE amount - fee END), 0) AS total FROM cash_movements WHERE portfolio_id = ? AND date <= ?",
       )
       .bind(portfolioId, date)
       .first<{ total: number }>();

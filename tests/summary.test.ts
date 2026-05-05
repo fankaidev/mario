@@ -36,7 +36,7 @@ function authHeaders(): Record<string, string> {
 }
 
 async function makeDeposit(amount: number) {
-  const res = await ctx.request(`/api/portfolios/${portfolioId}/transfers`, {
+  const res = await ctx.request(`/api/portfolios/${portfolioId}/cash-transfers`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ type: "deposit", amount, fee: 0, date: "2024-01-01" }),
@@ -45,7 +45,7 @@ async function makeDeposit(amount: number) {
 }
 
 async function makeWithdrawal(amount: number) {
-  const res = await ctx.request(`/api/portfolios/${portfolioId}/transfers`, {
+  const res = await ctx.request(`/api/portfolios/${portfolioId}/cash-transfers`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ type: "withdrawal", amount, fee: 0, date: "2024-01-01" }),

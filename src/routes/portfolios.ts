@@ -48,7 +48,7 @@ export async function getIRRCashFlows(
   const dateFilter = upToDate ? "AND date <= ?" : "";
   const rows = await db
     .prepare(
-      `SELECT type, amount, fee, date FROM transfers WHERE portfolio_id = ? AND type != 'interest' ${dateFilter} ORDER BY date`,
+      `SELECT type, amount, fee, date FROM cash_movements WHERE portfolio_id = ? AND type != 'interest' ${dateFilter} ORDER BY date`,
     )
     .bind(...(upToDate ? [portfolioId, upToDate] : [portfolioId]))
     .all<{ type: string; amount: number; fee: number; date: string }>();
@@ -77,7 +77,7 @@ export async function calculateCashBalance(db: D1Database, portfolioId: number):
         WHEN type = 'sell' THEN quantity * price - fee
         WHEN type = 'dividend' THEN quantity * price - fee
       END), 0) FROM transactions WHERE portfolio_id = ?) as tx_cash
-    FROM transfers WHERE portfolio_id = ?
+    FROM cash_movements WHERE portfolio_id = ?
   `,
     )
     .bind(portfolioId, portfolioId)
@@ -377,7 +377,7 @@ export async function getPortfolioSummary(
 ): Promise<PortfolioSummary> {
   const investmentRow = await db
     .prepare(
-      "SELECT SUM(CASE WHEN type = 'withdrawal' THEN -(amount + fee) WHEN type = 'interest' THEN 0 ELSE amount - fee END) AS total FROM transfers WHERE portfolio_id = ?",
+      "SELECT SUM(CASE WHEN type = 'withdrawal' THEN -(amount + fee) WHEN type = 'interest' THEN 0 ELSE amount - fee END) AS total FROM cash_movements WHERE portfolio_id = ?",
     )
     .bind(portfolioId)
     .first<{ total: number | null }>();

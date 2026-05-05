@@ -1,6 +1,6 @@
 # UC-PORTFOLIO-006: Cash Transactions
 
-> Users deposit and withdraw cash to track portfolio cash balance. Cash transfers are stored in a separate `transfers` table.
+> Users deposit and withdraw cash to track portfolio cash balance. Cash transfers are stored in the `cash_movements` table.
 
 ## Rules
 
@@ -12,9 +12,9 @@
 | R4 | Buy transaction decreases cash balance; negative balance allowed (margin/unsettled) |
 | R5 | Sell transaction increases cash balance |
 | R6 | Dividend transaction increases cash balance |
-| R7 | Deleting a transfer reverses its cash balance effect; for deposit, deletion blocked if resulting balance would be negative |
-| R8 | Transfers (deposit/withdrawal) are stored in the `transfers` table with amount, fee, date, and optional note |
-| R9 | Cash balance reflects net result of all portfolio transfers and transactions |
+| R7 | Deleting a cash transfer reverses its cash balance effect; for deposit, deletion blocked if resulting balance would be negative |
+| R8 | Cash transfers (deposit/withdrawal) are stored in the `cash_movements` table with amount, fee, date, and optional note |
+| R9 | Cash balance reflects net result of all portfolio cash movements and transactions |
 
 ## Scenarios
 
@@ -34,8 +34,8 @@
 | UC-PORTFOLIO-006-S10 | P1 | ✅ | Given portfolio with cash_balance=1000, When buying AAPL 10 shares @ 150 (cost=1500), Then cash_balance becomes -500 (margin allowed) | R4 |
 | UC-PORTFOLIO-006-S11 | P1 | ✅ | Given deposit with fee=50, When depositing 10000 USD, Then cash_balance becomes 9950 | R1 |
 | UC-PORTFOLIO-006-S12 | P1 | ✅ | Given withdrawal with fee=25, When withdrawing 1000 from balance=5000, Then cash_balance becomes 3975 | R2 |
-| UC-PORTFOLIO-006-S13 | P1 | ✅ | Given portfolio with deposits, withdrawals, buys, sells, and dividends, When recalculating cash, Then cash_balance equals net of all transfers and transactions | R9 |
-| UC-PORTFOLIO-006-S14 | P1 | ✅ | Given portfolio with deposit 10000 on 2024-01-01, buy 1500 on 2024-01-15, withdrawal 2000 on 2024-02-01, When viewing transfers list, Then deposit shows cash_balance=10000, withdrawal shows cash_balance=6500 (10000-1500-2000) | R9 |
+| UC-PORTFOLIO-006-S13 | P1 | ✅ | Given portfolio with deposits, withdrawals, buys, sells, and dividends, When recalculating cash, Then cash_balance equals net of all cash movements and transactions | R9 |
+| UC-PORTFOLIO-006-S14 | P1 | ✅ | Given portfolio with deposit 10000 on 2024-01-01, buy 1500 on 2024-01-15, withdrawal 2000 on 2024-02-01, When viewing cash transfers list, Then deposit shows cash_balance=10000, withdrawal shows cash_balance=6500 (10000-1500-2000) | R9 |
 
 ### ai-e2e
 

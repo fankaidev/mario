@@ -41,12 +41,12 @@ export interface Transaction {
   cash_balance?: number;
 }
 
-export type TransferType = "deposit" | "withdrawal" | "initial" | "interest";
+export type CashTransferType = "deposit" | "withdrawal" | "initial" | "interest";
 
-export interface Transfer {
+export interface CashTransfer {
   id: number;
   portfolio_id: number;
-  type: TransferType;
+  type: CashTransferType;
   amount: number;
   fee: number;
   date: string;
@@ -55,8 +55,8 @@ export interface Transfer {
   cash_balance?: number;
 }
 
-export interface CreateTransferRequest {
-  type: TransferType;
+export interface CreateCashTransferRequest {
+  type: CashTransferType;
   amount: number;
   fee?: number;
   date: string;

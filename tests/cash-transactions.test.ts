@@ -49,7 +49,7 @@ async function createTransfer(
   amount: number,
   fee: number,
 ): Promise<{ status: number; data?: { id: number } }> {
-  const res = await ctx.request(`/api/portfolios/${portfolioId}/transfers`, {
+  const res = await ctx.request(`/api/portfolios/${portfolioId}/cash-transfers`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ type, amount, fee, date: "2024-01-15" }),
@@ -75,7 +75,7 @@ async function createTransaction(
 }
 
 async function deleteTransfer(transferId: number): Promise<Response> {
-  return ctx.request(`/api/portfolios/${portfolioId}/transfers/${transferId}`, {
+  return ctx.request(`/api/portfolios/${portfolioId}/cash-transfers/${transferId}`, {
     method: "DELETE",
     headers: authHeaders(),
   });
@@ -217,9 +217,9 @@ describe("Cash Transactions", () => {
     expect(await getCashBalance()).toBe(3975);
   });
 
-  it("[UC-PORTFOLIO-006-S14] transfers list includes running cash balance after all events", async () => {
+  it("[UC-PORTFOLIO-006-S14] cash transfers list includes running cash balance after all events", async () => {
     // deposit 10000 on 2024-01-01
-    const d1 = await ctx.request(`/api/portfolios/${portfolioId}/transfers`, {
+    const d1 = await ctx.request(`/api/portfolios/${portfolioId}/cash-transfers`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ type: "deposit", amount: 10000, fee: 0, date: "2024-01-01" }),
@@ -242,14 +242,14 @@ describe("Cash Transactions", () => {
     expect(b1.status).toBe(201);
 
     // withdrawal 2000 on 2024-02-01
-    const w1 = await ctx.request(`/api/portfolios/${portfolioId}/transfers`, {
+    const w1 = await ctx.request(`/api/portfolios/${portfolioId}/cash-transfers`, {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ type: "withdrawal", amount: 2000, fee: 0, date: "2024-02-01" }),
     });
     expect(w1.status).toBe(201);
 
-    const res = await ctx.request(`/api/portfolios/${portfolioId}/transfers`, {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/cash-transfers`, {
       headers: authHeaders(),
     });
     expect(res.status).toBe(200);
@@ -267,7 +267,7 @@ describe("Cash Transactions", () => {
     expect(withdrawal.cash_balance).toBe(6500);
   });
 
-  it("[UC-PORTFOLIO-006-S13] recalculate cash from all transfers and transactions", async () => {
+  it("[UC-PORTFOLIO-006-S13] recalculate cash from all cash movements and transactions", async () => {
     await createTransfer("deposit", 100000, 0);
     await createTransfer("withdrawal", 10000, 0);
 
