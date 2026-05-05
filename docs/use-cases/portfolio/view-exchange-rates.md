@@ -11,7 +11,7 @@
 | R3  | Same-currency conversion always returns rate of 1 (no lookup needed)                                                                                                            |
 | R4  | Rate lookup returns null when no rate exists for the pair                                                                                                                       |
 | R5  | Exchange rate sync fetches from Yahoo Finance API (USDCNY=X, USDHKD=X) and is idempotent                                                                                        |
-| R6  | Exchange rates sync runs as part of the weekly cron before price sync                                                                                                           |
+| R6  | Exchange rates sync runs as part of the daily cron before price sync, fetching the last 7 days                                                                                  |
 | R7  | Historical backfill is supported via POST /sync with start_date and end_date                                                                                                    |
 | R8  | When a direct rate (from→to) is not stored, the inverse rate (1 / to→from) is used as fallback                                                                                  |
 | R9  | For HKD↔CNY conversions without a direct rate, the cross-rate via USD is computed: HKD→CNY = (HKD→USD) / (CNY→USD)                                                              |

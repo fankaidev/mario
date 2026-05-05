@@ -62,12 +62,12 @@ async function fetchHistory(
 /**
  * Sync exchange rates for all currency pairs.
  * Called by cron and by POST /sync route.
- * Fetches the last 30 days of exchange rate data to catch any missing dates.
+ * Fetches the last 7 days of exchange rate data to catch any missing dates.
  */
 export async function syncExchangeRates(db: D1Database): Promise<number> {
   const today = new Date().toISOString().split("T")[0]!;
   const past = new Date();
-  past.setDate(past.getDate() - 30);
+  past.setDate(past.getDate() - 7);
   const startDate = past.toISOString().split("T")[0]!;
 
   let count = 0;

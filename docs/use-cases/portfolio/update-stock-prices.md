@@ -10,12 +10,14 @@
 | R2 | Prices are stored in price_history table with (symbol, date, close) as composite primary key; newer values overwrite older ones for the same date |
 | R3 | Single stock fetch failure does not affect other stocks' updates |
 | R4 | API failure logs error, does not interrupt the flow |
-| R5 | Cron auto-update uses historical sync logic (syncPriceHistory) |
+| R5 | Cron daily auto-update uses historical sync logic (syncPriceHistory) with 7-day lookback |
 | R6 | Price update also fetches and stores company name in stocks table |
 | R7 | Symbols ending in `.HK`, `.SS`, `.SZ` use Eastmoney; 6-digit codes without suffix use Eastmoney; all others use Finnhub |
 | R8 | Historical price sync fetches daily close prices from fetcher's fetchHistory method; US stocks use Yahoo Finance for history (Finnhub has no history API); CN/HK stocks use Eastmoney for history |
 | R9 | Historical sync skips dates already present in price_history by fetching from last known date + 1 |
 | R10 | Zero is a valid price (e.g., expired warrants, CBBC) and must be stored and displayed, not treated as null/missing |
+| R11 | Scheduled daily sync re-fetches the most recent 7 days of price history to ensure data freshness; upserts are idempotent |
+| R12 | When a transaction introduces a symbol never seen by the user before, price history is backfilled from 2024-01-01 |
 
 ## Scenarios
 
@@ -35,6 +37,9 @@
 | UC-PORTFOLIO-005-S10 | P0 | ✅ | Given portfolio holds AAPL, 0700.HK, and 000979, When syncing price history, Then Yahoo is called for AAPL, Eastmoney for 0700.HK and 000979, all prices are updated | R7, R8 |
 | UC-PORTFOLIO-005-S11 | P1 | ❌ | Given price_history already has AAPL data up to 2024-01-15, When syncing, Then fetchHistory is called starting from 2024-01-16, existing records are not re-fetched | R9 |
 | UC-PORTFOLIO-005-S12 | P0 | ✅ | Given portfolio holds an expired warrant, When syncing price history with close=0, Then price is stored as 0 (not null), and getLatestPrice returns 0 | R10 |
+| UC-PORTFOLIO-005-S13 | P1 | ❌ | Given price_history already has AAPL data, When syncing with lookbackDays=7, Then fetchHistory is called starting from (today - 7 days), re-fetching overlapping data to ensure freshness | R11 |
+| UC-PORTFOLIO-005-S14 | P0 | ❌ | Given user has no prior transactions for NVDA, When creating a buy transaction for NVDA, Then syncPriceHistory is triggered from 2024-01-01, backfilling full price history | R12 |
+| UC-PORTFOLIO-005-S15 | P1 | ❌ | Given user already has AAPL transactions, When creating another buy for AAPL, Then no additional price sync is triggered | R12 |
 
 ### ai-e2e
 (none)
