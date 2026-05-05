@@ -41,7 +41,7 @@ export interface Transaction {
   cash_balance?: number;
 }
 
-export type TransferType = "deposit" | "withdrawal";
+export type TransferType = "deposit" | "withdrawal" | "initial";
 
 export interface Transfer {
   id: number;
