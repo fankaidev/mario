@@ -14,6 +14,7 @@
 | R6 | Transaction date cannot be later than current date |
 | R7 | `fee` field meaning varies by transaction type: buy=commission, sell=commission, dividend=withholding tax, initial=commission |
 | R8 | Initial transaction creates a lot just like buy, recording quantity and cost basis for pre-existing holdings |
+| R9 | When adding a buy or initial transaction for a symbol the user has never transacted before, the system automatically backfills price history from 2024-01-01 |
 
 ## Scenarios
 
