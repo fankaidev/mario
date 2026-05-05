@@ -214,13 +214,17 @@ export function CashTransfersTab({ id, currency }: { id: string; currency: strin
               </Badge>
               <span className="truncate text-muted-foreground">{t.note || ""}</span>
               <span>{currency}</span>
-              <span className="text-right">{t.amount.toLocaleString()}</span>
-              <span className="text-right text-muted-foreground">{t.fee > 0 ? t.fee : ""}</span>
-              <span className={`text-right ${netEffect >= 0 ? "text-green-600" : "text-red-600"}`}>
+              <span className="text-right tabular-nums">{t.amount.toLocaleString()}</span>
+              <span className="text-right tabular-nums text-muted-foreground">
+                {t.fee > 0 ? t.fee : ""}
+              </span>
+              <span
+                className={`text-right tabular-nums ${netEffect >= 0 ? "text-green-600" : "text-red-600"}`}
+              >
                 {netEffect >= 0 ? "+" : ""}
                 {netEffect.toLocaleString()}
               </span>
-              <span className="text-right font-medium">
+              <span className="text-right tabular-nums font-medium">
                 {Math.round(t.runningTotal).toLocaleString()}
               </span>
               {manageMode && (
