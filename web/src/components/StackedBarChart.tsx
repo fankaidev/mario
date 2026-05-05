@@ -102,8 +102,9 @@ export function StackedBarChart({ data, height = 250, formatValue }: StackedBarC
           </g>
         ))}
         {data.map((point, i) => {
-          if (i % labelStep !== 0 && i !== data.length - 1) return null;
+          if (i % labelStep !== 0) return null;
           const x = scaleX(i);
+          const dateLabel = point.label.length > 8 ? point.label.slice(2) : point.label;
           return (
             <text
               key={`label-${point.label}`}
@@ -113,7 +114,7 @@ export function StackedBarChart({ data, height = 250, formatValue }: StackedBarC
               fontSize={9}
               fill="#9ca3af"
             >
-              {point.label.length > 8 ? point.label.slice(5) : point.label}
+              {dateLabel}
             </text>
           );
         })}
