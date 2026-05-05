@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { LineChart } from "../../components/LineChart";
+import { LineChart } from "../../components/charts";
 import { Button } from "../../components/ui/button";
 import { Switch } from "../../components/ui/switch";
 import { get } from "../../lib/api";

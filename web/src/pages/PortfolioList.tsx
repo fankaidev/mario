@@ -17,7 +17,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Select } from "../components/ui/select";
 import { get, post, del } from "../lib/api";
-import { StackedBarChart, getPortfolioColor } from "../components/StackedBarChart";
+import { StackedBarChart, getPortfolioColor } from "../components/charts";
 import type { AggregatedSummary, ExchangeRateRecord, Portfolio } from "../../../shared/types/api";
 import type { Snapshot } from "./portfolio/types";
 
