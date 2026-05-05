@@ -330,20 +330,14 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
       </div>
       {snapshots.length === 0 && <EmptyState message="No snapshots yet." />}
       <div className="space-y-1">
-        <div
-          className={`grid items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground ${
-            manageMode
-              ? "grid-cols-[100px_100px_100px_100px_100px_1fr_32px]"
-              : "grid-cols-[100px_100px_100px_100px_100px_1fr]"
-          }`}
-        >
+        <div className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_32px] items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground">
           <span>Date</span>
           <span className="text-right">Investment</span>
           <span className="text-right">Securities</span>
           <span className="text-right">Cash</span>
           <span className="text-right">Total</span>
           <span className="text-right">P&L</span>
-          {manageMode && <span />}
+          <span />
         </div>
         {snapshots.map((snap) => {
           const totalValue = snap.market_value + snap.cash_balance;
@@ -357,11 +351,7 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
           return (
             <div
               key={snap.id}
-              className={`grid items-center gap-2 border-b py-2 text-sm ${
-                manageMode
-                  ? "grid-cols-[100px_100px_100px_100px_100px_1fr_32px]"
-                  : "grid-cols-[100px_100px_100px_100px_100px_1fr]"
-              }`}
+              className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_32px] items-center gap-2 border-b py-2 text-sm"
             >
               <span className="font-medium">{snap.date}</span>
               <span className="text-right">{snap.total_investment.toLocaleString()}</span>
