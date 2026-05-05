@@ -156,4 +156,39 @@ exchangeRates.post("/sync", async (c) => {
   return c.json({ data: { records_synced: count } });
 });
 
+exchangeRates.post("/bulk", async (c) => {
+  const body = await c.req.json<{
+    rates: Array<{
+      from_currency: string;
+      to_currency: string;
+      date: string;
+      rate: number;
+    }>;
+  }>();
+
+  if (!Array.isArray(body.rates)) {
+    return c.json({ error: "rates array is required" }, 400);
+  }
+
+  const db = c.env.DB;
+  let count = 0;
+
+  for (const r of body.rates) {
+    if (!r.from_currency || !r.to_currency || !r.date || typeof r.rate !== "number") continue;
+    try {
+      const insert = await db
+        .prepare(
+          "INSERT OR IGNORE INTO exchange_rates (from_currency, to_currency, date, rate) VALUES (?, ?, ?, ?)",
+        )
+        .bind(r.from_currency, r.to_currency, r.date, Math.round(r.rate * 1000000) / 1000000)
+        .run();
+      if (insert.meta.changes > 0) count++;
+    } catch {
+      // Skip invalid rows
+    }
+  }
+
+  return c.json({ data: { records_synced: count } });
+});
+
 export default exchangeRates;
