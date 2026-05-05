@@ -18,7 +18,7 @@ import { Label } from "../components/ui/label";
 import { Select } from "../components/ui/select";
 import { get, post, del } from "../lib/api";
 import { StackedBarChart, getPortfolioColor } from "../components/StackedBarChart";
-import type { AggregatedSummary, Portfolio } from "../../../shared/types/api";
+import type { AggregatedSummary, ExchangeRateRecord, Portfolio } from "../../../shared/types/api";
 import type { Snapshot } from "./portfolio/types";
 
 export function PortfolioList() {
@@ -48,6 +48,69 @@ export function PortfolioList() {
     queryFn: () => get<{ data: AggregatedSummary }>(`/summary?currency=${targetCurrency}`),
     staleTime: 60 * 1000,
   });
+
+  const { data: exchangeRatesData } = useQuery({
+    queryKey: ["exchangeRates"],
+    queryFn: () => get<{ data: ExchangeRateRecord[] }>("/exchange-rates"),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const rateLookup = useMemo(() => {
+    const rates = exchangeRatesData?.data ?? [];
+    // Build map: fromCurrency -> toCurrency -> sorted array of { date, rate }
+    const map = new Map<string, Array<{ date: string; rate: number }>>();
+    for (const r of rates) {
+      const key = `${r.from_currency}->${r.to_currency}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push({ date: r.date, rate: r.rate });
+    }
+    for (const arr of map.values()) {
+      arr.sort((a, b) => a.date.localeCompare(b.date));
+    }
+    return map;
+  }, [exchangeRatesData]);
+
+  function findRate(from: string, to: string, date: string): number | null {
+    if (from === to) return 1;
+
+    // Try direct rate at or before the snapshot date
+    const directKey = `${from}->${to}`;
+    const directRates = rateLookup.get(directKey);
+    const direct = findNearestRate(directRates, date);
+    if (direct !== null) return direct;
+
+    // Try inverse rate
+    const inverseKey = `${to}->${from}`;
+    const inverseRates = rateLookup.get(inverseKey);
+    const inverse = findNearestRate(inverseRates, date);
+    if (inverse !== null) return 1 / inverse;
+
+    // Try cross-rate via USD for HKD↔CNY
+    if (from !== "USD" && to !== "USD") {
+      const fromToUsd = findNearestRate(rateLookup.get(`${from}->USD`), date);
+      const toToUsd = findNearestRate(rateLookup.get(`${to}->USD`), date);
+      if (fromToUsd !== null && toToUsd !== null) return fromToUsd / toToUsd;
+    }
+
+    return null;
+  }
+
+  function findNearestRate(
+    rates: Array<{ date: string; rate: number }> | undefined,
+    targetDate: string,
+  ): number | null {
+    if (!rates || rates.length === 0) return null;
+    // Find the last rate on or before the target date
+    let best: { date: string; rate: number } | null = null;
+    for (const r of rates) {
+      if (r.date <= targetDate) {
+        best = r;
+      } else {
+        break;
+      }
+    }
+    return best?.rate ?? null;
+  }
 
   const snapshotQueries = useQueries({
     queries: portfolios
@@ -138,12 +201,15 @@ export function PortfolioList() {
         }
 
         if (lastSnap) {
-          const idx = portfolios.findIndex((pf) => pf.id === p.id);
-          segments.push({
-            label: p.name,
-            value: lastSnap.market_value + lastSnap.cash_balance,
-            color: getPortfolioColor(idx),
-          });
+          const rate = findRate(p.currency, targetCurrency, date);
+          if (rate !== null) {
+            const idx = portfolios.findIndex((pf) => pf.id === p.id);
+            segments.push({
+              label: p.name,
+              value: (lastSnap.market_value + lastSnap.cash_balance) * rate,
+              color: getPortfolioColor(idx),
+            });
+          }
         }
       }
       return {
@@ -151,7 +217,7 @@ export function PortfolioList() {
         segments,
       };
     });
-  }, [allSnapshotData, portfolios, chartCutoff]);
+  }, [allSnapshotData, portfolios, chartCutoff, targetCurrency, rateLookup]);
 
   const togglePortfolio = (id: number) => {
     setSelectedIds((prev) => {
@@ -342,7 +408,7 @@ export function PortfolioList() {
               <StackedBarChart
                 data={chartData}
                 height={250}
-                formatValue={(v) => v.toLocaleString()}
+                formatValue={(v) => `${Math.round(v).toLocaleString()} ${targetCurrency}`}
               />
             </CardContent>
           </Card>
