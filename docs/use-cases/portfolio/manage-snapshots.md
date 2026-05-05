@@ -1,6 +1,6 @@
 # UC-PORTFOLIO-008: Manage Portfolio Snapshots
 
-> Users can record historical portfolio snapshots for tracking total investment and market value over time. Weekly cron job auto-generates snapshots for active portfolios. Calculated snapshots auto-compute values from transactions, transfers, and price_history.
+> Users can record historical portfolio snapshots for tracking total investment and market value over time. Weekly cron job auto-generates snapshots for active portfolios. Calculated snapshots auto-compute values from transactions, transfers, and price_history. Manual snapshots can be used to calibrate values when there are errors or gaps in transaction/transfer history - subsequent calculated snapshots will use the calibrated values as baseline, preventing historical data issues from polluting future snapshots.
 
 ## Rules
 
@@ -17,6 +17,8 @@
 | R9 | Calculated snapshot date defaults to today if not provided |
 | R10 | Calculated snapshot date must not be in the future |
 | R11 | Calculated snapshot returns 409 if a snapshot already exists for that date |
+| R12 | If a previous snapshot exists, calculated snapshot uses it as baseline: total_investment = prev + period transfers, cash_balance = prev + period transfers + period transactions. This allows manual corrections to "calibrate" values |
+| R13 | Interest transfers are excluded from total_investment calculation but included in cash_balance |
 
 ## Scenarios
 
@@ -36,6 +38,8 @@
 | UC-PORTFOLIO-008-S10 | P1 | ❌ | Given snapshot already exists for date, When creating calculated snapshot, Then return 409 | R1, R11 |
 | UC-PORTFOLIO-008-S11 | P1 | ❌ | Given portfolio has sells before date D, When creating calculated snapshot for date D, Then market_value reflects only remaining holdings after sells, cash_balance includes sell proceeds | R7 |
 | UC-PORTFOLIO-008-S12 | P1 | ❌ | Given portfolio belongs to another user, When creating calculated snapshot, Then return 404 | |
+| UC-PORTFOLIO-008-S13 | P0 | ✅ | Given previous snapshot exists with calibrated cash_balance, When creating calculated snapshot for later date, Then new cash_balance = prev cash_balance + period changes | R12 |
+| UC-PORTFOLIO-008-S14 | P1 | ✅ | Given previous snapshot exists, When adding interest transfer and creating calculated snapshot, Then interest is included in cash_balance but excluded from total_investment | R12, R13 |
 
 ### ai-e2e
 (none)

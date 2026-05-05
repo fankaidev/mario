@@ -324,4 +324,78 @@ describe("Calculated Snapshots", () => {
     });
     expect(res.status).toBe(404);
   });
+
+  it("[UC-PORTFOLIO-008-S13] calculates incrementally from previous snapshot", async () => {
+    // Create first snapshot with manually adjusted values (simulating calibration)
+    await ctx.request(`/api/portfolios/${portfolioId}/snapshots`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        date: "2024-01-31",
+        total_investment: 10000,
+        market_value: 10500,
+        cash_balance: 500, // Manually calibrated value
+      }),
+    });
+
+    // Add transactions after the snapshot
+    await ctx.request(`/api/portfolios/${portfolioId}/transfers`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "deposit", amount: 5000, fee: 0, date: "2024-02-15" }),
+    });
+
+    await ctx.request(`/api/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        symbol: "AAPL",
+        type: "buy",
+        quantity: 10,
+        price: 150,
+        fee: 5,
+        date: "2024-02-20",
+      }),
+    });
+
+    await seedPrice("AAPL", "2024-02-28", 160);
+
+    // Calculate new snapshot - should use previous snapshot as baseline
+    const result = await calculateSnapshot(db, portfolioId, "2024-02-28");
+
+    // total_investment: 10000 (prev) + 5000 (deposit) = 15000
+    expect(result.total_investment).toBe(15000);
+    // cash_balance: 500 (prev calibrated) + 5000 (deposit) - 1505 (buy) = 3995
+    expect(result.cash_balance).toBe(3995);
+    // market_value: 10 * 160 = 1600
+    expect(result.market_value).toBe(1600);
+  });
+
+  it("[UC-PORTFOLIO-008-S14] interest excluded from total_investment in incremental calc", async () => {
+    // Create first snapshot
+    await ctx.request(`/api/portfolios/${portfolioId}/snapshots`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        date: "2024-01-31",
+        total_investment: 10000,
+        market_value: 0,
+        cash_balance: 10000,
+      }),
+    });
+
+    // Add interest after snapshot
+    await ctx.request(`/api/portfolios/${portfolioId}/transfers`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "interest", amount: 100, fee: 0, date: "2024-02-15" }),
+    });
+
+    const result = await calculateSnapshot(db, portfolioId, "2024-02-28");
+
+    // total_investment should NOT include interest
+    expect(result.total_investment).toBe(10000);
+    // cash_balance should include interest
+    expect(result.cash_balance).toBe(10100);
+  });
 });

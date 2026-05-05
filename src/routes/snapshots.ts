@@ -16,28 +16,72 @@ export async function calculateSnapshot(
   cash_balance: number;
   missing_prices: string[];
 }> {
-  // total_investment: net deposits/withdrawals up to date (excludes interest)
-  const investmentRow = await db
+  // Find the most recent snapshot before target date to use as baseline
+  const prevSnapshot = await db
     .prepare(
-      "SELECT COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN -(amount + fee) WHEN type = 'interest' THEN 0 ELSE amount - fee END), 0) AS total FROM transfers WHERE portfolio_id = ? AND date <= ?",
+      "SELECT date, total_investment, cash_balance FROM portfolio_snapshots WHERE portfolio_id = ? AND date < ? ORDER BY date DESC LIMIT 1",
     )
     .bind(portfolioId, date)
-    .first<{ total: number }>();
+    .first<{ date: string; total_investment: number; cash_balance: number }>();
 
-  // cash_balance: transfers (deposits - withdrawals + interest) + transactions (-buy costs + sell proceeds + dividends)
-  const transferCashRow = await db
-    .prepare(
-      "SELECT COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN -(amount + fee) ELSE amount - fee END), 0) AS total FROM transfers WHERE portfolio_id = ? AND date <= ?",
-    )
-    .bind(portfolioId, date)
-    .first<{ total: number }>();
+  let totalInvestment: number;
+  let cashBalance: number;
 
-  const txCashRow = await db
-    .prepare(
-      "SELECT COALESCE(SUM(CASE WHEN type IN ('buy', 'initial') THEN -(quantity * price + fee) WHEN type = 'sell' THEN quantity * price - fee WHEN type = 'dividend' THEN quantity * price - fee END), 0) AS total FROM transactions WHERE portfolio_id = ? AND date <= ?",
-    )
-    .bind(portfolioId, date)
-    .first<{ total: number }>();
+  if (prevSnapshot) {
+    // Incremental calculation from previous snapshot
+    const startDate = prevSnapshot.date;
+
+    // total_investment: previous + period transfers (excludes interest)
+    const investmentDelta = await db
+      .prepare(
+        "SELECT COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN -(amount + fee) WHEN type = 'interest' THEN 0 ELSE amount - fee END), 0) AS total FROM transfers WHERE portfolio_id = ? AND date > ? AND date <= ?",
+      )
+      .bind(portfolioId, startDate, date)
+      .first<{ total: number }>();
+
+    // cash_balance: previous + period transfers + period transactions
+    const transferDelta = await db
+      .prepare(
+        "SELECT COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN -(amount + fee) ELSE amount - fee END), 0) AS total FROM transfers WHERE portfolio_id = ? AND date > ? AND date <= ?",
+      )
+      .bind(portfolioId, startDate, date)
+      .first<{ total: number }>();
+
+    const txDelta = await db
+      .prepare(
+        "SELECT COALESCE(SUM(CASE WHEN type IN ('buy', 'initial') THEN -(quantity * price + fee) WHEN type = 'sell' THEN quantity * price - fee WHEN type = 'dividend' THEN quantity * price - fee END), 0) AS total FROM transactions WHERE portfolio_id = ? AND date > ? AND date <= ?",
+      )
+      .bind(portfolioId, startDate, date)
+      .first<{ total: number }>();
+
+    totalInvestment = prevSnapshot.total_investment + (investmentDelta?.total ?? 0);
+    cashBalance = prevSnapshot.cash_balance + (transferDelta?.total ?? 0) + (txDelta?.total ?? 0);
+  } else {
+    // No previous snapshot, calculate from beginning
+    const investmentRow = await db
+      .prepare(
+        "SELECT COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN -(amount + fee) WHEN type = 'interest' THEN 0 ELSE amount - fee END), 0) AS total FROM transfers WHERE portfolio_id = ? AND date <= ?",
+      )
+      .bind(portfolioId, date)
+      .first<{ total: number }>();
+
+    const transferCashRow = await db
+      .prepare(
+        "SELECT COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN -(amount + fee) ELSE amount - fee END), 0) AS total FROM transfers WHERE portfolio_id = ? AND date <= ?",
+      )
+      .bind(portfolioId, date)
+      .first<{ total: number }>();
+
+    const txCashRow = await db
+      .prepare(
+        "SELECT COALESCE(SUM(CASE WHEN type IN ('buy', 'initial') THEN -(quantity * price + fee) WHEN type = 'sell' THEN quantity * price - fee WHEN type = 'dividend' THEN quantity * price - fee END), 0) AS total FROM transactions WHERE portfolio_id = ? AND date <= ?",
+      )
+      .bind(portfolioId, date)
+      .first<{ total: number }>();
+
+    totalInvestment = investmentRow?.total ?? 0;
+    cashBalance = (transferCashRow?.total ?? 0) + (txCashRow?.total ?? 0);
+  }
 
   // Get transactions and corporate actions up to date and replay FIFO
   const txRows = await db
@@ -93,9 +137,9 @@ export async function calculateSnapshot(
   }
 
   return {
-    total_investment: investmentRow?.total ?? 0,
+    total_investment: Math.round(totalInvestment * 100) / 100,
     market_value: Math.round(marketValue * 100) / 100,
-    cash_balance: Math.round(((transferCashRow?.total ?? 0) + (txCashRow?.total ?? 0)) * 100) / 100,
+    cash_balance: Math.round(cashBalance * 100) / 100,
     missing_prices: missingPrices,
   };
 }
