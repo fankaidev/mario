@@ -7,6 +7,9 @@ import type {
   TransactionType,
 } from "../../shared/types/api";
 import { replayFIFO, type CorporateAction } from "../lib/fifo";
+import { syncPriceHistory } from "./prices";
+import { FetcherRouter } from "../clients/fetcher-router";
+import type { PriceFetcher } from "../clients/price-fetcher";
 
 const transactions = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
@@ -101,7 +104,7 @@ transactions.post("/", async (c) => {
   }
 
   if (body.type === "buy" || body.type === "initial") {
-    return handleBuy(c, portfolioId, body);
+    return handleBuy(c, portfolioId, body, user.id);
   }
   if (body.type === "sell") {
     return handleSell(c, portfolioId, body);
@@ -205,10 +208,51 @@ transactions.delete("/:txId", async (c) => {
 });
 
 async function handleBuy(
-  c: { env: { DB: D1Database }; json: (obj: unknown, status: number) => Response },
+  c: {
+    env: { DB: D1Database; FINNHUB_API_KEY?: string };
+    json: (obj: unknown, status: number) => Response;
+  },
   portfolioId: number,
   body: CreateTransactionRequest,
+  userId: number,
 ) {
+  // Check if this is a new symbol for the user and backfill price history
+  const existing = await c.env.DB.prepare(
+    "SELECT COUNT(*) as cnt FROM transactions t JOIN portfolios p ON t.portfolio_id = p.id WHERE p.user_id = ? AND t.symbol = ?",
+  )
+    .bind(userId, body.symbol)
+    .first<{ cnt: number }>();
+
+  if (existing && existing.cnt === 0) {
+    const apiKey = c.env.FINNHUB_API_KEY;
+    if (apiKey) {
+      const finnhub: PriceFetcher = {
+        async fetchPrice(symbol: string) {
+          const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}`, {
+            headers: { "X-Finnhub-Token": apiKey },
+          });
+          if (res.ok) {
+            const body = (await res.json()) as { c: number };
+            if (typeof body.c === "number" && body.c >= 0) return body.c;
+          }
+          return null;
+        },
+        async fetchName(symbol: string) {
+          const res = await fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}`, {
+            headers: { "X-Finnhub-Token": apiKey },
+          });
+          if (res.ok) {
+            const body = (await res.json()) as { name: string };
+            if (typeof body.name === "string" && body.name.length > 0) return body.name;
+          }
+          return null;
+        },
+      };
+      const fetcher = new FetcherRouter(finnhub);
+      await syncPriceHistory(c.env.DB, fetcher, body.symbol, "2024-01-01");
+    }
+  }
+
   const txResult = await c.env.DB.prepare(
     "INSERT INTO transactions (portfolio_id, symbol, type, quantity, price, fee, date) VALUES (?, ?, ?, ?, ?, ?, ?)",
   )

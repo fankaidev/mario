@@ -92,7 +92,7 @@ export default {
 
     let totalRecords = 0;
     for (const { symbol } of symbols.results) {
-      totalRecords += await syncPriceHistory(env.DB, fetcher, symbol);
+      totalRecords += await syncPriceHistory(env.DB, fetcher, symbol, "2026-01-01", 7);
     }
     console.log(`Scheduled price sync: ${totalRecords} records updated`);
 

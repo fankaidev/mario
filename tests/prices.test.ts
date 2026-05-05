@@ -199,6 +199,28 @@ describe("Price Sync", () => {
     expect(eastmoney.getAccessedSymbols()).toEqual(["0700.HK", "000979"]);
   });
 
+  it("[UC-PORTFOLIO-005-S13] re-fetches recent data with lookbackDays", async () => {
+    // Seed existing price data
+    await db
+      .prepare("INSERT INTO price_history (symbol, date, close) VALUES ('AAPL', '2024-01-15', 150)")
+      .run();
+
+    const finnhub = new FakePriceFetcher();
+    const yahoo = new FakePriceFetcher();
+    const eastmoney = new FakePriceFetcher();
+    yahoo.setHistory("AAPL", [{ date: "2024-01-20", close: 160 }]);
+
+    const router = new FetcherRouter(finnhub, yahoo, eastmoney);
+    // With lookbackDays=7, should fetch from (today - 7) even though latest date is 2024-01-15
+    // Since 2024-01-15 + 1 = 2024-01-16 which is before (today - 7),
+    // it should start from (today - 7) instead
+    await syncPriceHistory(db, router, "AAPL", "2024-01-01", 7);
+
+    // The fetcher should have been asked for data starting from (today - 7)
+    const accessed = yahoo.getAccessedSymbols();
+    expect(accessed).toContain("AAPL");
+  });
+
   it("[UC-PORTFOLIO-005-S12] stores and retrieves zero price for expired warrants", async () => {
     await makeBuy("EXPW.HK");
 

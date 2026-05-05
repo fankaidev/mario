@@ -26,8 +26,17 @@ export async function syncPriceHistory(
   fetcher: HistoryAndNameFetcher,
   symbol: string,
   startDate: string = "2026-01-01",
+  lookbackDays?: number,
 ): Promise<number> {
   const today = new Date().toISOString().split("T")[0]!;
+
+  const minStart = lookbackDays
+    ? (() => {
+        const d = new Date();
+        d.setDate(d.getDate() - lookbackDays);
+        return d.toISOString().split("T")[0]!;
+      })()
+    : null;
 
   // Find latest date for this symbol
   const latest = await db
@@ -35,9 +44,15 @@ export async function syncPriceHistory(
     .bind(symbol)
     .first<{ max_date: string | null }>();
 
-  const fetchStart = latest?.max_date
-    ? new Date(new Date(latest.max_date).getTime() + 86400000).toISOString().split("T")[0]!
-    : startDate;
+  let fetchStart: string;
+  if (latest?.max_date) {
+    const nextDay = new Date(new Date(latest.max_date).getTime() + 86400000)
+      .toISOString()
+      .split("T")[0]!;
+    fetchStart = minStart && minStart < nextDay ? minStart : nextDay;
+  } else {
+    fetchStart = minStart && minStart > startDate ? minStart : startDate;
+  }
 
   if (fetchStart > today) return 0;
 

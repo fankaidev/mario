@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestContext, cleanDatabase, createApiTokenForUser } from "./helpers";
 import type { TestContext } from "./helpers";
 
@@ -551,5 +551,160 @@ describe("Transaction History", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: string[] };
     expect(body.data).toEqual([]);
+  });
+});
+
+describe("New symbol price backfill", () => {
+  let ctx2: TestContext;
+  let db2: D1Database;
+  let portfolioId2: number;
+  let authToken2: string;
+
+  beforeAll(async () => {
+    ctx2 = await createTestContext({ FINNHUB_API_KEY: "test-key" });
+    db2 = ctx2.db;
+  });
+
+  afterAll(async () => {
+    await ctx2.clean();
+  });
+
+  beforeEach(async () => {
+    await cleanDatabase(db2);
+    const userResult = await db2
+      .prepare("INSERT INTO users (email) VALUES (?) RETURNING id")
+      .bind("test@example.com")
+      .first<{ id: number }>();
+    authToken2 = await createApiTokenForUser(db2, userResult!.id);
+    const portfolioResult = await db2
+      .prepare("INSERT INTO portfolios (user_id, name, currency) VALUES (?, ?, ?) RETURNING id")
+      .bind(userResult!.id, "US Stocks", "USD")
+      .first<{ id: number }>();
+    portfolioId2 = portfolioResult!.id;
+  });
+
+  function authHeaders2(): Record<string, string> {
+    return { Authorization: `Bearer ${authToken2}` };
+  }
+
+  it("[UC-PORTFOLIO-005-S14] backfills price history for new symbol on buy", async () => {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("finnhub") && url.includes("profile2")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ name: "NVIDIA Corp" }),
+        });
+      }
+      if (url.includes("yahoo")) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              chart: {
+                result: [
+                  {
+                    timestamp: [new Date("2024-01-15").getTime() / 1000],
+                    indicators: { quote: [{ close: [130] }] },
+                  },
+                ],
+              },
+            }),
+        });
+      }
+      return Promise.resolve({ ok: false, json: () => Promise.resolve({}) });
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    try {
+      const res = await ctx2.request(`/api/portfolios/${portfolioId2}/transactions`, {
+        method: "POST",
+        headers: { ...authHeaders2(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: "NVDA",
+          type: "buy",
+          quantity: 10,
+          price: 130,
+          fee: 0,
+          date: "2024-01-15",
+        }),
+      });
+      expect(res.status).toBe(201);
+
+      // Verify price history was backfilled
+      const priceRows = await db2
+        .prepare("SELECT * FROM price_history WHERE symbol = 'NVDA'")
+        .all();
+      expect(priceRows.results.length).toBeGreaterThan(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("[UC-PORTFOLIO-005-S15] does not backfill for known symbol", async () => {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("finnhub") && url.includes("profile2")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ name: "Apple Inc" }),
+        });
+      }
+      if (url.includes("yahoo")) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              chart: {
+                result: [
+                  {
+                    timestamp: [new Date("2024-01-15").getTime() / 1000],
+                    indicators: { quote: [{ close: [150] }] },
+                  },
+                ],
+              },
+            }),
+        });
+      }
+      return Promise.resolve({ ok: false, json: () => Promise.resolve({}) });
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    try {
+      // First buy triggers backfill (new symbol)
+      const res1 = await ctx2.request(`/api/portfolios/${portfolioId2}/transactions`, {
+        method: "POST",
+        headers: { ...authHeaders2(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: "AAPL",
+          type: "buy",
+          quantity: 10,
+          price: 150,
+          fee: 0,
+          date: "2024-01-15",
+        }),
+      });
+      expect(res1.status).toBe(201);
+
+      const callCountAfterFirst = mockFetch.mock.calls.length;
+
+      // Second buy for the same symbol should NOT trigger additional backfill
+      const res2 = await ctx2.request(`/api/portfolios/${portfolioId2}/transactions`, {
+        method: "POST",
+        headers: { ...authHeaders2(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: "AAPL",
+          type: "buy",
+          quantity: 20,
+          price: 155,
+          fee: 0,
+          date: "2024-02-01",
+        }),
+      });
+      expect(res2.status).toBe(201);
+
+      // No additional fetch calls should have been made
+      expect(mockFetch.mock.calls.length).toBe(callCountAfterFirst);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
