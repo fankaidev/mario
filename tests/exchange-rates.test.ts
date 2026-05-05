@@ -63,6 +63,30 @@ describe("getExchangeRate", () => {
     expect(rate).toBeNull();
   });
 
+  it("[UC-PORTFOLIO-011-S04b] uses inverse rate when direct rate not stored", async () => {
+    await db
+      .prepare(
+        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('HKD', 'USD', '2024-03-01', 0.128)",
+      )
+      .run();
+
+    // USD→HKD via inverse: 1 / 0.128 ≈ 7.8125
+    const rate = await getExchangeRate(db, "USD", "HKD", "2024-03-01");
+    expect(rate).toBeCloseTo(1 / 0.128, 4);
+  });
+
+  it("[UC-PORTFOLIO-011-S04c] computes cross-rate via USD for HKD→CNY", async () => {
+    await db
+      .prepare(
+        "INSERT INTO exchange_rates (from_currency, to_currency, date, rate) VALUES ('HKD', 'USD', '2024-03-01', 0.128), ('CNY', 'USD', '2024-03-01', 0.14)",
+      )
+      .run();
+
+    // HKD→CNY: HKD→USD / CNY→USD = 0.128 / 0.14 ≈ 0.9143
+    const rate = await getExchangeRate(db, "HKD", "CNY", "2024-03-01");
+    expect(rate).toBeCloseTo(0.128 / 0.14, 4);
+  });
+
   it("[UC-PORTFOLIO-011-S02b] returns latest rate when no date provided", async () => {
     await db
       .prepare(
