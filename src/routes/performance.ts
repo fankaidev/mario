@@ -19,6 +19,70 @@ import {
 
 const VALID_RANGES: RangeType[] = ["1M", "3M", "6M", "YTD", "1Y", "ALL"];
 
+function addRatePair(
+  pairs: Map<string, { from: string; to: string }>,
+  from: string,
+  to: string,
+): void {
+  pairs.set(`${from}→${to}`, { from, to });
+}
+
+function getRateFromCache(
+  rateArrays: Map<string, Array<{ date: string; rate: number }>>,
+  rateCursors: Map<string, number>,
+  from: string,
+  to: string,
+  targetDate: string,
+): number | null {
+  const direct = getRateWithCursor(rateArrays, rateCursors, from, to, targetDate);
+  if (direct !== null) return direct;
+
+  const inverse = getRateWithCursor(rateArrays, rateCursors, to, from, targetDate);
+  if (inverse !== null) return 1 / inverse;
+
+  if ((from === "HKD" || from === "CNY") && (to === "HKD" || to === "CNY")) {
+    let fromToUsd = getRateWithCursor(rateArrays, rateCursors, from, "USD", targetDate);
+    if (fromToUsd === null) {
+      const inv = getRateWithCursor(rateArrays, rateCursors, "USD", from, targetDate);
+      fromToUsd = inv !== null ? 1 / inv : null;
+    }
+    let toToUsd = getRateWithCursor(rateArrays, rateCursors, to, "USD", targetDate);
+    if (toToUsd === null) {
+      const inv = getRateWithCursor(rateArrays, rateCursors, "USD", to, targetDate);
+      toToUsd = inv !== null ? 1 / inv : null;
+    }
+    if (fromToUsd !== null && toToUsd !== null) {
+      return fromToUsd / toToUsd;
+    }
+  }
+
+  return null;
+}
+
+function getRateWithCursor(
+  rateArrays: Map<string, Array<{ date: string; rate: number }>>,
+  rateCursors: Map<string, number>,
+  from: string,
+  to: string,
+  targetDate: string,
+): number | null {
+  const key = `${from}→${to}`;
+  const rates = rateArrays.get(key);
+  if (!rates || rates.length === 0) return null;
+
+  let cursor = rateCursors.get(key) ?? 0;
+  while (cursor + 1 < rates.length && rates[cursor + 1]!.date <= targetDate) {
+    cursor++;
+  }
+  rateCursors.set(key, cursor);
+
+  const rate = rates[cursor]!;
+  if (rate.date <= targetDate) {
+    return rate.rate;
+  }
+  return null;
+}
+
 export async function computePortfolioPerformance(
   db: D1Database,
   portfolioId: number,
@@ -278,69 +342,112 @@ aggregatedPerformanceRouter.get("/chart", async (c) => {
     .bind(...params)
     .all<{ id: number; name: string; currency: string }>();
 
-  // For each portfolio, get all snapshots from the range start
-  const portfolioSnapshots: Map<
-    number,
-    Array<{ date: string; value: number }> & { currency: string }
-  > = new Map();
+  if (portfolios.results.length === 0) return c.json({ data: [] });
 
+  // Pre-fetch exchange rates for non-USD portfolios
+  const rateArrays = new Map<string, Array<{ date: string; rate: number }>>();
+  const ratePairs = new Map<string, { from: string; to: string }>();
+
+  for (const p of portfolios.results) {
+    if (p.currency === targetCurrency) continue;
+    addRatePair(ratePairs, p.currency, targetCurrency);
+    addRatePair(ratePairs, targetCurrency, p.currency);
+    if (
+      (p.currency === "HKD" && targetCurrency === "CNY") ||
+      (p.currency === "CNY" && targetCurrency === "HKD")
+    ) {
+      addRatePair(ratePairs, p.currency, "USD");
+      addRatePair(ratePairs, "USD", p.currency);
+      addRatePair(ratePairs, targetCurrency, "USD");
+      addRatePair(ratePairs, "USD", targetCurrency);
+    }
+  }
+
+  if (ratePairs.size > 0) {
+    const conds: string[] = [];
+    const rateParams: string[] = [];
+    for (const pair of ratePairs.values()) {
+      conds.push("(from_currency = ? AND to_currency = ?)");
+      rateParams.push(pair.from, pair.to);
+    }
+    const rateRows = await c.env.DB.prepare(
+      `SELECT from_currency, to_currency, date, rate FROM exchange_rates WHERE ${conds.join(" OR ")} ORDER BY from_currency, to_currency, date ASC`,
+    )
+      .bind(...rateParams)
+      .all<{ from_currency: string; to_currency: string; date: string; rate: number }>();
+
+    for (const row of rateRows.results) {
+      const key = `${row.from_currency}→${row.to_currency}`;
+      let arr = rateArrays.get(key);
+      if (!arr) {
+        arr = [];
+        rateArrays.set(key, arr);
+      }
+      arr.push({ date: row.date, rate: row.rate });
+    }
+  }
+
+  const rateCursors = new Map<string, number>();
+
+  // Fetch all snapshots in one query
+  const portfolioIds = portfolios.results.map((p) => p.id);
+  const snapshotParams: unknown[] = [...portfolioIds, range === "ALL" ? "0000-01-01" : startDate];
+
+  const snapshotRows = await c.env.DB.prepare(
+    `SELECT portfolio_id, date, market_value, cash_balance FROM portfolio_snapshots WHERE portfolio_id IN (${portfolioIds.map(() => "?").join(",")}) AND date >= ? ORDER BY portfolio_id, date ASC`,
+  )
+    .bind(...snapshotParams)
+    .all<{ portfolio_id: number; date: string; market_value: number; cash_balance: number }>();
+
+  const portfolioSnapshots = new Map<number, Array<{ date: string; value: number }>>();
   const allDates = new Set<string>();
 
-  for (const portfolio of portfolios.results) {
-    const rows = await c.env.DB.prepare(
-      "SELECT date, market_value, cash_balance FROM portfolio_snapshots WHERE portfolio_id = ? AND date >= ? ORDER BY date ASC",
-    )
-      .bind(portfolio.id, range === "ALL" ? "0000-01-01" : startDate)
-      .all<{ date: string; market_value: number; cash_balance: number }>();
-
-    const values: Array<{ date: string; value: number }> = [];
-    for (const row of rows.results) {
-      allDates.add(row.date);
-      values.push({ date: row.date, value: row.market_value + row.cash_balance });
+  for (const row of snapshotRows.results) {
+    allDates.add(row.date);
+    let snaps = portfolioSnapshots.get(row.portfolio_id);
+    if (!snaps) {
+      snaps = [];
+      portfolioSnapshots.set(row.portfolio_id, snaps);
     }
-
-    (values as any).currency = portfolio.currency;
-    portfolioSnapshots.set(portfolio.id, values as any);
+    snaps.push({ date: row.date, value: row.market_value + row.cash_balance });
   }
 
   if (allDates.size === 0) return c.json({ data: [] });
 
   const sortedDates = [...allDates].sort();
 
-  // Build chart points: for each date, forward-fill each portfolio's latest value
+  // Build chart points with two-pointer forward-fill
   const points: AggregatedChartPoint[] = [];
-  const lastValues = new Map<number, number>();
+  const snapCursors = new Map<number, number>();
 
   for (const date of sortedDates) {
     let totalValue = 0;
 
     for (const portfolio of portfolios.results) {
       const snaps = portfolioSnapshots.get(portfolio.id);
-      if (!snaps) continue;
+      if (!snaps || snaps.length === 0) continue;
 
-      // Find latest snapshot on or before this date
-      let latestValue: number | undefined;
-      for (const snap of snaps) {
-        if (snap.date <= date) {
-          latestValue = snap.value;
-        } else {
-          break;
-        }
+      let cursor = snapCursors.get(portfolio.id) ?? 0;
+      while (cursor + 1 < snaps.length && snaps[cursor + 1]!.date <= date) {
+        cursor++;
       }
+      snapCursors.set(portfolio.id, cursor);
 
-      if (latestValue !== undefined) {
-        lastValues.set(portfolio.id, latestValue);
-      }
+      if (snaps[cursor]!.date > date) continue;
 
-      const value = lastValues.get(portfolio.id);
-      if (value !== undefined) {
-        if (portfolio.currency === targetCurrency) {
-          totalValue += value;
-        } else {
-          const rate = await getExchangeRate(c.env.DB, portfolio.currency, targetCurrency, date);
-          if (rate !== null) {
-            totalValue += value * rate;
-          }
+      const value = snaps[cursor]!.value;
+      if (portfolio.currency === targetCurrency) {
+        totalValue += value;
+      } else {
+        const rate = getRateFromCache(
+          rateArrays,
+          rateCursors,
+          portfolio.currency,
+          targetCurrency,
+          date,
+        );
+        if (rate !== null) {
+          totalValue += value * rate;
         }
       }
     }
