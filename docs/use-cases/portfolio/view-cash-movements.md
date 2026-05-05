@@ -11,6 +11,7 @@
 | R3 | Running cash balance is calculated by interleaving all transfers and transactions chronologically |
 | R4 | Events are sorted by date, then created_at for same-date events |
 | R5 | Cash movements are returned in reverse chronological order (newest first) |
+| R6 | Cash movements can be filtered by type on the frontend; when no types are selected, all types are shown |
 
 ## Scenarios
 
@@ -27,4 +28,6 @@
 
 ### ai-e2e
 
-(none)
+| ID | Priority | Status | Scenario | Rules |
+|----|----------|--------|----------|-------|
+| UC-PORTFOLIO-014-S07 | P2 | ❌ | Given movements of multiple types, When filtering by type (e.g. "buy"), Then only movements matching the selected types are shown | R6 |

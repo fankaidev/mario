@@ -5,7 +5,7 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { EmptyState } from "../../components/EmptyState";
 import { get } from "../../lib/api";
-import type { CashMovement } from "../../../../shared/types/api";
+import type { CashMovement, CashMovementType } from "../../../../shared/types/api";
 
 function CashMovementTypeBadge({ type }: { type: string }) {
   const className =
@@ -28,6 +28,28 @@ export function CashTab({ id, currency }: { id: string; currency: string }) {
   >("ALL");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
+  const [selectedTypes, setSelectedTypes] = useState<Set<CashMovementType>>(new Set());
+
+  const ALL_TYPES: CashMovementType[] = [
+    "deposit",
+    "withdrawal",
+    "buy",
+    "sell",
+    "dividend",
+    "initial",
+  ];
+
+  const toggleType = (type: CashMovementType) => {
+    setSelectedTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) {
+        next.delete(type);
+      } else {
+        next.add(type);
+      }
+      return next;
+    });
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ["cash-movements", id],
@@ -74,8 +96,11 @@ export function CashTab({ id, currency }: { id: string; currency: string }) {
     if (endDate) {
       filtered = filtered.filter((m) => m.date <= endDate);
     }
+    if (selectedTypes.size > 0) {
+      filtered = filtered.filter((m) => selectedTypes.has(m.type));
+    }
     return filtered;
-  }, [data?.data, startDate, endDate]);
+  }, [data?.data, startDate, endDate, selectedTypes]);
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
 
@@ -105,6 +130,20 @@ export function CashTab({ id, currency }: { id: string; currency: string }) {
         >
           Custom
         </Button>
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-1">
+        {ALL_TYPES.map((type) => (
+          <Button
+            key={type}
+            size="sm"
+            variant={selectedTypes.has(type) ? "default" : "outline"}
+            className="h-6 px-2 text-xs"
+            onClick={() => toggleType(type)}
+          >
+            {type}
+          </Button>
+        ))}
       </div>
 
       {datePreset === "CUSTOM" && (
@@ -151,11 +190,16 @@ export function CashTab({ id, currency }: { id: string; currency: string }) {
               {m.amount >= 0 ? "+" : ""}
               {m.amount.toLocaleString()}
             </span>
-            <span className="text-right font-medium">{m.cash_balance.toFixed(2)}</span>
+            <span className="text-right font-medium">
+              {m.cash_balance.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
           </div>
         ))}
         {filteredMovements.length === 0 && data?.data.length !== 0 && (
-          <EmptyState message="No movements in this date range." />
+          <EmptyState message="No movements match the current filters." />
         )}
       </div>
     </div>
