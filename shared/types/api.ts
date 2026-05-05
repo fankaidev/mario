@@ -41,7 +41,7 @@ export interface Transaction {
   cash_balance?: number;
 }
 
-export type TransferType = "deposit" | "withdrawal" | "initial";
+export type TransferType = "deposit" | "withdrawal" | "initial" | "interest";
 
 export interface Transfer {
   id: number;
@@ -170,7 +170,14 @@ export interface PriceHistoryResponse {
   prices: PriceHistoryItem[];
 }
 
-export type CashMovementType = "deposit" | "withdrawal" | "buy" | "sell" | "dividend" | "initial";
+export type CashMovementType =
+  | "deposit"
+  | "withdrawal"
+  | "buy"
+  | "sell"
+  | "dividend"
+  | "initial"
+  | "interest";
 
 export interface CashMovement {
   id: number;
