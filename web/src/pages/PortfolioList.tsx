@@ -27,6 +27,7 @@ export function PortfolioList() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [manageMode, setManageMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectionInitialized, setSelectionInitialized] = useState(false);
   const [chartRange, setChartRange] = useState<"1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL">("1Y");
   const [targetCurrency, setTargetCurrency] = useState<"USD" | "HKD" | "CNY">("USD");
 
@@ -36,12 +37,16 @@ export function PortfolioList() {
   });
 
   const portfolios = data?.data ?? [];
+  const allMode = selectionInitialized && selectedIds.size === 0;
+  const selectedChartPortfolios = allMode
+    ? portfolios
+    : portfolios.filter((p) => selectedIds.has(p.id));
 
   useEffect(() => {
-    if (portfolios.length > 0 && selectedIds.size === 0) {
-      setSelectedIds(new Set(portfolios.map((p) => p.id)));
+    if (!selectionInitialized && portfolios.length > 0) {
+      setSelectionInitialized(true);
     }
-  }, [portfolios, selectedIds.size]);
+  }, [portfolios.length, selectionInitialized]);
 
   const { data: aggregatedSummary, isLoading: aggLoading } = useQuery({
     queryKey: ["summary", targetCurrency],
@@ -122,20 +127,16 @@ export function PortfolioList() {
   }
 
   const snapshotQueries = useQueries({
-    queries: portfolios
-      .filter((p) => selectedIds.has(p.id))
-      .map((p) => ({
-        queryKey: ["snapshots", p.id] as const,
-        queryFn: () => get<{ data: Snapshot[] }>(`/portfolios/${p.id}/snapshots`),
-        staleTime: 5 * 60 * 1000,
-      })),
+    queries: selectedChartPortfolios.map((p) => ({
+      queryKey: ["snapshots", p.id] as const,
+      queryFn: () => get<{ data: Snapshot[] }>(`/portfolios/${p.id}/snapshots`),
+      staleTime: 5 * 60 * 1000,
+    })),
   });
-
-  const selectedPortfolios = portfolios.filter((p) => selectedIds.has(p.id));
 
   const allSnapshotData: Array<Snapshot & { portfolio_id: number }> = snapshotQueries
     .map((q, i) => {
-      const pId = selectedPortfolios[i]?.id;
+      const pId = selectedChartPortfolios[i]?.id;
       if (!pId || !q.data?.data) return [];
       return q.data.data.map((s) => ({ ...s, portfolio_id: pId }));
     })
@@ -230,6 +231,8 @@ export function PortfolioList() {
 
   const togglePortfolio = (id: number) => {
     setSelectedIds((prev) => {
+      if (prev.size === 0) return new Set([id]);
+
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
@@ -238,6 +241,10 @@ export function PortfolioList() {
       }
       return next;
     });
+  };
+
+  const toggleAllPortfolios = () => {
+    setSelectedIds(new Set());
   };
 
   const { data: trashData } = useQuery({
@@ -340,68 +347,91 @@ export function PortfolioList() {
         </div>
       )}
 
-      {portfolios.length > 0 && chartData.length > 0 && (
+      {portfolios.length > 0 && (
         <div className="mb-6">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-1">
-              {portfolios.map((p, i) => (
-                <Button
-                  key={p.id}
-                  size="sm"
-                  variant={selectedIds.has(p.id) ? "default" : "outline"}
-                  className="h-6 px-2 text-xs"
-                  onClick={() => togglePortfolio(p.id)}
-                >
-                  <span
-                    className="mr-1 inline-block h-2 w-2 rounded-full"
-                    style={{
-                      backgroundColor: selectedIds.has(p.id) ? "#fff" : getPortfolioColor(i),
-                    }}
-                  />
-                  {p.name}
-                </Button>
-              ))}
+          <div className="mb-3 space-y-2">
+            <div className="flex flex-wrap items-start gap-1.5">
+              <Button
+                size="sm"
+                variant="outline"
+                className={`h-7 gap-1.5 rounded-md px-2.5 text-xs ${allMode ? "border-foreground bg-background text-foreground shadow-sm" : "border-border bg-background text-muted-foreground hover:text-foreground"}`}
+                onClick={toggleAllPortfolios}
+              >
+                {allMode && <Check className="h-3 w-3" />}
+                All
+              </Button>
+              {portfolios.map((p, i) => {
+                const selected = selectedIds.has(p.id);
+                return (
+                  <Button
+                    key={p.id}
+                    size="sm"
+                    variant="outline"
+                    className={`h-7 gap-1.5 rounded-md px-2.5 text-xs ${selected ? "border-foreground bg-background text-foreground shadow-sm" : "border-border bg-background text-muted-foreground hover:text-foreground"}`}
+                    onClick={() => togglePortfolio(p.id)}
+                  >
+                    <span
+                      className="inline-block h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: getPortfolioColor(i) }}
+                    />
+                    {selected && <Check className="h-3 w-3" />}
+                    {p.name}
+                  </Button>
+                );
+              })}
             </div>
-            <div className="flex items-center gap-1">
-              <span className="mr-1 text-xs text-muted-foreground">Currency:</span>
-              {(["USD", "HKD", "CNY"] as const).map((c) => (
-                <Button
-                  key={c}
-                  size="sm"
-                  variant={targetCurrency === c ? "default" : "outline"}
-                  className="h-6 px-2 text-xs"
-                  onClick={() => setTargetCurrency(c)}
-                >
-                  {c}
-                </Button>
-              ))}
-            </div>
-            <div className="flex items-center gap-1">
-              {(["1M", "3M", "6M", "YTD", "1Y", "ALL"] as const).map((r) => (
-                <Button
-                  key={r}
-                  size="sm"
-                  variant={chartRange === r ? "default" : "outline"}
-                  className="h-6 px-2 text-xs"
-                  onClick={() => setChartRange(r)}
-                >
-                  {r}
-                </Button>
-              ))}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="inline-flex rounded-md border border-input bg-background p-0.5">
+                {(["1M", "3M", "6M", "YTD", "1Y", "ALL"] as const).map((r) => (
+                  <Button
+                    key={r}
+                    size="sm"
+                    variant="ghost"
+                    className={`h-7 rounded-sm px-3 text-xs ${chartRange === r ? "bg-foreground text-background hover:bg-foreground hover:text-background" : "text-muted-foreground hover:text-foreground"}`}
+                    onClick={() => setChartRange(r)}
+                  >
+                    {r}
+                  </Button>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <div className="inline-flex rounded-md border border-input bg-background p-0.5">
+                  {(["USD", "HKD", "CNY"] as const).map((c) => (
+                    <Button
+                      key={c}
+                      size="sm"
+                      variant="ghost"
+                      className={`h-7 rounded-sm px-3 text-xs ${targetCurrency === c ? "bg-foreground text-background hover:bg-foreground hover:text-background" : "text-muted-foreground hover:text-foreground"}`}
+                      onClick={() => setTargetCurrency(c)}
+                    >
+                      {c}
+                    </Button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
-          <Card>
-            <CardContent className="p-4">
-              <h3 className="mb-3 text-sm font-semibold">
-                Portfolio Value Over Time ({targetCurrency})
-              </h3>
-              <StackedBarChart
-                data={chartData}
-                height={250}
-                formatValue={(v) => Math.round(v).toLocaleString()}
-              />
-            </CardContent>
-          </Card>
+          {chartData.length > 0 && (
+            <Card>
+              <CardContent className="p-4">
+                <h3 className="mb-3 text-sm font-semibold">
+                  Portfolio Value Over Time ({targetCurrency})
+                </h3>
+                <StackedBarChart
+                  data={chartData}
+                  height={250}
+                  formatValue={(v) => Math.round(v).toLocaleString()}
+                />
+              </CardContent>
+            </Card>
+          )}
+          {chartData.length === 0 && (
+            <Card>
+              <CardContent className="p-4">
+                <EmptyState message="No portfolios selected." />
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
