@@ -96,7 +96,7 @@ export function StackedBarChart({ data, height = 250, formatValue }: StackedBarC
               stroke="#e5e7eb"
               strokeWidth={0.5}
             />
-            <text x={leftPad - 4} y={scaleY(v) + 4} textAnchor="end" fontSize={10} fill="#9ca3af">
+            <text x={leftPad - 4} y={scaleY(v) + 4} textAnchor="end" fontSize={8} fill="#9ca3af">
               {formatValue ? formatValue(v) : v.toLocaleString()}
             </text>
           </g>
