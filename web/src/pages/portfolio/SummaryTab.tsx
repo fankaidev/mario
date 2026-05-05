@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Wrench, Check, Trash2 } from "lucide-react";
 import { Button } from "../../components/ui/button";
@@ -125,31 +125,6 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
   const [manageMode, setManageMode] = useState(false);
   const [chartRange, setChartRange] = useState<"1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL">("1Y");
 
-  const chartCutoff = useMemo(() => {
-    const today = new Date();
-    let start: Date;
-    switch (chartRange) {
-      case "1M":
-        start = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
-        break;
-      case "3M":
-        start = new Date(today.getFullYear(), today.getMonth() - 3, today.getDate());
-        break;
-      case "6M":
-        start = new Date(today.getFullYear(), today.getMonth() - 6, today.getDate());
-        break;
-      case "YTD":
-        start = new Date(today.getFullYear(), 0, 1);
-        break;
-      case "1Y":
-        start = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
-        break;
-      case "ALL":
-        return undefined;
-    }
-    return start.toISOString().split("T")[0];
-  }, [chartRange]);
-
   const { data: summaryData, isLoading: summaryLoading } = useQuery({
     queryKey: ["summary", id],
     queryFn: () => get<{ data: Summary }>(`/portfolios/${id}/summary`),
@@ -161,8 +136,11 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
   });
 
   const { data: chartSeriesData, isLoading: chartSeriesLoading } = useQuery({
-    queryKey: ["snapshots-chart-series", id],
-    queryFn: () => get<{ data: SnapshotChartPoint[] }>(`/portfolios/${id}/snapshots/chart-series`),
+    queryKey: ["snapshots-chart-series", id, chartRange],
+    queryFn: () =>
+      get<{ data: SnapshotChartPoint[] }>(
+        `/portfolios/${id}/snapshots/chart-series?range=${chartRange}`,
+      ),
   });
 
   const deleteSnapshotMutation = useMutation({
@@ -190,16 +168,16 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
     marketValue: number;
     investment: number;
     returnRate: number;
+    pnl: number;
   }
 
-  const points: ChartPoint[] = chartSeries
-    .map((point) => ({
-      date: point.date,
-      marketValue: point.market_value,
-      investment: point.total_investment,
-      returnRate: point.return_rate,
-    }))
-    .filter((p) => !chartCutoff || p.date >= chartCutoff);
+  const points: ChartPoint[] = chartSeries.map((point) => ({
+    date: point.date,
+    marketValue: point.market_value,
+    investment: point.total_investment,
+    returnRate: point.return_rate,
+    pnl: point.pnl ?? point.market_value - point.total_investment,
+  }));
 
   if (currentSummary) {
     const today = new Date().toISOString().split("T")[0] ?? "";
@@ -208,6 +186,7 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
       marketValue: Math.round(currentSummary.securities_value * 100) / 100,
       investment: currentSummary.total_investment,
       returnRate: currentSummary.return_rate,
+      pnl: currentSummary.total_pnl,
     });
   }
 
@@ -295,7 +274,7 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
               <LineChart
                 data={points.map((p) => ({
                   label: p.date,
-                  values: [{ key: "pnl", value: p.marketValue - p.investment, color: "#7c3aed" }],
+                  values: [{ key: "pnl", value: p.pnl, color: "#7c3aed" }],
                 }))}
                 height={250}
                 formatValue={(v) => Math.round(v).toLocaleString()}
