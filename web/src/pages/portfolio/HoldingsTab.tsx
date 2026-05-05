@@ -4,48 +4,11 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { EmptyState } from "../../components/EmptyState";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../../components/ui/table";
+import { Table, TableBody, TableCell, TableHeader, TableRow } from "../../components/ui/table";
 import { get } from "../../lib/api";
-import type { Holding, SortField, SortState, Tag } from "./types";
+import { SortableTh, type SortState } from "../../components/SortableTh";
+import type { Holding, SortField, Tag } from "./types";
 import { HoldingDetailPanel } from "./HoldingDetailPanel";
-
-function Th({
-  label,
-  field,
-  sort,
-  onSort,
-  align,
-}: {
-  label: string;
-  field: SortField;
-  sort: SortState;
-  onSort: (s: SortState) => void;
-  align?: "left" | "right";
-}) {
-  const isActive = sort.field === field;
-  const arrow = isActive ? (sort.direction === "asc" ? "↑" : "↓") : "";
-
-  return (
-    <TableHead
-      className={`cursor-pointer select-none ${align === "right" ? "text-right" : ""}`}
-      onClick={() =>
-        onSort({
-          field,
-          direction: isActive && sort.direction === "asc" ? "desc" : "asc",
-        })
-      }
-    >
-      {label} {arrow}
-    </TableHead>
-  );
-}
 
 function LotDetailsRow({
   id,
@@ -235,7 +198,10 @@ export function HoldingsTab({
   id: string;
   onSelectSymbol?: ((symbol: string) => void) | undefined;
 }) {
-  const [sort, setSort] = useState<SortState>({ field: "unrealizedPnlRate", direction: "desc" });
+  const [sort, setSort] = useState<SortState<SortField>>({
+    field: "unrealizedPnlRate",
+    direction: "desc",
+  });
   const [tagFilter, setTagFilter] = useState<number | null>(null);
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(new Set());
 
@@ -356,26 +322,44 @@ export function HoldingsTab({
         <Table>
           <TableHeader>
             <TableRow>
-              <Th label="Symbol" field="symbol" sort={sort} onSort={setSort} />
-              <Th label="Qty" field="quantity" sort={sort} onSort={setSort} align="right" />
-              <Th label="Avg Cost" field="cost" sort={sort} onSort={setSort} align="right" />
-              <Th label="Price" field="price" sort={sort} onSort={setSort} align="right" />
-              <Th
+              <SortableTh label="Symbol" field="symbol" sort={sort} onSort={setSort} />
+              <SortableTh label="Qty" field="quantity" sort={sort} onSort={setSort} align="right" />
+              <SortableTh
+                label="Avg Cost"
+                field="cost"
+                sort={sort}
+                onSort={setSort}
+                align="right"
+              />
+              <SortableTh label="Price" field="price" sort={sort} onSort={setSort} align="right" />
+              <SortableTh
                 label="Mkt Value"
                 field="marketValue"
                 sort={sort}
                 onSort={setSort}
                 align="right"
               />
-              <Th label="P&L" field="unrealizedPnl" sort={sort} onSort={setSort} align="right" />
-              <Th
-                label="P&L%"
+              <SortableTh
+                label="P&amp;L"
+                field="unrealizedPnl"
+                sort={sort}
+                onSort={setSort}
+                align="right"
+              />
+              <SortableTh
+                label="P&amp;L%"
                 field="unrealizedPnlRate"
                 sort={sort}
                 onSort={setSort}
                 align="right"
               />
-              <Th label="Weight%" field="weight" sort={sort} onSort={setSort} align="right" />
+              <SortableTh
+                label="Weight%"
+                field="weight"
+                sort={sort}
+                onSort={setSort}
+                align="right"
+              />
             </TableRow>
           </TableHeader>
           <TableBody>

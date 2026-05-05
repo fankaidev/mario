@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
+import { Card, CardContent } from "../../components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +14,14 @@ import { EmptyState } from "../../components/EmptyState";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Select } from "../../components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../components/ui/table";
 import { get, post } from "../../lib/api";
 import type { CorporateAction } from "../../../../shared/types/api";
 
@@ -136,36 +145,76 @@ export function CorporateActionsTab({ id }: { id: string }) {
 
       {actions.length === 0 && <EmptyState message="No corporate actions yet." />}
 
-      <div className="space-y-1">
-        <div className="grid items-center gap-2 border-b py-2 text-xs font-medium text-muted-foreground grid-cols-[100px_80px_80px_80px_1fr]">
-          <span>Date</span>
-          <span>Symbol</span>
-          <span>Type</span>
-          <span className="text-right">Ratio</span>
-          <span className="text-right">Created</span>
-        </div>
-        {actions.map((a) => (
-          <div
-            key={a.id}
-            className="grid items-center gap-2 border-b py-2 text-sm grid-cols-[100px_80px_80px_80px_1fr]"
-          >
-            <span className="text-muted-foreground">{a.effective_date}</span>
-            <span className="font-medium">{a.symbol}</span>
-            <Badge
-              variant="secondary"
-              className={`w-fit border-transparent ${
-                a.type === "split" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
-              }`}
-            >
-              {a.type}
-            </Badge>
-            <span className="text-right">{a.ratio}</span>
-            <span className="text-right text-muted-foreground text-xs">
-              {new Date(a.created_at).toLocaleDateString()}
-            </span>
+      {actions.length > 0 && (
+        <>
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Symbol</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Ratio</TableHead>
+                  <TableHead className="text-right">Created</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {actions.map((a) => (
+                  <TableRow key={a.id}>
+                    <TableCell className="text-muted-foreground">{a.effective_date}</TableCell>
+                    <TableCell className="font-medium">{a.symbol}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="secondary"
+                        className={`w-fit border-transparent ${
+                          a.type === "split"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-blue-100 text-blue-700"
+                        }`}
+                      >
+                        {a.type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">{a.ratio}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {new Date(a.created_at).toLocaleDateString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
-        ))}
-      </div>
+
+          <div className="space-y-2 md:hidden">
+            {actions.map((a) => (
+              <Card key={a.id}>
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-medium">{a.symbol}</span>
+                      <Badge
+                        variant="secondary"
+                        className={`ml-2 w-fit border-transparent ${
+                          a.type === "split"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-blue-100 text-blue-700"
+                        }`}
+                      >
+                        {a.type}
+                      </Badge>
+                    </div>
+                    <span className="tabular-nums">{a.ratio}</span>
+                  </div>
+                  <div className="mt-1 flex justify-between text-xs text-muted-foreground">
+                    <span>{a.effective_date}</span>
+                    <span>Created {new Date(a.created_at).toLocaleDateString()}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
 
       {showAdd && (
         <AddCorporateActionModal
