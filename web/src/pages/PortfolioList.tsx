@@ -409,8 +409,8 @@ export function PortfolioList() {
         <EmptyState message="No portfolios yet. Create one to get started." />
       )}
 
-      {data?.data.length !== 0 && (
-        <div className="mb-4 flex items-center justify-end gap-2">
+      <div className="mb-4 flex items-center justify-end gap-2">
+        {data?.data.length !== 0 && (
           <Button variant="outline" onClick={() => setManageMode(!manageMode)}>
             {manageMode ? (
               <>
@@ -424,12 +424,12 @@ export function PortfolioList() {
               </>
             )}
           </Button>
-          <Button onClick={() => setShowCreate(true)}>
-            <Plus className="h-4 w-4" />
-            New Portfolio
-          </Button>
-        </div>
-      )}
+        )}
+        <Button onClick={() => setShowCreate(true)}>
+          <Plus className="h-4 w-4" />
+          New Portfolio
+        </Button>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {data?.data.map((p) =>
