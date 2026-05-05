@@ -343,12 +343,8 @@ export function SummaryTab({ id, currency }: { id: string; currency: string }) {
         {snapshots.map((snap) => {
           const totalValue = snap.market_value + snap.cash_balance;
           const pnl = totalValue - snap.total_investment;
-          const rate =
-            snap.return_rate != null
-              ? snap.return_rate
-              : snap.total_investment > 0
-                ? (pnl / snap.total_investment) * 100
-                : 0;
+          const chartPoint = chartSeries.find((p) => p.date === snap.date);
+          const rate = chartPoint?.return_rate ?? 0;
           return (
             <div
               key={snap.id}
