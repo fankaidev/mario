@@ -182,6 +182,16 @@ export interface CashMovement {
   cash_balance: number;
 }
 
+export interface CorporateAction {
+  id: number;
+  portfolio_id: number;
+  symbol: string;
+  type: "split" | "merge";
+  ratio: number;
+  effective_date: string;
+  created_at: string;
+}
+
 export interface CreateTagRequest {
   name: string;
 }
