@@ -12,6 +12,7 @@ import { TransfersTab } from "./portfolio/TransfersTab";
 import { CashTab } from "./portfolio/CashTab";
 import { SummaryTab } from "./portfolio/SummaryTab";
 import { TagsTab } from "./portfolio/TagsTab";
+import { CorporateActionsTab } from "./portfolio/CorporateActionsTab";
 
 export function PortfolioDetail() {
   const { id } = useParams<{ id: string }>();
@@ -56,7 +57,8 @@ export function PortfolioDetail() {
                 ["holdings", "Holdings"],
                 ["transactions", "Transactions"],
                 ["transfers", "Transfers"],
-                ["cash", "Cash Balance"],
+                ["cash_balance", "Cash Balance"],
+                ["corporate_actions", "Corporate Actions"],
                 ["tags", "Tags"],
                 ["summary", "Summary"],
               ] as [TabName, string][]
@@ -84,7 +86,8 @@ export function PortfolioDetail() {
             />
           )}
           {tab === "transfers" && <TransfersTab id={id!} currency={portfolio?.currency ?? ""} />}
-          {tab === "cash" && <CashTab id={id!} currency={portfolio?.currency ?? ""} />}
+          {tab === "cash_balance" && <CashTab id={id!} currency={portfolio?.currency ?? ""} />}
+          {tab === "corporate_actions" && <CorporateActionsTab id={id!} />}
           {tab === "tags" && <TagsTab id={id!} />}
           {tab === "summary" && <SummaryTab id={id!} currency={portfolio?.currency ?? ""} />}
         </Tabs>

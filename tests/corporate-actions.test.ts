@@ -170,3 +170,41 @@ describe("Corporate Actions", () => {
     expect(lotDetails.data.lots[0]!.cost_basis).toBe(20000); // Cost basis unchanged
   });
 });
+
+describe("GET /api/portfolios/:id/corporate-actions", () => {
+  it("[UC-PORTFOLIO-010-S05] lists corporate actions for a portfolio ordered by effective date desc", async () => {
+    await createCorporateAction("AAPL", "split", 4, "2024-06-01");
+    await createCorporateAction("TSLA", "merge", 5, "2024-03-15");
+
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/corporate-actions`, {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Array<{
+        symbol: string;
+        type: string;
+        ratio: number;
+        effective_date: string;
+        created_at: string;
+      }>;
+    };
+    expect(body.data).toHaveLength(2);
+    // Most recent effective date first
+    expect(body.data[0]!.symbol).toBe("AAPL");
+    expect(body.data[0]!.type).toBe("split");
+    expect(body.data[0]!.ratio).toBe(4);
+    expect(body.data[1]!.symbol).toBe("TSLA");
+    expect(body.data[1]!.type).toBe("merge");
+    expect(body.data[1]!.ratio).toBe(5);
+  });
+
+  it("[UC-PORTFOLIO-010-S06] returns empty list when no corporate actions exist", async () => {
+    const res = await ctx.request(`/api/portfolios/${portfolioId}/corporate-actions`, {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: unknown[] };
+    expect(body.data).toHaveLength(0);
+  });
+});
