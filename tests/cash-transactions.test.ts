@@ -285,4 +285,36 @@ describe("Cash Transactions", () => {
     // Total: 90000 - 15010 + 8995 + 85 = 84070
     expect(cashBalance).toBe(84070);
   });
+
+  it("[UC-PORTFOLIO-006-S15] initial transfer increases cash_balance", async () => {
+    const result = await createTransfer("initial", 50000, 0);
+    expect(result.status).toBe(201);
+
+    expect(await getCashBalance()).toBe(50000);
+  });
+
+  it("[UC-PORTFOLIO-006-S16] interest transfer increases cash_balance", async () => {
+    const result = await createTransfer("interest", 123.45, 0);
+    expect(result.status).toBe(201);
+
+    expect(await getCashBalance()).toBe(123.45);
+  });
+
+  it("[UC-PORTFOLIO-006-S17] interest does not count toward total_investment", async () => {
+    // Add deposit and interest
+    await createTransfer("deposit", 10000, 0);
+    await createTransfer("interest", 500, 0);
+
+    const response = await ctx.request(`/api/portfolios/${portfolioId}/summary`, {
+      headers: authHeaders(),
+    });
+    const json = (await response.json()) as {
+      data: { cash_balance: number; total_investment: number };
+    };
+
+    // Cash includes interest
+    expect(json.data.cash_balance).toBe(10500);
+    // Total investment excludes interest
+    expect(json.data.total_investment).toBe(10000);
+  });
 });
